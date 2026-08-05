@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TopBar } from '@/components/TopBar';
 import { RequisitionPanel } from '@/components/RequisitionPanel';
@@ -8,16 +8,20 @@ import { MatrixPanel } from '@/components/MatrixPanel';
 import { CandidateCard } from '@/components/CandidateCard';
 import { CollaborationPanel } from '@/components/CollaborationPanel';
 
-// NOTE: org selection is hardcoded for a single-tenant v1. Swap for a
-// real auth-derived org_id once auth is wired up. Requisition selection
-// now comes from the URL (?requisition=<id>), set by the New Requisition
-// flow, falling back to a demo default for local testing.
 const DEMO_ORG_ID = process.env.NEXT_PUBLIC_DEMO_ORG_ID ?? '';
 const DEMO_REQUISITION_ID = process.env.NEXT_PUBLIC_DEMO_REQUISITION_ID ?? '';
 
 export const dynamic = 'force-dynamic';
 
 export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 40 }}>Loading…</div>}>
+      <DashboardContent />
+    </Suspense>
+  );
+}
+
+function DashboardContent() {
   const searchParams = useSearchParams();
   const requisitionId = searchParams.get('requisition') ?? DEMO_REQUISITION_ID;
 
@@ -64,13 +68,10 @@ export default function DashboardPage() {
       console.error(data.error);
       return;
     }
-    // Duplicate or freshly evaluated — either way, just refresh silently.
     await loadRequisition();
   }
 
   async function handleSaveNote(body: string) {
-    // A dedicated /api/notes route mirrors the pattern of /api/collaboration;
-    // omitted here for brevity but follows the same shape.
     console.log('save note', activeCandidateId, body);
   }
 
@@ -88,7 +89,7 @@ export default function DashboardPage() {
     await loadCollaboration();
   }
 
-  if (loading) return <div style={{ padding: 40 }}>Loading requisition\u2026</div>;
+  if (loading) return <div style={{ padding: 40 }}>Loading requisition…</div>;
   if (!requisition) return <div style={{ padding: 40 }}>Requisition not found.</div>;
 
   const appClass = [
