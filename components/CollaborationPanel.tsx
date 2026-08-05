@@ -19,10 +19,10 @@ type Note = {
 };
 
 const ICONS: Record<CollabEvent['event_type'], string> = {
-  decision: '\u2713',
+  decision: '✓',
   commented: '\ud83d\udcac',
   viewed: '\ud83d\udc41',
-  shared: '\u2934'
+  shared: '⤴'
 };
 
 function describeEvent(e: CollabEvent) {
@@ -75,7 +75,7 @@ export function CollaborationPanel({
   return (
     <div className="side-panel">
       <button className="panel-collapse-btn" onClick={onCollapse}>
-        \u203a
+        ›
       </button>
       <div className="side-tabs">
         <button className={`side-tab ${tab === 'notes' ? 'active' : ''}`} onClick={() => setTab('notes')}>
@@ -109,7 +109,7 @@ export function CollaborationPanel({
           {notes.map((n) => (
             <div className="note-entry" key={n.id}>
               <div className="note-entry-meta">
-                {n.profiles?.full_name ?? 'You'} \u00b7 {new Date(n.updated_at).toLocaleDateString()}
+                {n.profiles?.full_name ?? 'You'} · {new Date(n.updated_at).toLocaleDateString()}
               </div>
               <div className="note-entry-text">{n.body}</div>
             </div>

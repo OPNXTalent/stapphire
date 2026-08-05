@@ -52,7 +52,7 @@ export function RequisitionPanel({
   return (
     <div className="req-panel">
       <button className="panel-collapse-btn left-btn" onClick={onToggleCollapse}>
-        {collapsed ? '\u203A' : '\u2039'}
+        {collapsed ? '\u203A' : '‹'}
       </button>
 
       {collapsed && (
@@ -106,7 +106,7 @@ export function RequisitionPanel({
             disabled={uploading || org.credits_remaining <= 0}
             onClick={() => fileInputRef.current?.click()}
           >
-            <span>{uploading ? 'Evaluating\u2026' : 'Upload resume'}</span>
+            <span>{uploading ? 'Evaluating…' : 'Upload resume'}</span>
             <span style={{ color: 'var(--ink-faint)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
               1 credit
             </span>
@@ -118,7 +118,7 @@ export function RequisitionPanel({
               <div key={r.id} className="req-list-item">
                 <span className="req-list-name">{r.title}</span>
                 <span className="req-list-meta">
-                  {r.candidateCount} evaluated \u00b7 {r.status}
+                  {r.candidateCount} evaluated · {r.status}
                 </span>
               </div>
             ))}

@@ -182,7 +182,7 @@ export default function NewRequisitionPage() {
           onClick={handleSubmit}
           style={{ width: 'auto', padding: '10px 20px' }}
         >
-          <span>{submitting ? 'Parsing job description\u2026' : 'Create requisition'}</span>
+          <span>{submitting ? 'Parsing job description…' : 'Create requisition'}</span>
         </button>
       </div>
     </>

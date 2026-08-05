@@ -66,8 +66,8 @@ export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
           <polygon points="12,1 21,7 24,14 17,23 7,23 0,14 3,7" fill="var(--sapphire)" />
         </svg>
         <div className="matrix-toggle-label">Candidate Matrix</div>
-        <div className="matrix-toggle-sub">Same rubric, every candidate \u2014 evidence compared side by side</div>
-        <div className="matrix-toggle-chev">\u25be</div>
+        <div className="matrix-toggle-sub">Same rubric, every candidate — evidence compared side by side</div>
+        <div className="matrix-toggle-chev">▾</div>
       </div>
 
       <div className={`matrix-wrap ${open ? 'open' : ''}`}>
@@ -112,9 +112,9 @@ export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
                       </div>
                     </td>
                     {dimensionKeys.map((k) => (
-                      <td key={k}>{evalu.matrix_dimensions?.[k] ?? '\u2014'}</td>
+                      <td key={k}>{evalu.matrix_dimensions?.[k] ?? '—'}</td>
                     ))}
-                    <td>{evalu.risk_flags?.[0] ?? '\u2014'}</td>
+                    <td>{evalu.risk_flags?.[0] ?? '—'}</td>
                     <td>
                       <span className={`rec-pill ${evalu.status}`}>
                         {evalu.status.charAt(0).toUpperCase() + evalu.status.slice(1)}

@@ -53,10 +53,10 @@ export function CandidateCard({
 
         <div className="quick-actions">
           <button className="qa-btn" title="Add note" onClick={() => onAddNote(candidate.id)}>
-            \u270e
+            ✎
           </button>
           <button className="qa-btn" title="Share with team" onClick={() => onShare(candidate.id)}>
-            \u2934
+            ⤴
           </button>
         </div>
 
