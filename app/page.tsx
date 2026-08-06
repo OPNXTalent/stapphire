@@ -7,6 +7,7 @@ import { RequisitionPanel } from '@/components/RequisitionPanel';
 import { MatrixPanel } from '@/components/MatrixPanel';
 import { CollaborationPanel } from '@/components/CollaborationPanel';
 import { NewRequisitionForm } from '@/components/NewRequisitionForm';
+import { TrashArchiveModal } from '@/components/TrashArchiveModal';
 
 const DEMO_ORG_ID = process.env.NEXT_PUBLIC_DEMO_ORG_ID ?? '';
 const DEMO_REQUISITION_ID = process.env.NEXT_PUBLIC_DEMO_REQUISITION_ID ?? '';
@@ -39,6 +40,7 @@ function DashboardContent() {
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [creatingRequisition, setCreatingRequisition] = useState(false);
+  const [trashModalOpen, setTrashModalOpen] = useState(false);
   const [batchQueue, setBatchQueue] = useState<
     { name: string; status: 'pending' | 'processing' | 'done' | 'duplicate' | 'non_resume' | 'error'; message: string }[]
   >([]);
@@ -184,9 +186,33 @@ function DashboardContent() {
     await Promise.all([loadRequisition(), loadTrash()]);
   }
 
-  async function handleEmptyTrash(targetRequisitionId: string) {
-    await fetch(`/api/requisitions/${targetRequisitionId}/empty-trash`, { method: 'POST' });
-    if (targetRequisitionId === requisitionId) await loadTrash();
+  // Archiving is non-destructive — if the archived requisition is the
+  // one currently on screen, jump to another open one, or start the
+  // creation flow if none are left.
+  async function handleArchiveRequisition(id: string) {
+    await fetch(`/api/requisitions/${id}/archive`, { method: 'POST' });
+
+    if (id === requisitionId) {
+      const res = await fetch(`/api/requisitions?org_id=${DEMO_ORG_ID}`, { cache: 'no-store' });
+      const data = await res.json();
+      const remaining = (data.requisitions ?? []).filter((r: any) => r.id !== id);
+      if (remaining.length > 0) {
+        router.push(`/?requisition=${remaining[0].id}`);
+      } else {
+        setCreatingRequisition(true);
+      }
+    }
+    await loadAllRequisitions();
+  }
+
+  async function handleRestoreRequisition(id: string) {
+    await fetch(`/api/requisitions/${id}/restore`, { method: 'POST' });
+    await loadAllRequisitions();
+  }
+
+  async function handleEmptyAllTrash() {
+    await fetch(`/api/organizations/${DEMO_ORG_ID}/empty-trash`, { method: 'POST' });
+    await loadTrash();
   }
 
   function handleRequisitionCreated(newId: string) {
@@ -227,6 +253,8 @@ function DashboardContent() {
               candidateCount: r.candidates?.[0]?.count ?? 0
             }))}
           onSwitchRequisition={handleSwitchRequisition}
+          onArchiveRequisition={handleArchiveRequisition}
+          onOpenTrashModal={() => setTrashModalOpen(true)}
           collapsed={leftCollapsed}
           onToggleCollapse={() => setLeftCollapsed((c) => !c)}
           onBatchUpload={handleBatchUpload}
@@ -238,8 +266,6 @@ function DashboardContent() {
             setBatchRequisitionId(null);
           }}
           candidateCount={candidates.length}
-          onRestoreCandidate={handleRestoreCandidate}
-          onEmptyTrash={handleEmptyTrash}
           onAddRequisition={() => setCreatingRequisition(true)}
         />
 
@@ -269,6 +295,15 @@ function DashboardContent() {
           collaboratorName="You"
         />
       </div>
+
+      <TrashArchiveModal
+        open={trashModalOpen}
+        onClose={() => setTrashModalOpen(false)}
+        orgId={DEMO_ORG_ID}
+        onRestoreCandidate={handleRestoreCandidate}
+        onRestoreRequisition={handleRestoreRequisition}
+        onEmptyTrash={handleEmptyAllTrash}
+      />
     </>
   );
 }

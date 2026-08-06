@@ -39,7 +39,11 @@ create table requisitions (
   created_at timestamptz not null default now(),
   -- unguessable token for the read-only external share link — never
   -- exposes credits, billing, or Private Notes to whoever holds it
-  share_token uuid unique not null default uuid_generate_v4()
+  share_token uuid unique not null default uuid_generate_v4(),
+  -- archived — set aside from the active list, fully recoverable.
+  -- Unlike candidate trash, there is no permanent-deletion path for
+  -- requisitions; archiving is a soft, non-destructive action.
+  archived_at timestamptz
 );
 
 -- ── Core object 2: Candidate (normalized profile, not the raw PDF) ─

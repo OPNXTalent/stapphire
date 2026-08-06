@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
     .from('requisitions')
     .select('*, candidates(count)')
     .eq('org_id', orgId)
+    .is('archived_at', null)
     .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

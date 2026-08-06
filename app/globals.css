@@ -203,21 +203,49 @@
     margin-bottom:12px;
   }
 
-  .trash-icon-btn{
+  .archive-icon-btn{
     flex-shrink:0; width:24px; height:24px;
     border:1px solid var(--line-strong); border-radius: var(--radius);
     background: var(--paper); font-size:12px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
   }
-  .trash-icon-btn:hover{ border-color: var(--sapphire); }
+  .archive-icon-btn:hover{ border-color: var(--sapphire); }
+  .archive-icon-btn-compact{ width:20px; height:20px; font-size:10px; opacity:0.6; }
+  .archive-icon-btn-compact:hover{ opacity:1; }
 
-  .req-title-row .req-card-trash-expanded{
-    flex-basis:100%; order:2;
-    background: var(--paper); border:1px solid var(--line); border-radius: var(--radius);
-    padding:10px 12px; margin-top:8px;
-  }
   .batch-meta{ color: var(--sapphire); font-weight:600; }
   .req-status::before{ content:""; width:6px; height:6px; background: var(--green); border-radius:1px; }
+
+  /* Trash & Archive — larger footer icon + global modal */
+  .trash-bin-btn{
+    font-size:19px; background:none; border:none; cursor:pointer;
+    color: var(--ink-faint); padding:2px 4px; line-height:1;
+  }
+  .trash-bin-btn:hover{ color: var(--sapphire); }
+
+  .trash-modal-backdrop{
+    position:fixed; inset:0; background: rgba(11,20,40,0.42);
+    z-index:200; display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .trash-modal{
+    background: var(--paper); border-radius:8px; width:100%; max-width:460px; max-height:78vh;
+    display:flex; flex-direction:column; overflow:hidden;
+    box-shadow: 0 16px 48px rgba(11,20,40,0.28);
+  }
+  .trash-modal-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 20px; border-bottom:1px solid var(--line); flex-shrink:0;
+  }
+  .trash-modal-title{ font-family: var(--font-display); font-weight:700; font-size:16px; }
+  .trash-modal-close{ border:none; background:none; font-size:15px; cursor:pointer; color: var(--ink-faint); }
+  .trash-modal-close:hover{ color: var(--ink); }
+  .trash-modal-body{ padding:16px 20px 20px; overflow-y:auto; flex:1; }
+  .trash-modal-section-label{
+    font-family: var(--font-mono); font-size:10px; letter-spacing:0.05em; text-transform:uppercase;
+    color: var(--ink-faint); margin:16px 0 8px;
+  }
+  .trash-modal-section-label:first-child{ margin-top:0; }
+  .trash-item-sub{ color: var(--ink-faint); font-weight:400; }
 
   .credit-block{ background: var(--paper-cool); border-radius: var(--radius); padding:10px 12px; margin-bottom:10px; }
   .credit-count{ font-family: var(--font-mono); font-size:19px; font-weight:500; }

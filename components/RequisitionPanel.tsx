@@ -22,8 +22,6 @@ type BatchItem = {
   message: string;
 };
 
-type TrashCandidate = { id: string; full_name: string };
-
 const STATUS_ICON: Record<BatchItem['status'], string> = {
   pending: '·',
   processing: '…',
@@ -33,94 +31,13 @@ const STATUS_ICON: Record<BatchItem['status'], string> = {
   error: '✕'
 };
 
-// Self-contained trash icon + inline expandable list, reusable on any
-// requisition card. Each instance fetches its own requisition's trash
-// on demand — stays strictly contained to that one requisition, never
-// a shared list.
-function TrashControl({
-  requisitionId,
-  onRestoreCandidate,
-  onEmptyTrash
-}: {
-  requisitionId: string;
-  onRestoreCandidate: (candidateId: string) => Promise<void>;
-  onEmptyTrash: (requisitionId: string) => Promise<void>;
-}) {
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState<TrashCandidate[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  async function fetchTrash() {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/requisitions/${requisitionId}/trash`, { cache: 'no-store' });
-      const data = await res.json();
-      setItems(data.candidates ?? []);
-      setLoaded(true);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function toggle(e: React.MouseEvent) {
-    e.stopPropagation();
-    if (!open && !loaded) await fetchTrash();
-    setOpen((o) => !o);
-  }
-
-  async function handleRestore(candidateId: string) {
-    await onRestoreCandidate(candidateId);
-    await fetchTrash();
-  }
-
-  async function handleEmpty() {
-    if (!window.confirm(`Permanently delete ${items.length} candidate(s)? This cannot be undone.`)) return;
-    await onEmptyTrash(requisitionId);
-    await fetchTrash();
-  }
-
-  return (
-    <>
-      <button className="trash-icon-btn" title="Trash" onClick={toggle}>
-        🗑
-      </button>
-      {open && (
-        <div className="req-card-trash-expanded" onClick={(e) => e.stopPropagation()}>
-          {loading ? (
-            <div className="trash-empty-hint">Loading…</div>
-          ) : items.length === 0 ? (
-            <div className="trash-empty-hint">Nothing in trash</div>
-          ) : (
-            <>
-              {items.map((c) => (
-                <div key={c.id} className="trash-item">
-                  <span className="trash-item-name">{c.full_name}</span>
-                  <button className="qa-btn-text" onClick={() => handleRestore(c.id)}>
-                    Restore
-                  </button>
-                </div>
-              ))}
-              <button
-                className="qa-btn-text"
-                style={{ marginTop: 8, color: 'var(--red)', borderBottomColor: 'var(--red)' }}
-                onClick={handleEmpty}
-              >
-                Empty Trash
-              </button>
-            </>
-          )}
-        </div>
-      )}
-    </>
-  );
-}
-
 export function RequisitionPanel({
   requisition,
   org,
   otherRequisitions,
   onSwitchRequisition,
+  onArchiveRequisition,
+  onOpenTrashModal,
   collapsed,
   onToggleCollapse,
   onBatchUpload,
@@ -129,14 +46,14 @@ export function RequisitionPanel({
   batchRequisitionId,
   onClearBatch,
   candidateCount,
-  onRestoreCandidate,
-  onEmptyTrash,
   onAddRequisition
 }: {
   requisition: Requisition;
   org: Org;
   otherRequisitions: { id: string; title: string; status: string; candidateCount: number }[];
   onSwitchRequisition: (id: string) => void;
+  onArchiveRequisition: (id: string) => void;
+  onOpenTrashModal: () => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onBatchUpload: (files: File[]) => void;
@@ -145,8 +62,6 @@ export function RequisitionPanel({
   batchRequisitionId: string | null;
   onClearBatch: () => void;
   candidateCount: number;
-  onRestoreCandidate: (id: string) => Promise<void>;
-  onEmptyTrash: (requisitionId: string) => Promise<void>;
   onAddRequisition: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -177,6 +92,13 @@ export function RequisitionPanel({
 
     onBatchUpload(files);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function handleArchiveClick(e: React.MouseEvent, id: string, title: string) {
+    e.stopPropagation();
+    if (window.confirm(`Archive "${title}"? You can restore it anytime from Trash & Archive.`)) {
+      onArchiveRequisition(id);
+    }
   }
 
   const pct = org.credits_total > 0 ? (org.credits_remaining / org.credits_total) * 100 : 0;
@@ -229,6 +151,13 @@ export function RequisitionPanel({
           <div className="req-box">
             <div className="req-title-row">
               <div className="req-title" title={requisition.title}>{requisition.title}</div>
+              <button
+                className="archive-icon-btn"
+                title="Archive requisition"
+                onClick={(e) => handleArchiveClick(e, requisition.id, requisition.title)}
+              >
+                📦
+              </button>
             </div>
 
             <button className="qa-btn-text share-link-btn" style={{ marginBottom: 14 }} onClick={handleCopyLink}>
@@ -317,6 +246,13 @@ export function RequisitionPanel({
                 <div key={r.id} className="req-card req-card-compact" onClick={() => onSwitchRequisition(r.id)}>
                   <div className="req-title-row">
                     <div className="req-title req-title-compact" title={r.title}>{r.title}</div>
+                    <button
+                      className="archive-icon-btn archive-icon-btn-compact"
+                      title="Archive requisition"
+                      onClick={(e) => handleArchiveClick(e, r.id, r.title)}
+                    >
+                      📦
+                    </button>
                   </div>
                   {rBatchLive ? (
                     <div className="req-list-meta batch-meta">
@@ -339,7 +275,10 @@ export function RequisitionPanel({
       )}
 
       {!collapsed && (
-        <div className="req-footer" style={{ justifyContent: 'flex-end' }}>
+        <div className="req-footer">
+          <button className="trash-bin-btn" title="Trash & Archive" onClick={onOpenTrashModal}>
+            🗑
+          </button>
           <a href="/sign-out">Sign out</a>
         </div>
       )}
