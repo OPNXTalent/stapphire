@@ -35,11 +35,15 @@ export function RequisitionPanel({
   requisition,
   org,
   otherRequisitions,
+  onSwitchRequisition,
   collapsed,
   onToggleCollapse,
   onBatchUpload,
   batchQueue,
   batchActive,
+  batchBelongsHere,
+  batchRequisitionId,
+  batchRequisitionTitle,
   onClearBatch,
   candidateCount,
   trashedCandidates,
@@ -50,11 +54,15 @@ export function RequisitionPanel({
   requisition: Requisition;
   org: Org;
   otherRequisitions: { id: string; title: string; status: string; candidateCount: number }[];
+  onSwitchRequisition: (id: string) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onBatchUpload: (files: File[]) => void;
   batchQueue: BatchItem[];
   batchActive: boolean;
+  batchBelongsHere: boolean;
+  batchRequisitionId: string | null;
+  batchRequisitionTitle: string;
   onClearBatch: () => void;
   candidateCount: number;
   trashedCandidates: { id: string; full_name: string }[];
@@ -169,7 +177,20 @@ export function RequisitionPanel({
               </button>
             )}
 
-            {(batchActive || batchQueue.length > 0) && (
+            {(batchActive || batchQueue.length > 0) && !batchBelongsHere && (
+              <div className="batch-elsewhere">
+                <span>
+                  {batchActive ? 'Batch running' : 'Batch finished'} for <strong>{batchRequisitionTitle}</strong>
+                </span>
+                {batchRequisitionId && (
+                  <button className="qa-btn-text" onClick={() => onSwitchRequisition(batchRequisitionId)}>
+                    Go there
+                  </button>
+                )}
+              </div>
+            )}
+
+            {(batchActive || batchQueue.length > 0) && batchBelongsHere && (
               <div className="batch-panel">
                 <div className="batch-summary">
                   {batchActive ? (
@@ -228,7 +249,7 @@ export function RequisitionPanel({
           <div className="req-list">
             <span className="eyebrow">Other Requisitions</span>
             {otherRequisitions.map((r) => (
-              <div key={r.id} className="req-list-item">
+              <div key={r.id} className="req-list-item" onClick={() => onSwitchRequisition(r.id)}>
                 <span className="req-list-name">{r.title}</span>
                 <span className="req-list-meta">
                   {r.candidateCount} evaluated · {r.status}

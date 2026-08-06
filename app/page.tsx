@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { TopBar } from '@/components/TopBar';
 import { RequisitionPanel } from '@/components/RequisitionPanel';
@@ -25,6 +25,10 @@ function DashboardContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const requisitionId = searchParams.get('requisition') ?? DEMO_REQUISITION_ID;
+  const requisitionIdRef = useRef(requisitionId);
+  useEffect(() => {
+    requisitionIdRef.current = requisitionId;
+  }, [requisitionId]);
 
   const [requisition, setRequisition] = useState<any>(null);
   const [org, setOrg] = useState<any>(null);
@@ -39,6 +43,15 @@ function DashboardContent() {
     { name: string; status: 'pending' | 'processing' | 'done' | 'duplicate' | 'non_resume' | 'error'; message: string }[]
   >([]);
   const [batchActive, setBatchActive] = useState(false);
+  const [batchRequisitionId, setBatchRequisitionId] = useState<string | null>(null);
+  const [batchRequisitionTitle, setBatchRequisitionTitle] = useState<string>('');
+  const [allRequisitions, setAllRequisitions] = useState<any[]>([]);
+
+  const loadAllRequisitions = useCallback(async () => {
+    const res = await fetch(`/api/requisitions?org_id=${DEMO_ORG_ID}`, { cache: 'no-store' });
+    const data = await res.json();
+    setAllRequisitions(data.requisitions ?? []);
+  }, []);
 
   const loadRequisition = useCallback(async () => {
     const res = await fetch(`/api/requisitions/${requisitionId}`, { cache: 'no-store' });
@@ -55,7 +68,7 @@ function DashboardContent() {
   }, [requisitionId]);
 
   useEffect(() => {
-    Promise.all([loadRequisition(), loadTrash()]).finally(() => setLoading(false));
+    Promise.all([loadRequisition(), loadTrash(), loadAllRequisitions()]).finally(() => setLoading(false));
   }, [requisitionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Evaluates one file, reading its progress stream, and reports back
@@ -64,10 +77,11 @@ function DashboardContent() {
   // single upload and one slot in a concurrent batch.
   async function evaluateOneFile(
     file: File,
+    targetRequisitionId: string,
     onProgress: (message: string) => void
   ): Promise<{ status: 'done' | 'duplicate' | 'non_resume' | 'error'; message: string }> {
     const formData = new FormData();
-    formData.append('requisition_id', requisitionId);
+    formData.append('requisition_id', targetRequisitionId);
     formData.append('file', file);
 
     const res = await fetch('/api/evaluate', { method: 'POST', body: formData });
@@ -112,8 +126,13 @@ function DashboardContent() {
   // another — real wall-clock speedup for a large batch, since each
   // evaluation's 10-15s isn't spent waiting in a single-file line.
   async function handleBatchUpload(files: File[]) {
+    const targetRequisitionId = requisitionId;
+    const targetRequisitionTitle = requisition?.title ?? '';
+
     setBatchQueue(files.map((f) => ({ name: f.name, status: 'pending', message: '' })));
     setBatchActive(true);
+    setBatchRequisitionId(targetRequisitionId);
+    setBatchRequisitionTitle(targetRequisitionTitle);
 
     const CONCURRENCY = 3;
     let nextIndex = 0;
@@ -125,21 +144,27 @@ function DashboardContent() {
 
         setBatchQueue((q) => q.map((item, i) => (i === myIndex ? { ...item, status: 'processing' } : item)));
 
-        const result = await evaluateOneFile(file, (msg) => {
+        const result = await evaluateOneFile(file, targetRequisitionId, (msg) => {
           setBatchQueue((q) => q.map((item, i) => (i === myIndex ? { ...item, message: msg } : item)));
         });
 
         setBatchQueue((q) =>
           q.map((item, i) => (i === myIndex ? { ...item, status: result.status, message: result.message } : item))
         );
-        await loadRequisition();
+
+        // Only refresh the visible matrix if the batch's target is still
+        // the requisition currently on screen — checked live via ref,
+        // since a plain closure would only ever see the value from when
+        // the batch started, never a navigation that happens mid-run.
+        if (targetRequisitionId === requisitionIdRef.current) await loadRequisition();
       }
     }
 
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, worker));
 
     setBatchActive(false);
-    await loadTrash();
+    if (targetRequisitionId === requisitionIdRef.current) await loadTrash();
+    await loadAllRequisitions();
   }
 
   async function handleDeleteCandidate(candidateId: string) {
@@ -163,6 +188,10 @@ function DashboardContent() {
     router.push(`/?requisition=${newId}`);
   }
 
+  function handleSwitchRequisition(id: string) {
+    router.push(`/?requisition=${id}`);
+  }
+
   if (loading) return <div style={{ padding: 40 }}>Loading requisition…</div>;
   if (!requisition) return <div style={{ padding: 40 }}>Requisition not found.</div>;
 
@@ -183,13 +212,27 @@ function DashboardContent() {
         <RequisitionPanel
           requisition={requisition}
           org={org ?? { credits_remaining: 0, credits_total: 0, credits_refill_at: null }}
-          otherRequisitions={[]}
+          otherRequisitions={allRequisitions
+            .filter((r) => r.id !== requisitionId)
+            .map((r) => ({
+              id: r.id,
+              title: r.title,
+              status: r.status,
+              candidateCount: r.candidates?.[0]?.count ?? 0
+            }))}
+          onSwitchRequisition={handleSwitchRequisition}
           collapsed={leftCollapsed}
           onToggleCollapse={() => setLeftCollapsed((c) => !c)}
           onBatchUpload={handleBatchUpload}
           batchQueue={batchQueue}
           batchActive={batchActive}
-          onClearBatch={() => setBatchQueue([])}
+          batchBelongsHere={batchRequisitionId === requisitionId}
+          batchRequisitionId={batchRequisitionId}
+          batchRequisitionTitle={batchRequisitionTitle}
+          onClearBatch={() => {
+            setBatchQueue([]);
+            setBatchRequisitionId(null);
+          }}
           candidateCount={candidates.length}
           trashedCandidates={trashedCandidates}
           onRestoreCandidate={handleRestoreCandidate}

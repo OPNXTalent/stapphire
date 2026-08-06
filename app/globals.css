@@ -159,6 +159,12 @@
   .batch-item-error{ color: var(--red); }
   .batch-item-error .batch-item-icon{ color: var(--red); }
 
+  .batch-elsewhere{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:10px 12px; background: var(--paper-cool); border-radius: var(--radius);
+    font-size:11.5px; color: var(--ink-soft);
+  }
+
   .req-box{
     border:1.5px solid var(--sapphire);
     background: var(--sapphire-pale);
