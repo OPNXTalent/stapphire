@@ -88,6 +88,9 @@ create table collaboration_events (
   requisition_id uuid not null references requisitions(id) on delete cascade,
   candidate_id uuid references candidates(id) on delete cascade,
   actor_id uuid references profiles(id),
+  -- freeform display name — used until there's a real login system to
+  -- attach comments to. Anyone with a share link can self-identify.
+  actor_name text,
   event_type text not null check (event_type in ('shared','viewed','commented','decision')),
   comment text,
   decision text check (decision in ('advance','hold','decline')),

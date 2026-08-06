@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { requisition_id, candidate_id, actor_id, event_type, comment, decision } = body;
+    const { requisition_id, candidate_id, actor_id, actor_name, event_type, comment, decision } = body;
 
     if (!requisition_id || !event_type) {
       return NextResponse.json({ error: 'requisition_id and event_type are required' }, { status: 400 });
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await supabaseAdmin
       .from('collaboration_events')
-      .insert({ requisition_id, candidate_id, actor_id: actor_id ?? null, event_type, comment, decision })
+      .insert({ requisition_id, candidate_id, actor_id: actor_id ?? null, actor_name: actor_name ?? null, event_type, comment, decision })
       .select()
       .single();
 

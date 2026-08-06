@@ -7,6 +7,7 @@ type CollabEvent = {
   event_type: 'shared' | 'viewed' | 'commented' | 'decision';
   comment: string | null;
   decision: string | null;
+  actor_name: string | null;
   created_at: string;
   profiles: { full_name: string; role: string } | null;
 };
@@ -18,6 +19,8 @@ type Note = {
   profiles: { full_name: string } | null;
 };
 
+const NAME_STORAGE_KEY = 'stapphire_commenter_name';
+
 const ICONS: Record<CollabEvent['event_type'], string> = {
   decision: '✓',
   commented: '💬',
@@ -26,7 +29,7 @@ const ICONS: Record<CollabEvent['event_type'], string> = {
 };
 
 function describeEvent(e: CollabEvent) {
-  const actor = e.profiles?.full_name ?? 'Someone';
+  const actor = e.actor_name || e.profiles?.full_name || 'Someone';
   switch (e.event_type) {
     case 'decision':
       return `${actor} decided to ${e.decision}`;
@@ -44,6 +47,11 @@ function describeEvent(e: CollabEvent) {
 // than pre-fetched by the parent page. That's what makes the General
 // vs. per-candidate toggle possible without threading extra state
 // through every parent component.
+//
+// There's no login system yet, so anyone with a share link has full
+// Collaboration access automatically — no invite step. To keep comments
+// distinguishable, each person sets their own display name once; it's
+// remembered in their browser and sent along with every comment.
 export function CollaborationPanel({
   collapsed,
   onExpand,
@@ -67,7 +75,17 @@ export function CollaborationPanel({
   const [events, setEvents] = useState<CollabEvent[]>([]);
   const [draft, setDraft] = useState('');
   const [commentDraft, setCommentDraft] = useState('');
-  const [email, setEmail] = useState('');
+  const [commenterName, setCommenterName] = useState('');
+
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? window.localStorage.getItem(NAME_STORAGE_KEY) : null;
+    if (saved) setCommenterName(saved);
+  }, []);
+
+  function handleNameChange(value: string) {
+    setCommenterName(value);
+    if (typeof window !== 'undefined') window.localStorage.setItem(NAME_STORAGE_KEY, value);
+  }
 
   // Default back to candidate mode whenever a new candidate becomes active.
   useEffect(() => {
@@ -118,26 +136,12 @@ export function CollaborationPanel({
       body: JSON.stringify({
         requisition_id: requisitionId,
         candidate_id: viewMode === 'candidate' ? activeCandidateId : null,
+        actor_name: commenterName.trim() || null,
         event_type: 'commented',
         comment: commentDraft
       })
     });
     setCommentDraft('');
-    loadEvents();
-  }
-
-  async function handleInvite() {
-    if (!email.trim()) return;
-    await fetch('/api/collaboration', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requisition_id: requisitionId,
-        event_type: 'shared',
-        comment: `Invited ${email.trim()}`
-      })
-    });
-    setEmail('');
     loadEvents();
   }
 
@@ -198,16 +202,14 @@ export function CollaborationPanel({
         </div>
       ) : (
         <div className="side-content">
-          <div className="invite-row">
+          <div className="commenter-name-row">
+            <span className="commenter-name-label">Your name</span>
             <input
               type="text"
-              placeholder="Add hiring manager by email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              placeholder="e.g. Dana Pruitt"
+              value={commenterName}
+              onChange={(e) => handleNameChange(e.target.value)}
             />
-            <button className="invite-btn" onClick={handleInvite}>
-              Invite
-            </button>
           </div>
 
           <div className="filter-row" style={{ marginBottom: 14 }}>
