@@ -178,9 +178,9 @@ function DashboardContent() {
     await Promise.all([loadRequisition(), loadTrash()]);
   }
 
-  async function handleEmptyTrash() {
-    await fetch(`/api/requisitions/${requisitionId}/empty-trash`, { method: 'POST' });
-    await loadTrash();
+  async function handleEmptyTrash(targetRequisitionId: string) {
+    await fetch(`/api/requisitions/${targetRequisitionId}/empty-trash`, { method: 'POST' });
+    if (targetRequisitionId === requisitionId) await loadTrash();
   }
 
   function handleRequisitionCreated(newId: string) {
@@ -234,7 +234,6 @@ function DashboardContent() {
             setBatchRequisitionId(null);
           }}
           candidateCount={candidates.length}
-          trashedCandidates={trashedCandidates}
           onRestoreCandidate={handleRestoreCandidate}
           onEmptyTrash={handleEmptyTrash}
           onAddRequisition={() => setCreatingRequisition(true)}

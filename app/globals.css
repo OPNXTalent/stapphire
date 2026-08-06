@@ -171,14 +171,33 @@
     border-radius: var(--radius);
     padding:16px; margin-bottom:18px;
   }
+  .req-title-row{
+    display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:8px;
+    margin-bottom:12px;
+  }
   .req-title{
     font-family: var(--font-display); font-weight:700;
-    font-size:16.5px; line-height:1.25; margin:0 0 12px;
+    font-size:16.5px; line-height:1.25; margin:0; flex:1; min-width:0;
   }
   .req-status{
     display:inline-flex; align-items:center; gap:5px;
     font-family: var(--font-mono); font-size:10.5px; color: var(--green);
     margin-bottom:12px;
+  }
+
+  .trash-icon-btn{
+    flex-shrink:0; width:24px; height:24px;
+    border:1px solid var(--line-strong); border-radius: var(--radius);
+    background: var(--paper); font-size:12px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .trash-icon-btn:hover{ border-color: var(--sapphire); }
+
+  .req-title-row .req-list-trash-expanded,
+  .req-list-row .req-list-trash-expanded{
+    flex-basis:100%; order:2;
+    background: var(--paper); border:1px solid var(--line); border-radius: var(--radius);
+    padding:10px 12px; margin-top:8px;
   }
   .req-status::before{ content:""; width:6px; height:6px; background: var(--green); border-radius:1px; }
 
@@ -233,7 +252,8 @@
   }
 
   .req-list{ margin-top:20px; }
-  .req-list-item{ padding:10px 8px; border-radius: var(--radius); display:flex; flex-direction:column; gap:2px; cursor:pointer; }
+  .req-list-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  .req-list-item{ padding:10px 8px; border-radius: var(--radius); display:flex; flex-direction:column; gap:2px; cursor:pointer; flex:1; min-width:0; }
   .req-list-item:hover{ background: var(--paper-cool); }
   .req-list-item.current{ background: var(--sapphire-pale); }
   .req-list-name{ font-size:12.5px; font-weight:600; }

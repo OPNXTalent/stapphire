@@ -22,6 +22,8 @@ type BatchItem = {
   message: string;
 };
 
+type TrashCandidate = { id: string; full_name: string };
+
 const STATUS_ICON: Record<BatchItem['status'], string> = {
   pending: '·',
   processing: '…',
@@ -30,6 +32,90 @@ const STATUS_ICON: Record<BatchItem['status'], string> = {
   non_resume: '—',
   error: '✕'
 };
+
+// A self-contained trash icon + inline expandable list, reusable for
+// any requisition (the current one, or any row in Other Requisitions).
+// Each instance fetches its own requisition's trash on demand — trash
+// stays strictly contained to the resumes within that one requisition,
+// never a shared/global list.
+function TrashControl({
+  requisitionId,
+  onRestoreCandidate,
+  onEmptyTrash
+}: {
+  requisitionId: string;
+  onRestoreCandidate: (candidateId: string) => Promise<void>;
+  onEmptyTrash: (requisitionId: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState<TrashCandidate[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  async function fetchTrash() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/requisitions/${requisitionId}/trash`, { cache: 'no-store' });
+      const data = await res.json();
+      setItems(data.candidates ?? []);
+      setLoaded(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function toggle(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!open && !loaded) await fetchTrash();
+    setOpen((o) => !o);
+  }
+
+  async function handleRestore(candidateId: string) {
+    await onRestoreCandidate(candidateId);
+    await fetchTrash();
+  }
+
+  async function handleEmpty() {
+    if (!window.confirm(`Permanently delete ${items.length} candidate(s)? This cannot be undone.`)) return;
+    await onEmptyTrash(requisitionId);
+    await fetchTrash();
+  }
+
+  return (
+    <>
+      <button className="trash-icon-btn" title="Trash" onClick={toggle}>
+        🗑
+      </button>
+      {open && (
+        <div className="req-list-trash-expanded" onClick={(e) => e.stopPropagation()}>
+          {loading ? (
+            <div className="trash-empty-hint">Loading…</div>
+          ) : items.length === 0 ? (
+            <div className="trash-empty-hint">Nothing in trash</div>
+          ) : (
+            <>
+              {items.map((c) => (
+                <div key={c.id} className="trash-item">
+                  <span className="trash-item-name">{c.full_name}</span>
+                  <button className="qa-btn-text" onClick={() => handleRestore(c.id)}>
+                    Restore
+                  </button>
+                </div>
+              ))}
+              <button
+                className="qa-btn-text"
+                style={{ marginTop: 8, color: 'var(--red)', borderBottomColor: 'var(--red)' }}
+                onClick={handleEmpty}
+              >
+                Empty Trash
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
 
 export function RequisitionPanel({
   requisition,
@@ -46,7 +132,6 @@ export function RequisitionPanel({
   batchRequisitionTitle,
   onClearBatch,
   candidateCount,
-  trashedCandidates,
   onRestoreCandidate,
   onEmptyTrash,
   onAddRequisition
@@ -65,13 +150,11 @@ export function RequisitionPanel({
   batchRequisitionTitle: string;
   onClearBatch: () => void;
   candidateCount: number;
-  trashedCandidates: { id: string; full_name: string }[];
-  onRestoreCandidate: (id: string) => void;
-  onEmptyTrash: () => void;
+  onRestoreCandidate: (id: string) => Promise<void>;
+  onEmptyTrash: (requisitionId: string) => Promise<void>;
   onAddRequisition: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [trashOpen, setTrashOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
   async function handleCopyLink() {
@@ -148,7 +231,14 @@ export function RequisitionPanel({
 
           <span className="eyebrow">Open Requisition</span>
           <div className="req-box">
-            <div className="req-title">{requisition.title}</div>
+            <div className="req-title-row">
+              <div className="req-title">{requisition.title}</div>
+              <TrashControl
+                requisitionId={requisition.id}
+                onRestoreCandidate={onRestoreCandidate}
+                onEmptyTrash={onEmptyTrash}
+              />
+            </div>
 
             <button className="qa-btn-text share-link-btn" style={{ marginBottom: 14 }} onClick={handleCopyLink}>
               <span>{linkCopied ? 'Link copied' : 'Share Link'}</span>
@@ -249,54 +339,16 @@ export function RequisitionPanel({
           <div className="req-list">
             <span className="eyebrow">Other Requisitions</span>
             {otherRequisitions.map((r) => (
-              <div key={r.id} className="req-list-item" onClick={() => onSwitchRequisition(r.id)}>
-                <span className="req-list-name">{r.title}</span>
-                <span className="req-list-meta">
-                  {r.candidateCount} evaluated · {r.status}
-                </span>
+              <div key={r.id} className="req-list-row">
+                <div className="req-list-item" onClick={() => onSwitchRequisition(r.id)}>
+                  <span className="req-list-name">{r.title}</span>
+                  <span className="req-list-meta">
+                    {r.candidateCount} evaluated · {r.status}
+                  </span>
+                </div>
+                <TrashControl requisitionId={r.id} onRestoreCandidate={onRestoreCandidate} onEmptyTrash={onEmptyTrash} />
               </div>
             ))}
-          </div>
-
-          <div className="req-list">
-            <div className="trash-header" onClick={() => setTrashOpen((o) => !o)}>
-              <span className="eyebrow" style={{ marginBottom: 0 }}>
-                Trash {trashedCandidates.length > 0 ? `(${trashedCandidates.length})` : ''}
-              </span>
-              {trashedCandidates.length > 0 && (
-                <span className="trash-chev">{trashOpen ? '▾' : '▸'}</span>
-              )}
-            </div>
-
-            {trashOpen && (
-              <>
-                {trashedCandidates.length === 0 ? (
-                  <div className="trash-empty-hint">Nothing in trash</div>
-                ) : (
-                  <>
-                    {trashedCandidates.map((c) => (
-                      <div key={c.id} className="trash-item">
-                        <span className="trash-item-name">{c.full_name}</span>
-                        <button className="qa-btn-text" onClick={() => onRestoreCandidate(c.id)}>
-                          Restore
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      className="qa-btn-text"
-                      style={{ marginTop: 10, color: 'var(--red)', borderBottomColor: 'var(--red)' }}
-                      onClick={() => {
-                        if (window.confirm(`Permanently delete ${trashedCandidates.length} candidate(s)? This cannot be undone.`)) {
-                          onEmptyTrash();
-                        }
-                      }}
-                    >
-                      Empty Trash
-                    </button>
-                  </>
-                )}
-              </>
-            )}
           </div>
         </div>
       )}
