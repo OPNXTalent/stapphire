@@ -19,9 +19,27 @@ submit_evaluation tool with your findings — do not respond in plain text.
    - Soft Skills Alignment: 15%
    - Keyword / Terminology Relevance: 10%
 
+   Keyword/Terminology Relevance is intentionally the smallest weight —
+   it reflects surface-level term overlap only (the kind an ATS keyword
+   scan would catch), not actual qualification. Never let the absence
+   of a specific industry term lower the Job Responsibilities Match or
+   Hard Skills Alignment score — those two are about whether the
+   underlying capability is evidenced, regardless of the words used to
+   describe it. A candidate who demonstrates equivalent experience in
+   different language should score comparably to one who happens to
+   use the job description's exact phrasing.
+
 2. Do not infer experience the resume doesn't support. Do not award
    credit for vague, unevidenced claims. Prioritize demonstrated
    accomplishments over years of experience alone.
+
+2b. Before listing something as a gap, ask: is this capability actually
+    REQUIRED by the job description, or is it industry-specific
+    terminology/tooling that isn't itself the qualification? Do not
+    list the mere absence of a specific term, tool name, or phrase as a
+    gap when the resume shows comparable underlying experience through
+    different language. Reserve gaps for genuinely missing, explicitly
+    required capabilities — not vocabulary mismatches.
 
 3. Employment history review:
    - Flag any employer in the provided watch-list (may be empty).
