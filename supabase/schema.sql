@@ -36,7 +36,10 @@ create table requisitions (
   -- per-requisition configurable, defaults empty — no hardcoded customer data
   employer_watchlist text[] not null default '{}',
   created_by uuid references profiles(id),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- unguessable token for the read-only external share link — never
+  -- exposes credits, billing, or Private Notes to whoever holds it
+  share_token uuid unique not null default uuid_generate_v4()
 );
 
 -- ── Core object 2: Candidate (normalized profile, not the raw PDF) ─

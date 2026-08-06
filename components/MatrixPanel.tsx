@@ -40,12 +40,14 @@ export function MatrixPanel({
   candidates,
   onOpenNotes,
   onOpenCollaboration,
-  onDelete
+  onDelete,
+  showPrivateActions = true
 }: {
   candidates: Candidate[];
   onOpenNotes: (candidateId: string) => void;
   onOpenCollaboration: (candidateId: string) => void;
   onDelete: (candidateId: string) => void;
+  showPrivateActions?: boolean;
 }) {
   const [filter, setFilter] = useState('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -175,16 +177,18 @@ export function MatrixPanel({
                       {evalu.status.charAt(0).toUpperCase() + evalu.status.slice(1)}
                     </span>
 
-                    <button
-                      className="matrix-row-delete"
-                      title="Move to trash"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(c.id);
-                      }}
-                    >
-                      🗑
-                    </button>
+                    {showPrivateActions && (
+                      <button
+                        className="matrix-row-delete"
+                        title="Move to trash"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(c.id);
+                        }}
+                      >
+                        🗑
+                      </button>
+                    )}
 
                     <span className="matrix-row-chev">▾</span>
                   </div>
@@ -274,15 +278,17 @@ export function MatrixPanel({
                         >
                           Print this evaluation
                         </button>
-                        <button
-                          className="qa-btn-text"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenNotes(c.id);
-                          }}
-                        >
-                          Private Notes
-                        </button>
+                        {showPrivateActions && (
+                          <button
+                            className="qa-btn-text"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenNotes(c.id);
+                            }}
+                          >
+                            Private Notes
+                          </button>
+                        )}
                         <button
                           className="qa-btn-text"
                           onClick={(e) => {

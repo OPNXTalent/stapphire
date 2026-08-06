@@ -7,6 +7,7 @@ type Requisition = {
   title: string;
   status: string;
   job_description: string;
+  share_token?: string;
 };
 
 type Org = {
@@ -42,6 +43,15 @@ export function RequisitionPanel({
   const [uploading, setUploading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [trashOpen, setTrashOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  async function handleCopyLink() {
+    if (!requisition.share_token) return;
+    const url = `${window.location.origin}/shared/${requisition.share_token}`;
+    await navigator.clipboard.writeText(url);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -86,6 +96,13 @@ export function RequisitionPanel({
           <div className="req-active">
             <div className="req-title">{requisition.title}</div>
             <div className="req-status">{requisition.status === 'open' ? 'Open' : requisition.status}</div>
+
+            <button className="qa-btn-text" style={{ marginBottom: 12 }} onClick={handleCopyLink}>
+              {linkCopied ? 'Link copied ✓' : 'Copy shareable link'}
+            </button>
+            <div className="upload-hint" style={{ marginTop: -8, marginBottom: 10 }}>
+              Read-only — Private Notes never appear in this link
+            </div>
 
             <div className="credit-block">
               <div className="credit-count">

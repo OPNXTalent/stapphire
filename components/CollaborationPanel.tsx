@@ -52,7 +52,8 @@ export function CollaborationPanel({
   hasUnread,
   onSaveNote,
   onComment,
-  onInvite
+  onInvite,
+  hideNotesTab = false
 }: {
   collapsed: boolean;
   onExpand: () => void;
@@ -67,6 +68,7 @@ export function CollaborationPanel({
   onSaveNote: (body: string) => void;
   onComment: (body: string) => void;
   onInvite: (email: string) => void;
+  hideNotesTab?: boolean;
 }) {
   const [draft, setDraft] = useState('');
   const [commentDraft, setCommentDraft] = useState('');
@@ -86,9 +88,11 @@ export function CollaborationPanel({
         ›
       </button>
       <div className="side-tabs">
-        <button className={`side-tab ${tab === 'notes' ? 'active' : ''}`} onClick={() => onTabChange('notes')}>
-          Private Notes
-        </button>
+        {!hideNotesTab && (
+          <button className={`side-tab ${tab === 'notes' ? 'active' : ''}`} onClick={() => onTabChange('notes')}>
+            Private Notes
+          </button>
+        )}
         <button
           className={`side-tab ${tab === 'collaboration' ? 'active' : ''}`}
           onClick={() => onTabChange('collaboration')}
@@ -98,7 +102,7 @@ export function CollaborationPanel({
         </button>
       </div>
 
-      {tab === 'notes' ? (
+      {tab === 'notes' && !hideNotesTab ? (
         <div className="side-content">
           {activeCandidateId ? (
             <>
