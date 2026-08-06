@@ -129,20 +129,27 @@ export async function POST(req: NextRequest) {
         try {
           const ext = file.name.includes('.') ? file.name.split('.').pop() : 'dat';
           storagePath = `${requisitionId}/${contentHash}.${ext}`;
-          const { error: storageError } = await supabaseAdmin.storage
+          console.log('[resume-storage] attempting upload to path:', storagePath, 'bytes:', buffer.length);
+
+          const { data: uploadData, error: storageError } = await supabaseAdmin.storage
             .from('resumes')
             .upload(storagePath, buffer, {
               contentType: file.type || 'application/octet-stream',
               upsert: true
             });
+
           if (storageError) {
-            console.error('Resume storage upload failed:', storageError);
+            console.error('[resume-storage] upload returned an error:', JSON.stringify(storageError));
             storagePath = null;
+          } else {
+            console.log('[resume-storage] upload succeeded, response data:', JSON.stringify(uploadData));
           }
-        } catch (storageErr) {
-          console.error('Resume storage upload failed:', storageErr);
+        } catch (storageErr: any) {
+          console.error('[resume-storage] upload threw an exception:', storageErr?.message ?? storageErr);
           storagePath = null;
         }
+
+        console.log('[resume-storage] final storagePath being inserted into candidates row:', storagePath);
 
         const { data: candidate, error: candidateError } = await supabaseAdmin
           .from('candidates')
@@ -158,6 +165,7 @@ export async function POST(req: NextRequest) {
           .single();
 
         if (candidateError) throw candidateError;
+        console.log('[resume-storage] candidate row after insert, original_file_url:', candidate?.original_file_url);
 
         // Non-resume uploads are stored but do not consume a credit and
         // are not scored — resolved decision from the spec: invalid
