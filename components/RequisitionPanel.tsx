@@ -109,7 +109,23 @@ export function RequisitionPanel({
             disabled={uploading || org.credits_remaining <= 0}
             onClick={() => fileInputRef.current?.click()}
           >
-            <span>{uploading ? statusMsg || 'Evaluating…' : 'Upload resume'}</span>
+            <span className="btn-upload-content">
+              {uploading && (
+                <svg className="gem-loader" viewBox="0 0 24 24" fill="none">
+                  <polygon points="12,1 21,7 24,14 17,23 7,23 0,14 3,7" fill="url(#gemLoaderGrad)" />
+                  <polygon className="facet-a" points="12,1 21,7 12,9" fill="#fff" opacity="0.3" />
+                  <polygon className="facet-b" points="3,7 12,1 12,9" fill="#fff" opacity="0.12" />
+                  <polygon className="facet-c" points="0,14 3,7 12,9 7,23" fill="#0A2452" opacity="0.3" />
+                  <defs>
+                    <linearGradient id="gemLoaderGrad" x1="0" y1="0" x2="24" y2="23">
+                      <stop offset="0%" stopColor="#5C87F5" />
+                      <stop offset="100%" stopColor="#123A8F" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              )}
+              {uploading ? statusMsg || 'Evaluating…' : 'Upload resume'}
+            </span>
             <span style={{ color: 'var(--ink-faint)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
               1 credit
             </span>

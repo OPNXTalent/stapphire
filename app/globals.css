@@ -165,6 +165,32 @@
   .btn-upload.spent{ background: var(--sapphire-pale); border-color: var(--sapphire); color: var(--deep); pointer-events:none; }
   .upload-hint{ font-family: var(--font-mono); font-size:10px; color: var(--ink-faint); margin-top:6px; line-height:1.4; }
 
+  /* Glowing gem — shown in the upload button while a resume is being
+     evaluated. One orchestrated moment: a slow overall pulse plus each
+     facet catching light out of sync, like a stone being turned. */
+  .btn-upload-content{ display:flex; align-items:center; gap:7px; }
+  .gem-loader{
+    width:15px; height:15px; flex-shrink:0;
+    animation: gemPulseGlow 1.7s ease-in-out infinite;
+  }
+  @keyframes gemPulseGlow{
+    0%, 100%{
+      filter: drop-shadow(0 0 1px var(--sapphire)) drop-shadow(0 0 0px var(--sapphire-2));
+      transform: scale(1);
+    }
+    50%{
+      filter: drop-shadow(0 0 6px var(--sapphire-2)) drop-shadow(0 0 3px var(--sapphire));
+      transform: scale(1.1);
+    }
+  }
+  .gem-loader .facet-a{ animation: facetTwinkle 1.7s ease-in-out infinite; animation-delay: 0s; }
+  .gem-loader .facet-b{ animation: facetTwinkle 1.7s ease-in-out infinite; animation-delay: 0.4s; }
+  .gem-loader .facet-c{ animation: facetTwinkle 1.7s ease-in-out infinite; animation-delay: 0.9s; }
+  @keyframes facetTwinkle{
+    0%, 100%{ opacity: 0.12; }
+    50%{ opacity: 0.55; }
+  }
+
   .req-list{ margin-top:20px; }
   .req-list-item{ padding:10px 8px; border-radius: var(--radius); display:flex; flex-direction:column; gap:2px; cursor:pointer; }
   .req-list-item:hover{ background: var(--paper-cool); }
