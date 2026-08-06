@@ -279,14 +279,14 @@ export function RequisitionPanel({
           <button className="footer-icon-link" onClick={onOpenArchiveModal}>
             <span className="footer-icon">📦</span> Archive
           </button>
-          <button className="footer-icon-link" onClick={onOpenTrashModal}>
-            <span className="footer-icon">🗑</span> Trash
-          </button>
         </div>
       )}
 
       {!collapsed && (
         <div className="req-footer">
+          <button className="trash-bin-btn" title="Trash" onClick={onOpenTrashModal}>
+            🗑
+          </button>
           <a href="/sign-out">Sign out</a>
         </div>
       )}
