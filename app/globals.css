@@ -140,7 +140,12 @@
   .batch-summary{
     padding:9px 12px; font-family: var(--font-mono); font-size:11px; color: var(--ink-soft);
     border-bottom:1px solid var(--line); background: var(--paper-cool);
+    display:flex; align-items:center; justify-content:space-between;
   }
+  .batch-summary-clickable{ cursor:pointer; }
+  .batch-summary-clickable:hover{ background: var(--sapphire-pale); color: var(--deep); }
+  .batch-close-hint{ font-size:10px; color: var(--ink-faint); flex-shrink:0; }
+  .batch-summary-clickable:hover .batch-close-hint{ color: var(--deep); }
   .batch-list{ max-height:220px; overflow-y:auto; }
   .batch-item{
     display:flex; align-items:center; gap:7px;

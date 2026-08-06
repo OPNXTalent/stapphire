@@ -265,7 +265,11 @@ export function RequisitionPanel({
 
             {batchIsHere && (batchActive || batchQueue.length > 0) && (
               <div className="batch-panel">
-                <div className="batch-summary">
+                <div
+                  className={`batch-summary ${!batchActive ? 'batch-summary-clickable' : ''}`}
+                  onClick={!batchActive ? onClearBatch : undefined}
+                  title={!batchActive ? 'Click to close' : undefined}
+                >
                   {batchActive ? (
                     <span className="btn-upload-content">
                       <svg className="gem-loader" viewBox="0 0 24 24" fill="none">
@@ -283,11 +287,14 @@ export function RequisitionPanel({
                       Evaluating {doneCount} / {batchQueue.length}
                     </span>
                   ) : (
-                    <span>
-                      Done — {successCount} evaluated
-                      {duplicateCount > 0 ? `, ${duplicateCount} duplicate` : ''}
-                      {errorCount > 0 ? `, ${errorCount} skipped` : ''}
-                    </span>
+                    <>
+                      <span>
+                        Done — {successCount} evaluated
+                        {duplicateCount > 0 ? `, ${duplicateCount} duplicate` : ''}
+                        {errorCount > 0 ? `, ${errorCount} skipped` : ''}
+                      </span>
+                      <span className="batch-close-hint">✕</span>
+                    </>
                   )}
                 </div>
 
@@ -302,19 +309,6 @@ export function RequisitionPanel({
                     </div>
                   ))}
                 </div>
-
-                {!batchActive && (
-                  <button
-                    className="qa-btn-text"
-                    style={{ marginTop: 10 }}
-                    onClick={() => {
-                      onClearBatch();
-                      fileInputRef.current?.click();
-                    }}
-                  >
-                    Upload more
-                  </button>
-                )}
               </div>
             )}
           </div>
