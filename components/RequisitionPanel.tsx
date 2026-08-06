@@ -229,11 +229,6 @@ export function RequisitionPanel({
           <div className="req-box">
             <div className="req-title-row">
               <div className="req-title" title={requisition.title}>{requisition.title}</div>
-              <TrashControl
-                requisitionId={requisition.id}
-                onRestoreCandidate={onRestoreCandidate}
-                onEmptyTrash={onEmptyTrash}
-              />
             </div>
 
             <button className="qa-btn-text share-link-btn" style={{ marginBottom: 14 }} onClick={handleCopyLink}>
@@ -322,7 +317,6 @@ export function RequisitionPanel({
                 <div key={r.id} className="req-card req-card-compact" onClick={() => onSwitchRequisition(r.id)}>
                   <div className="req-title-row">
                     <div className="req-title req-title-compact" title={r.title}>{r.title}</div>
-                    <TrashControl requisitionId={r.id} onRestoreCandidate={onRestoreCandidate} onEmptyTrash={onEmptyTrash} />
                   </div>
                   {rBatchLive ? (
                     <div className="req-list-meta batch-meta">
