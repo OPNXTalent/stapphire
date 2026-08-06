@@ -345,16 +345,16 @@
   .matrix-row-chev{ flex-shrink:0; font-family: var(--font-mono); font-size:11px; color: var(--ink-faint); transition: transform 0.15s ease; }
   .matrix-row.expanded .matrix-row-chev{ transform: rotate(180deg); }
 
-  .matrix-row-delete{
+  .disposition-select{
     flex-shrink:0;
-    width:24px; height:24px;
-    display:flex; align-items:center; justify-content:center;
-    border:none; background:none; border-radius:4px;
-    font-size:12px; opacity:0; transition: opacity 0.15s ease, background 0.15s ease;
+    font-family: var(--font-mono); font-size:10px; letter-spacing:0.02em;
+    color: var(--ink-faint); background: var(--paper);
+    border:1px solid var(--line-strong); border-radius:12px;
+    padding:4px 8px; max-width:118px;
     cursor:pointer;
   }
-  .matrix-row-head:hover .matrix-row-delete{ opacity:0.55; }
-  .matrix-row-delete:hover{ opacity:1 !important; background: var(--red-tint); }
+  .disposition-select:hover{ border-color: var(--sapphire); }
+  .disposition-select.disposition-set{ color: var(--deep); border-color: var(--sapphire); background: var(--sapphire-pale); font-weight:600; }
 
   .matrix-row-body{ padding:4px 16px 18px; animation: cardEnter 0.2s ease; }
   .cand-name{ font-weight:700; color: var(--ink); font-size:12.5px; }
@@ -581,7 +581,7 @@
     @page{ margin: 0.6in; }
 
     .brand, .req-panel, .side-panel, .pull-tab,
-    .matrix-toggle, .filter-row, .matrix-row-chev, .matrix-row-actions, .matrix-row-delete{
+    .matrix-toggle, .filter-row, .matrix-row-chev, .matrix-row-actions, .disposition-select{
       display:none !important;
     }
     .print-header{ display:flex !important; padding-bottom:14px; margin-bottom:20px; border-bottom:2px solid var(--sapphire); }

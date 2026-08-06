@@ -106,6 +106,15 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
     await Promise.all([load(), loadTrash()]);
   }
 
+  async function handleSetDisposition(candidateId: string, disposition: string) {
+    await fetch(`/api/candidates/${candidateId}/disposition`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ disposition, actor_name: collaboratorName })
+    });
+    await load();
+  }
+
   async function handleRestoreCandidate(candidateId: string) {
     await fetch(`/api/candidates/${candidateId}/restore`, { method: 'POST' });
     await Promise.all([load(), loadTrash()]);
@@ -190,6 +199,7 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
             candidates={candidates}
             onSelectCandidate={setActiveCandidateId}
             onDelete={handleDeleteCandidate}
+            onSetDisposition={handleSetDisposition}
           />
         </div>
 

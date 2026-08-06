@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { dispositionLabel } from '@/lib/dispositions';
 
 type CollabEvent = {
   id: string;
@@ -32,7 +33,7 @@ function describeEvent(e: CollabEvent) {
   const actor = e.actor_name || e.profiles?.full_name || 'Someone';
   switch (e.event_type) {
     case 'decision':
-      return `${actor} decided to ${e.decision}`;
+      return `${actor} moved to ${dispositionLabel(e.decision)}`;
     case 'commented':
       return `${actor} commented`;
     case 'viewed':

@@ -56,6 +56,12 @@ create table candidates (
   -- soft delete — deleted candidates go to trash and stay recoverable
   -- until the trash is explicitly emptied
   deleted_at timestamptz,
+  -- human-set pipeline stage — separate from the AI's evaluation status.
+  -- The AI's greenlight/consider/decline is evidence; this is a decision.
+  disposition text check (disposition is null or disposition in (
+    'phone_screen','interview','second_interview','third_interview','final_interview',
+    'make_offer','onboarding','hired','withdrew','did_not_select'
+  )),
   unique (requisition_id, content_hash)
 );
 
@@ -93,7 +99,11 @@ create table collaboration_events (
   actor_name text,
   event_type text not null check (event_type in ('shared','viewed','commented','decision')),
   comment text,
-  decision text check (decision in ('advance','hold','decline')),
+  decision text check (decision is null or decision in (
+    'advance','hold','decline',
+    'phone_screen','interview','second_interview','third_interview','final_interview',
+    'make_offer','onboarding','hired','withdrew','did_not_select'
+  )),
   -- optional document shared alongside a comment
   attachment_path text,
   attachment_filename text,

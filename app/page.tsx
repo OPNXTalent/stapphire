@@ -170,6 +170,15 @@ function DashboardContent() {
     await Promise.all([loadRequisition(), loadTrash()]);
   }
 
+  async function handleSetDisposition(candidateId: string, disposition: string) {
+    await fetch(`/api/candidates/${candidateId}/disposition`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ disposition, actor_name: 'You' })
+    });
+    await loadRequisition();
+  }
+
   async function handleRestoreCandidate(candidateId: string) {
     await fetch(`/api/candidates/${candidateId}/restore`, { method: 'POST' });
     await Promise.all([loadRequisition(), loadTrash()]);
@@ -244,6 +253,7 @@ function DashboardContent() {
               candidates={candidates}
               onSelectCandidate={setActiveCandidateId}
               onDelete={handleDeleteCandidate}
+              onSetDisposition={handleSetDisposition}
             />
           )}
         </div>

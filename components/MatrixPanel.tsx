@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { DISPOSITIONS } from '@/lib/dispositions';
 
 type Evaluation = {
   overall_match: number;
@@ -18,6 +19,7 @@ type Candidate = {
   document_type: string;
   source_filename: string | null;
   original_file_url: string | null;
+  disposition: string | null;
   evaluations: Evaluation[];
 };
 
@@ -42,16 +44,19 @@ function rankBadgeClass(rank: number) {
 export function MatrixPanel({
   candidates,
   onSelectCandidate,
-  onDelete
+  onDelete,
+  onSetDisposition
 }: {
   candidates: Candidate[];
   onSelectCandidate: (candidateId: string | null) => void;
   onDelete: (candidateId: string) => void;
+  onSetDisposition: (candidateId: string, disposition: string) => void;
 }) {
   const [filter, setFilter] = useState('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [localDisposition, setLocalDisposition] = useState<Record<string, string>>({});
 
   useEffect(() => {
     function clearPrint() {
@@ -87,6 +92,15 @@ export function MatrixPanel({
     // Collapsing clears selection too — when nothing is expanded, the
     // side panel should be about the requisition, not a stale candidate.
     onSelectCandidate(opening ? id : null);
+  }
+
+  function handleDispositionChange(candidateId: string, value: string) {
+    if (value === '__trash__') {
+      onDelete(candidateId);
+      return;
+    }
+    setLocalDisposition((prev) => ({ ...prev, [candidateId]: value }));
+    onSetDisposition(candidateId, value);
   }
 
   const scored = useMemo(
@@ -181,16 +195,22 @@ export function MatrixPanel({
                       {evalu.status.charAt(0).toUpperCase() + evalu.status.slice(1)}
                     </span>
 
-                    <button
-                      className="matrix-row-delete"
-                      title="Move to trash"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(c.id);
-                      }}
+                    <select
+                      className={`disposition-select ${
+                        (localDisposition[c.id] ?? c.disposition) ? 'disposition-set' : ''
+                      }`}
+                      value={localDisposition[c.id] ?? c.disposition ?? ''}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => handleDispositionChange(c.id, e.target.value)}
                     >
-                      🗑
-                    </button>
+                      <option value="">Disposition</option>
+                      {DISPOSITIONS.map((d) => (
+                        <option key={d.value} value={d.value}>
+                          {d.label}
+                        </option>
+                      ))}
+                      <option value="__trash__">Move to Trash</option>
+                    </select>
 
                     <span className="matrix-row-chev">▾</span>
                   </div>
