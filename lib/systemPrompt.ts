@@ -9,7 +9,8 @@ evidence. The recruiter and hiring team remain responsible for judgment.
 
 You will be given a job description (already parsed into evaluation
 pillars) and a single candidate resume. Evaluate the resume against the
-job description using the following process:
+job description using the following process, then call the
+submit_evaluation tool with your findings — do not respond in plain text.
 
 1. Weighted scoring (do not disclose these weights as a decision — they
    produce evidence, not a verdict):
@@ -39,46 +40,9 @@ job description using the following process:
    document_type to "non_resume" and leave scoring fields at 0 — do not
    attempt to evaluate it as a candidate.
 
-Respond with ONLY a single JSON object, no prose before or after it, no
-markdown code fences, matching exactly this shape:
-
-{
-  "candidate_name": string,
-  "document_type": "resume" | "non_resume",
-  "overall_match": number,
-  "status": "greenlight" | "consider" | "decline",
-  "scores": {
-    "job_responsibilities_match": number,
-    "hard_skills_alignment": number,
-    "soft_skills_alignment": number,
-    "keyword_relevance": number
-  },
-  "signals": {
-    "resume_confidence": "High" | "Moderate" | "Limited",
-    "evidence_quality": "Strong" | "Moderate" | "Limited",
-    "location_fit": string,
-    "relocation_consideration": string | null,
-    "employment_status": string,
-    "timeline_review": string,
-    "required_certifications": string | null
-  },
-  "strengths": string[],
-  "gaps": string[],
-  "ats_compatibility": { "rating": "High" | "Moderate" | "Low", "reasoning": string },
-  "employment_history": {
-    "watchlist_employer_match": { "found": boolean, "entries": string[] },
-    "gaps": string[],
-    "short_tenure_roles": string[]
-  },
-  "risk_flags": string[],
-  "interview_recommendations": {
-    "probe_areas": string[],
-    "skills_to_validate": string[],
-    "org_value": string,
-    "alternate_roles": string[]
-  },
-  "matrix_dimensions": { [key: string]: string }
-}
+Keep every text field to plain prose with no line breaks inside a single
+field — use separate array entries instead of embedding newlines within
+one string.
 
 "status" thresholds: overall_match >= 85 -> "greenlight";
 69-84 -> "consider"; <= 68 -> "decline". These are signals for the
@@ -86,6 +50,85 @@ matrix, not a hiring recommendation — never use language like "Recommend
 Interview" anywhere in the output; that decision belongs to the human
 reviewer.
 `.trim();
+
+// Forcing output through a tool call (rather than asking the model to
+// write JSON as free text) guarantees well-formed, schema-conforming
+// output every time — no more parse failures from stray formatting,
+// markdown fences, or unescaped characters in free text.
+export const EVALUATION_TOOL = {
+  name: 'submit_evaluation',
+  description: 'Submit the structured evaluation of a candidate resume against a job description.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      candidate_name: { type: 'string' },
+      document_type: { type: 'string', enum: ['resume', 'non_resume'] },
+      overall_match: { type: 'number' },
+      status: { type: 'string', enum: ['greenlight', 'consider', 'decline'] },
+      scores: {
+        type: 'object',
+        properties: {
+          job_responsibilities_match: { type: 'number' },
+          hard_skills_alignment: { type: 'number' },
+          soft_skills_alignment: { type: 'number' },
+          keyword_relevance: { type: 'number' }
+        },
+        required: ['job_responsibilities_match', 'hard_skills_alignment', 'soft_skills_alignment', 'keyword_relevance']
+      },
+      signals: {
+        type: 'object',
+        properties: {
+          resume_confidence: { type: 'string', enum: ['High', 'Moderate', 'Limited'] },
+          evidence_quality: { type: 'string', enum: ['Strong', 'Moderate', 'Limited'] },
+          location_fit: { type: 'string' },
+          relocation_consideration: { type: 'string' },
+          employment_status: { type: 'string' },
+          timeline_review: { type: 'string' },
+          required_certifications: { type: 'string' }
+        }
+      },
+      strengths: { type: 'array', items: { type: 'string' } },
+      gaps: { type: 'array', items: { type: 'string' } },
+      ats_compatibility: {
+        type: 'object',
+        properties: {
+          rating: { type: 'string', enum: ['High', 'Moderate', 'Low'] },
+          reasoning: { type: 'string' }
+        }
+      },
+      employment_history: {
+        type: 'object',
+        properties: {
+          watchlist_employer_match: {
+            type: 'object',
+            properties: {
+              found: { type: 'boolean' },
+              entries: { type: 'array', items: { type: 'string' } }
+            }
+          },
+          gaps: { type: 'array', items: { type: 'string' } },
+          short_tenure_roles: { type: 'array', items: { type: 'string' } }
+        }
+      },
+      risk_flags: { type: 'array', items: { type: 'string' } },
+      interview_recommendations: {
+        type: 'object',
+        properties: {
+          probe_areas: { type: 'array', items: { type: 'string' } },
+          skills_to_validate: { type: 'array', items: { type: 'string' } },
+          org_value: { type: 'string' },
+          alternate_roles: { type: 'array', items: { type: 'string' } }
+        }
+      },
+      matrix_dimensions: {
+        type: 'object',
+        additionalProperties: { type: 'string' },
+        description: 'JD-specific comparison columns, e.g. {"Call Center Experience": "Excellent"}'
+      }
+    },
+    required: ['candidate_name', 'document_type', 'overall_match', 'status', 'scores', 'signals', 'strengths', 'gaps', 'risk_flags']
+  }
+};
 
 export function buildEvaluationUserMessage(params: {
   jobDescription: string;

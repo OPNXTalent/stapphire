@@ -3,15 +3,31 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { anthropic, EVALUATION_MODEL } from '@/lib/anthropic';
 import { extractTextFromFile } from '@/lib/extractText';
 
-const JD_PARSE_PROMPT = `
-Parse the following job description into its natural evaluation
-dimensions for a candidate comparison matrix (e.g. "Call Center
-Experience", "CRM / Systems", "Complaint Resolution" — dimensions
-should reflect this specific role, not a generic template).
+export const maxDuration = 60;
 
-Respond with ONLY a JSON array of short column-header strings, no prose,
-no markdown fences. 4-7 dimensions.
+const JD_PARSE_PROMPT = `
+Parse the job description into its natural evaluation dimensions for a
+candidate comparison matrix (e.g. "Call Center Experience", "CRM /
+Systems", "Complaint Resolution" — dimensions should reflect this
+specific role, not a generic template). Produce 4-7 dimensions, then
+call the submit_pillars tool with them.
 `.trim();
+
+const JD_PARSE_TOOL = {
+  name: 'submit_pillars',
+  description: 'Submit the parsed evaluation dimensions for this job description.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      pillars: {
+        type: 'array',
+        items: { type: 'string' },
+        description: '4-7 short column-header strings for the comparison matrix'
+      }
+    },
+    required: ['pillars']
+  }
+};
 
 export async function GET(req: NextRequest) {
   const orgId = req.nextUrl.searchParams.get('org_id');
@@ -53,11 +69,14 @@ export async function POST(req: NextRequest) {
       model: EVALUATION_MODEL,
       max_tokens: 512,
       system: JD_PARSE_PROMPT,
+      tools: [JD_PARSE_TOOL],
+      tool_choice: { type: 'tool', name: 'submit_pillars' },
       messages: [{ role: 'user', content: job_description }]
     });
 
-    const textBlock = parseResponse.content.find((b) => b.type === 'text');
-    const pillars = textBlock && textBlock.type === 'text' ? JSON.parse(textBlock.text) : [];
+    const toolUseBlock = parseResponse.content.find((b) => b.type === 'tool_use');
+    const pillars =
+      toolUseBlock && toolUseBlock.type === 'tool_use' ? (toolUseBlock.input as any).pillars : [];
 
     const { data, error } = await supabaseAdmin
       .from('requisitions')

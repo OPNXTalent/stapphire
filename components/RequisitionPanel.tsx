@@ -29,20 +29,23 @@ export function RequisitionPanel({
   otherRequisitions: { id: string; title: string; status: string; candidateCount: number }[];
   collapsed: boolean;
   onToggleCollapse: () => void;
-  onUpload: (file: File) => Promise<void>;
+  onUpload: (file: File, onProgress: (status: string) => void) => Promise<void>;
   candidateCount: number;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [statusMsg, setStatusMsg] = useState('');
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setStatusMsg('Starting\u2026');
     try {
-      await onUpload(file);
+      await onUpload(file, setStatusMsg);
     } finally {
       setUploading(false);
+      setStatusMsg('');
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }
@@ -106,7 +109,7 @@ export function RequisitionPanel({
             disabled={uploading || org.credits_remaining <= 0}
             onClick={() => fileInputRef.current?.click()}
           >
-            <span>{uploading ? 'Evaluating…' : 'Upload resume'}</span>
+            <span>{uploading ? statusMsg || 'Evaluating…' : 'Upload resume'}</span>
             <span style={{ color: 'var(--ink-faint)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
               1 credit
             </span>
