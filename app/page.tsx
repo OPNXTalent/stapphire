@@ -8,6 +8,10 @@ import { MatrixPanel } from '@/components/MatrixPanel';
 import { CandidateCard } from '@/components/CandidateCard';
 import { CollaborationPanel } from '@/components/CollaborationPanel';
 
+// NOTE: org selection is hardcoded for a single-tenant v1. Swap for a
+// real auth-derived org_id once auth is wired up. Requisition selection
+// now comes from the URL (?requisition=<id>), set by the New Requisition
+// flow, falling back to a demo default for local testing.
 const DEMO_ORG_ID = process.env.NEXT_PUBLIC_DEMO_ORG_ID ?? '';
 const DEMO_REQUISITION_ID = process.env.NEXT_PUBLIC_DEMO_REQUISITION_ID ?? '';
 
@@ -56,22 +60,50 @@ function DashboardContent() {
     Promise.all([loadRequisition(), loadCollaboration()]).finally(() => setLoading(false));
   }, [requisitionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleUpload(file: File) {
+  async function handleUpload(file: File, onProgress: (status: string) => void) {
     const formData = new FormData();
     formData.append('requisition_id', requisitionId);
     formData.append('file', file);
 
     const res = await fetch('/api/evaluate', { method: 'POST', body: formData });
-    const data = await res.json();
 
-    if (!res.ok) {
-      console.error(data.error);
+    if (!res.body) {
+      console.error('No response stream from evaluate route');
       return;
     }
-    await loadRequisition();
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? ''; // keep the last, possibly-incomplete line
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line);
+
+        if (event.type === 'status' || event.type === 'progress') {
+          onProgress(event.message);
+        } else if (event.type === 'error') {
+          console.error(event.message);
+          onProgress('Something went wrong');
+        } else if (event.type === 'done') {
+          // Duplicate or freshly evaluated — either way, just refresh silently.
+          await loadRequisition();
+        }
+      }
+    }
   }
 
   async function handleSaveNote(body: string) {
+    // A dedicated /api/notes route mirrors the pattern of /api/collaboration;
+    // omitted here for brevity but follows the same shape.
     console.log('save note', activeCandidateId, body);
   }
 
