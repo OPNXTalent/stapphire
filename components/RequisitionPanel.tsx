@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ManageAccessModal } from '@/components/ManageAccessModal';
 
 type Requisition = {
   id: string;
@@ -69,6 +70,7 @@ export function RequisitionPanel({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [manageAccessOpen, setManageAccessOpen] = useState(false);
   const [trialStatus, setTrialStatus] = useState<{ used: number; remaining: number; limit: number } | null>(null);
 
   useEffect(() => {
@@ -191,9 +193,17 @@ export function RequisitionPanel({
               </button>
             </div>
 
-            <button className="qa-btn-text share-link-btn" style={{ marginBottom: 14 }} onClick={handleCopyLink}>
+            <button className="qa-btn-text share-link-btn" style={{ marginBottom: 8 }} onClick={handleCopyLink}>
               <span>{linkCopied ? 'Link copied' : 'Share Link'}</span>
               <span className="share-link-icon">{linkCopied ? '✓' : '⧉'}</span>
+            </button>
+            <button
+              className="qa-btn-text share-link-btn"
+              style={{ marginBottom: 14 }}
+              onClick={() => setManageAccessOpen(true)}
+            >
+              <span>Manage Access</span>
+              <span className="share-link-icon">👥</span>
             </button>
 
             <input
@@ -321,6 +331,13 @@ export function RequisitionPanel({
           <a href="/sign-out">Sign out</a>
         </div>
       )}
+
+      <ManageAccessModal
+        open={manageAccessOpen}
+        onClose={() => setManageAccessOpen(false)}
+        requisitionId={requisition.id}
+        requisitionTitle={requisition.title}
+      />
     </div>
   );
 }

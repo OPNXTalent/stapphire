@@ -135,6 +135,17 @@ create table requisition_shares (
   created_at timestamptz not null default now()
 );
 
+-- ── Authenticated collaborator display names ────────────────────
+-- Kept separate from the org-scoped `profiles` table since a
+-- collaborator (hiring manager) doesn't belong to an org themselves —
+-- they just have real login access to specific requisitions someone
+-- else's org granted them, via requisition_shares.
+create table collaborator_profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  full_name text not null,
+  created_at timestamptz not null default now()
+);
+
 -- ── Lightweight identity for share-link visitors ────────────────
 -- Not a real login (no password) — a quick name-gate so a collaborator
 -- arriving via a share link has a real, fixed database record instead
