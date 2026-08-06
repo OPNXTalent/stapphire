@@ -372,25 +372,57 @@
   .qa-btn-text:hover{ color: var(--deep); border-bottom-color: var(--deep); }
   .qa-btn-text:disabled{ color: var(--ink-faint); border-bottom-color: var(--ink-faint); cursor:default; }
 
+  /* Print letterhead — hidden on screen, shown only when printing */
+  .print-header{
+    display:none;
+    align-items:center; gap:10px;
+  }
+  .print-header .gem{ width:24px; height:24px; flex-shrink:0; }
+  .print-header-word{ font-family: var(--font-display); font-weight:700; font-size:16px; color: var(--deep); }
+  .print-header-tag{
+    font-family: var(--font-mono); font-size:10px; color: var(--ink-faint);
+    letter-spacing:0.05em; text-transform:uppercase;
+    padding-left:9px; border-left:1px solid var(--line-strong);
+  }
+  .print-header-date{ margin-left:auto; font-family: var(--font-mono); font-size:10px; color: var(--ink-faint); }
+
   /* Print isolation — printing a single candidate's evaluation shows
-     only that row's content, none of the app chrome, sidebars, or
-     other candidates. */
+     only that row's content inside a clean bordered frame, none of the
+     app chrome, sidebars, or other candidates. */
   @media print{
+    @page{ margin: 0.6in; }
+
     .brand, .req-panel, .side-panel, .pull-tab,
     .matrix-toggle, .filter-row, .matrix-row-chev, .matrix-row-actions{
       display:none !important;
     }
+    .print-header{ display:flex !important; padding-bottom:14px; margin-bottom:20px; border-bottom:2px solid var(--sapphire); }
+
     .app{ display:block !important; height:auto !important; margin-top:0 !important; }
     .center-panel{ display:block !important; height:auto !important; overflow:visible !important; }
     .matrix-wrap{ overflow:visible !important; flex:none !important; }
     .matrix-scroll{ padding:0 !important; }
     .matrix-list{ border:none !important; }
     .matrix-row{ display:none !important; }
+
     .matrix-row.print-target{
       display:block !important;
-      border:none !important;
+      box-sizing:border-box; width:100%; max-width:100%;
+      border:1.5px solid var(--sapphire) !important;
+      border-radius:8px !important;
+      padding:26px !important;
+      page-break-inside: avoid;
     }
-    .matrix-row.print-target .matrix-row-head{ background:none !important; padding:0 0 12px !important; }
+    .matrix-row.print-target .matrix-row-head{ background:none !important; padding:0 0 14px !important; }
     .matrix-row.print-target .matrix-row-body{ padding:0 !important; }
+
+    /* Nothing should overflow the frame — stack side-by-side content
+       and let long text wrap instead of clipping or bleeding past the
+       border on paper. */
+    .matrix-row.print-target *{ max-width:100% !important; overflow-wrap:break-word; }
+    .matrix-row.print-target .two-col{ grid-template-columns:1fr !important; gap:16px !important; }
+    .matrix-row.print-target .signal-row{ gap:6px !important; }
+    .matrix-row.print-target table.matrix{ width:100% !important; }
+
     body{ background:#fff !important; }
   }

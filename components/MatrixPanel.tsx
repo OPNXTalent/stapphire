@@ -101,6 +101,25 @@ export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
         <div className="matrix-toggle-sub">Same rubric, every candidate — tap a name for the full picture</div>
       </div>
 
+      <div className="print-header">
+        <svg className="gem" viewBox="0 0 24 24" fill="none">
+          <polygon points="12,1 21,7 24,14 17,23 7,23 0,14 3,7" fill="url(#printGemGrad)" />
+          <polygon points="12,1 21,7 12,9" fill="#fff" opacity="0.22" />
+          <polygon points="3,7 12,1 12,9" fill="#fff" opacity="0.1" />
+          <polygon points="0,14 3,7 12,9 7,23" fill="#0A2452" opacity="0.35" />
+          <polygon points="24,14 21,7 12,9 17,23" fill="#0A2452" opacity="0.2" />
+          <defs>
+            <linearGradient id="printGemGrad" x1="0" y1="0" x2="24" y2="23">
+              <stop offset="0%" stopColor="#5C87F5" />
+              <stop offset="100%" stopColor="#123A8F" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <span className="print-header-word">Stapphire</span>
+        <span className="print-header-tag">Hiring Quality Control</span>
+        <span className="print-header-date">Generated {new Date().toLocaleDateString()}</span>
+      </div>
+
       <div className="matrix-wrap open">
         <div className="matrix-scroll">
           <div className="filter-row">
