@@ -171,6 +171,18 @@
     border-radius: var(--radius);
     padding:16px; margin-bottom:18px;
   }
+
+  .req-card{
+    border:1px solid var(--line-strong);
+    background: var(--paper);
+    border-radius: var(--radius);
+    padding:10px 12px; margin-bottom:8px;
+    cursor:pointer;
+  }
+  .req-card:hover{ border-color: var(--sapphire); background: var(--paper-cool); }
+  .req-card-compact .req-title-row{ margin-bottom:4px; }
+  .req-title-compact{ font-size:13px; }
+
   .req-title-row{
     display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:8px;
     margin-bottom:12px;
@@ -193,12 +205,12 @@
   }
   .trash-icon-btn:hover{ border-color: var(--sapphire); }
 
-  .req-title-row .req-list-trash-expanded,
-  .req-list-row .req-list-trash-expanded{
+  .req-title-row .req-card-trash-expanded{
     flex-basis:100%; order:2;
     background: var(--paper); border:1px solid var(--line); border-radius: var(--radius);
     padding:10px 12px; margin-top:8px;
   }
+  .batch-meta{ color: var(--sapphire); font-weight:600; }
   .req-status::before{ content:""; width:6px; height:6px; background: var(--green); border-radius:1px; }
 
   .credit-block{ background: var(--paper-cool); border-radius: var(--radius); padding:10px 12px; margin-bottom:10px; }

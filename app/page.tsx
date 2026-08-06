@@ -44,7 +44,6 @@ function DashboardContent() {
   >([]);
   const [batchActive, setBatchActive] = useState(false);
   const [batchRequisitionId, setBatchRequisitionId] = useState<string | null>(null);
-  const [batchRequisitionTitle, setBatchRequisitionTitle] = useState<string>('');
   const [allRequisitions, setAllRequisitions] = useState<any[]>([]);
 
   const loadAllRequisitions = useCallback(async () => {
@@ -127,12 +126,10 @@ function DashboardContent() {
   // evaluation's 10-15s isn't spent waiting in a single-file line.
   async function handleBatchUpload(files: File[]) {
     const targetRequisitionId = requisitionId;
-    const targetRequisitionTitle = requisition?.title ?? '';
 
     setBatchQueue(files.map((f) => ({ name: f.name, status: 'pending', message: '' })));
     setBatchActive(true);
     setBatchRequisitionId(targetRequisitionId);
-    setBatchRequisitionTitle(targetRequisitionTitle);
 
     const CONCURRENCY = 3;
     let nextIndex = 0;
@@ -226,9 +223,7 @@ function DashboardContent() {
           onBatchUpload={handleBatchUpload}
           batchQueue={batchQueue}
           batchActive={batchActive}
-          batchBelongsHere={batchRequisitionId === requisitionId}
           batchRequisitionId={batchRequisitionId}
-          batchRequisitionTitle={batchRequisitionTitle}
           onClearBatch={() => {
             setBatchQueue([]);
             setBatchRequisitionId(null);

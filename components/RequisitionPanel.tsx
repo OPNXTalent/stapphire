@@ -33,11 +33,10 @@ const STATUS_ICON: Record<BatchItem['status'], string> = {
   error: '✕'
 };
 
-// A self-contained trash icon + inline expandable list, reusable for
-// any requisition (the current one, or any row in Other Requisitions).
-// Each instance fetches its own requisition's trash on demand — trash
-// stays strictly contained to the resumes within that one requisition,
-// never a shared/global list.
+// Self-contained trash icon + inline expandable list, reusable on any
+// requisition card. Each instance fetches its own requisition's trash
+// on demand — stays strictly contained to that one requisition, never
+// a shared list.
 function TrashControl({
   requisitionId,
   onRestoreCandidate,
@@ -87,7 +86,7 @@ function TrashControl({
         🗑
       </button>
       {open && (
-        <div className="req-list-trash-expanded" onClick={(e) => e.stopPropagation()}>
+        <div className="req-card-trash-expanded" onClick={(e) => e.stopPropagation()}>
           {loading ? (
             <div className="trash-empty-hint">Loading…</div>
           ) : items.length === 0 ? (
@@ -127,9 +126,7 @@ export function RequisitionPanel({
   onBatchUpload,
   batchQueue,
   batchActive,
-  batchBelongsHere,
   batchRequisitionId,
-  batchRequisitionTitle,
   onClearBatch,
   candidateCount,
   onRestoreCandidate,
@@ -145,9 +142,7 @@ export function RequisitionPanel({
   onBatchUpload: (files: File[]) => void;
   batchQueue: BatchItem[];
   batchActive: boolean;
-  batchBelongsHere: boolean;
   batchRequisitionId: string | null;
-  batchRequisitionTitle: string;
   onClearBatch: () => void;
   candidateCount: number;
   onRestoreCandidate: (id: string) => Promise<void>;
@@ -190,6 +185,7 @@ export function RequisitionPanel({
   const successCount = batchQueue.filter((i) => i.status === 'done').length;
   const duplicateCount = batchQueue.filter((i) => i.status === 'duplicate').length;
   const errorCount = batchQueue.filter((i) => i.status === 'error' || i.status === 'non_resume').length;
+  const batchIsHere = batchRequisitionId === requisition.id;
 
   return (
     <div className="req-panel">
@@ -254,7 +250,7 @@ export function RequisitionPanel({
               onChange={handleFileChange}
             />
 
-            {!batchActive && batchQueue.length === 0 && (
+            {!(batchIsHere && (batchActive || batchQueue.length > 0)) && (
               <button
                 className="btn btn-upload"
                 disabled={org.credits_remaining <= 0}
@@ -267,20 +263,7 @@ export function RequisitionPanel({
               </button>
             )}
 
-            {(batchActive || batchQueue.length > 0) && !batchBelongsHere && (
-              <div className="batch-elsewhere">
-                <span>
-                  {batchActive ? 'Batch running' : 'Batch finished'} for <strong>{batchRequisitionTitle}</strong>
-                </span>
-                {batchRequisitionId && (
-                  <button className="qa-btn-text" onClick={() => onSwitchRequisition(batchRequisitionId)}>
-                    Go there
-                  </button>
-                )}
-              </div>
-            )}
-
-            {(batchActive || batchQueue.length > 0) && batchBelongsHere && (
+            {batchIsHere && (batchActive || batchQueue.length > 0) && (
               <div className="batch-panel">
                 <div className="batch-summary">
                   {batchActive ? (
@@ -338,17 +321,31 @@ export function RequisitionPanel({
 
           <div className="req-list">
             <span className="eyebrow">Other Requisitions</span>
-            {otherRequisitions.map((r) => (
-              <div key={r.id} className="req-list-row">
-                <div className="req-list-item" onClick={() => onSwitchRequisition(r.id)}>
-                  <span className="req-list-name">{r.title}</span>
-                  <span className="req-list-meta">
-                    {r.candidateCount} evaluated · {r.status}
-                  </span>
+            {otherRequisitions.map((r) => {
+              const rBatchIsHere = batchRequisitionId === r.id;
+              const rBatchLive = rBatchIsHere && (batchActive || batchQueue.length > 0);
+              return (
+                <div key={r.id} className="req-card req-card-compact" onClick={() => onSwitchRequisition(r.id)}>
+                  <div className="req-title-row">
+                    <div className="req-title req-title-compact">{r.title}</div>
+                    <TrashControl requisitionId={r.id} onRestoreCandidate={onRestoreCandidate} onEmptyTrash={onEmptyTrash} />
+                  </div>
+                  {rBatchLive ? (
+                    <div className="req-list-meta batch-meta">
+                      {batchActive
+                        ? `Evaluating ${doneCount} / ${batchQueue.length}…`
+                        : `Done — ${successCount} evaluated${duplicateCount > 0 ? `, ${duplicateCount} duplicate` : ''}${
+                            errorCount > 0 ? `, ${errorCount} skipped` : ''
+                          }`}
+                    </div>
+                  ) : (
+                    <span className="req-list-meta">
+                      {r.candidateCount} evaluated · {r.status}
+                    </span>
+                  )}
                 </div>
-                <TrashControl requisitionId={r.id} onRestoreCandidate={onRestoreCandidate} onEmptyTrash={onEmptyTrash} />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
