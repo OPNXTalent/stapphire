@@ -23,8 +23,6 @@ type Candidate = {
   evaluations: Evaluation[];
 };
 
-const FILTERS = ['All', 'Greenlight', 'Consider', 'Decline', 'Local', 'Relocation', 'Current Employee', 'Former Employee'];
-
 function facetTier(score: number): 'strong' | 'moderate' | 'limited' {
   if (score >= 85) return 'strong';
   if (score >= 69) return 'moderate';
@@ -52,7 +50,8 @@ export function MatrixPanel({
   onDelete: (candidateId: string) => void;
   onSetDisposition: (candidateId: string, disposition: string) => void;
 }) {
-  const [filter, setFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dispositionFilter, setDispositionFilter] = useState('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -112,16 +111,14 @@ export function MatrixPanel({
   );
 
   const filtered = useMemo(() => {
-    if (filter === 'All') return scored;
-    if (['Greenlight', 'Consider', 'Decline'].includes(filter)) {
-      return scored.filter((c) => c.evaluations[0].status === filter.toLowerCase());
-    }
     return scored.filter((c) => {
-      const signals = c.evaluations[0].signals ?? {};
-      const haystack = Object.values(signals).join(' ').toLowerCase();
-      return haystack.includes(filter.toLowerCase());
+      const statusOk = statusFilter === 'all' || c.evaluations[0].status === statusFilter;
+      const dispositionOk =
+        dispositionFilter === 'all' ||
+        (dispositionFilter === 'none' ? !c.disposition : c.disposition === dispositionFilter);
+      return statusOk && dispositionOk;
     });
-  }, [scored, filter]);
+  }, [scored, statusFilter, dispositionFilter]);
 
   return (
     <>
@@ -155,15 +152,30 @@ export function MatrixPanel({
       <div className="matrix-wrap open">
         <div className="matrix-scroll">
           <div className="filter-row">
-            {FILTERS.map((f) => (
-              <span
-                key={f}
-                className={`filter-chip ${filter === f ? 'active' : ''}`}
-                onClick={() => setFilter(f)}
-              >
-                {f}
-              </span>
-            ))}
+            <select
+              className="matrix-filter-select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="all">All Statuses</option>
+              <option value="greenlight">Greenlight</option>
+              <option value="consider">Consider</option>
+              <option value="decline">Decline</option>
+            </select>
+
+            <select
+              className="matrix-filter-select"
+              value={dispositionFilter}
+              onChange={(e) => setDispositionFilter(e.target.value)}
+            >
+              <option value="all">All Dispositions</option>
+              <option value="none">No Disposition</option>
+              {DISPOSITIONS.map((d) => (
+                <option key={d.value} value={d.value}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="matrix-list">

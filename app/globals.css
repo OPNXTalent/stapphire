@@ -364,6 +364,14 @@
 
   .filter-row{ display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
   .filter-chip{ font-family: var(--font-mono); font-size:10.5px; padding:4px 10px; border-radius:12px; border:1px solid var(--line-strong); color: var(--ink-soft); background: var(--paper); }
+
+  .matrix-filter-select{
+    font-family: var(--font-mono); font-size:11px; color: var(--ink-soft);
+    padding:6px 10px; border-radius:14px; border:1px solid var(--line-strong);
+    background: var(--paper); cursor:pointer;
+  }
+  .matrix-filter-select:hover{ border-color: var(--sapphire); }
+  .matrix-filter-select:focus{ outline:none; border-color: var(--sapphire); }
   .filter-chip.active{ background: var(--deep); border-color: var(--deep); color:#fff; }
   .filter-chip:hover{ border-color: var(--sapphire); }
 
