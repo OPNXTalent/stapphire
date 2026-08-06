@@ -107,13 +107,10 @@ export function RequisitionPanel({
           <div className="req-box">
             <div className="req-title">{requisition.title}</div>
 
-            <button className="qa-btn-text share-link-btn" onClick={handleCopyLink}>
+            <button className="qa-btn-text share-link-btn" style={{ marginBottom: 14 }} onClick={handleCopyLink}>
               <span>{linkCopied ? 'Link copied' : 'Share Link'}</span>
               <span className="share-link-icon">{linkCopied ? '✓' : '⧉'}</span>
             </button>
-            <div className="upload-hint" style={{ marginTop: -8, marginBottom: 14 }}>
-              Read-only — Private Notes never appear in this link
-            </div>
 
             <input
               ref={fileInputRef}

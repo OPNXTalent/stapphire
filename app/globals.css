@@ -135,8 +135,8 @@
   .credit-block-top{ margin-bottom:20px; }
 
   .req-box{
-    border:1.5px solid var(--lavender);
-    background: #F7F4FE;
+    border:1.5px solid var(--sapphire);
+    background: var(--sapphire-pale);
     border-radius: var(--radius);
     padding:16px; margin-bottom:18px;
   }
