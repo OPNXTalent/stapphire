@@ -356,3 +356,41 @@
   ::-webkit-scrollbar-track{ background:transparent; }
   ::-webkit-scrollbar-thumb{ background: var(--line-strong); border-radius:5px; }
   ::-webkit-scrollbar-thumb:hover{ background: var(--ink-faint); }
+
+  /* Row action buttons — Download / Print, inside an expanded matrix row */
+  .matrix-row-actions{
+    display:flex; gap:18px; flex-wrap:wrap;
+    margin-top:16px; padding-top:14px;
+    border-top:1px solid var(--line);
+  }
+  .qa-btn-text{
+    font-family: var(--font-mono); font-size:11px;
+    color: var(--sapphire); background:none; border:none; padding:0;
+    text-decoration:none; border-bottom:1px dotted var(--sapphire);
+    cursor:pointer;
+  }
+  .qa-btn-text:hover{ color: var(--deep); border-bottom-color: var(--deep); }
+  .qa-btn-text:disabled{ color: var(--ink-faint); border-bottom-color: var(--ink-faint); cursor:default; }
+
+  /* Print isolation — printing a single candidate's evaluation shows
+     only that row's content, none of the app chrome, sidebars, or
+     other candidates. */
+  @media print{
+    .brand, .req-panel, .side-panel, .pull-tab,
+    .matrix-toggle, .filter-row, .matrix-row-chev, .matrix-row-actions{
+      display:none !important;
+    }
+    .app{ display:block !important; height:auto !important; margin-top:0 !important; }
+    .center-panel{ display:block !important; height:auto !important; overflow:visible !important; }
+    .matrix-wrap{ overflow:visible !important; flex:none !important; }
+    .matrix-scroll{ padding:0 !important; }
+    .matrix-list{ border:none !important; }
+    .matrix-row{ display:none !important; }
+    .matrix-row.print-target{
+      display:block !important;
+      border:none !important;
+    }
+    .matrix-row.print-target .matrix-row-head{ background:none !important; padding:0 0 12px !important; }
+    .matrix-row.print-target .matrix-row-body{ padding:0 !important; }
+    body{ background:#fff !important; }
+  }

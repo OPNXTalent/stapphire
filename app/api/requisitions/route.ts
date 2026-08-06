@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { anthropic, EVALUATION_MODEL } from '@/lib/anthropic';
-import { extractTextFromFile } from '@/lib/extractText';
+import { extractTextFromBuffer } from '@/lib/extractText';
 
 export const maxDuration = 60;
 
@@ -59,7 +59,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const job_description = file ? await extractTextFromFile(file) : (pastedText as string);
+    const job_description = file
+      ? await extractTextFromBuffer(Buffer.from(await file.arrayBuffer()), file.name, file.type)
+      : (pastedText as string);
 
     if (!job_description.trim()) {
       return NextResponse.json({ error: 'Job description is empty after extraction' }, { status: 400 });

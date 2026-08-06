@@ -1,18 +1,24 @@
 // Shared by resume uploads (/api/evaluate) and job description uploads
 // (/api/requisitions), so both accept the same file types the same way.
+// Takes a Buffer rather than a File so callers can reuse the same bytes
+// for storage (e.g. saving the original resume) without reading the
+// upload twice.
 
-export async function extractTextFromFile(file: File): Promise<string> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const name = file.name.toLowerCase();
+export async function extractTextFromBuffer(
+  buffer: Buffer,
+  filename: string,
+  mimeType?: string
+): Promise<string> {
+  const name = filename.toLowerCase();
 
-  if (file.type === 'application/pdf' || name.endsWith('.pdf')) {
+  if (mimeType === 'application/pdf' || name.endsWith('.pdf')) {
     const pdfParse = (await import('pdf-parse')).default;
     const parsed = await pdfParse(buffer);
     return parsed.text;
   }
 
   if (
-    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
     name.endsWith('.docx')
   ) {
     // .docx is a zip archive of XML, not plain text — reading it as raw

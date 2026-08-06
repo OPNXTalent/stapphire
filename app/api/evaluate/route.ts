@@ -3,7 +3,7 @@ import { createHash } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { anthropic, EVALUATION_MODEL } from '@/lib/anthropic';
 import { EVALUATION_SYSTEM_PROMPT, EVALUATION_TOOL, buildEvaluationUserMessage } from '@/lib/systemPrompt';
-import { extractTextFromFile } from '@/lib/extractText';
+import { extractTextFromBuffer } from '@/lib/extractText';
 
 // Vercel kills serverless functions at 10s by default on the Hobby plan.
 // A full resume evaluation (text extraction + Claude call) routinely
@@ -51,7 +51,8 @@ export async function POST(req: NextRequest) {
         const org = requisition.organizations as { id: string; credits_remaining: number };
 
         send({ type: 'status', message: 'Reading resume' });
-        const resumeText = await extractTextFromFile(file);
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const resumeText = await extractTextFromBuffer(buffer, file.name, file.type);
         const contentHash = createHash('sha256').update(resumeText.trim().toLowerCase()).digest('hex');
 
         // Duplicate check — never re-evaluate, never charge twice, never mention it.
@@ -120,12 +121,36 @@ export async function POST(req: NextRequest) {
 
         send({ type: 'status', message: 'Saving results' });
 
+        // Store the original file so recruiters can download exactly
+        // what the candidate submitted, not just the extracted text.
+        // Non-critical path — a storage failure shouldn't sink the whole
+        // evaluation, so it's logged rather than thrown.
+        let storagePath: string | null = null;
+        try {
+          const ext = file.name.includes('.') ? file.name.split('.').pop() : 'dat';
+          storagePath = `${requisitionId}/${contentHash}.${ext}`;
+          const { error: storageError } = await supabaseAdmin.storage
+            .from('resumes')
+            .upload(storagePath, buffer, {
+              contentType: file.type || 'application/octet-stream',
+              upsert: true
+            });
+          if (storageError) {
+            console.error('Resume storage upload failed:', storageError);
+            storagePath = null;
+          }
+        } catch (storageErr) {
+          console.error('Resume storage upload failed:', storageErr);
+          storagePath = null;
+        }
+
         const { data: candidate, error: candidateError } = await supabaseAdmin
           .from('candidates')
           .insert({
             requisition_id: requisitionId,
             full_name: evaluation.candidate_name,
             source_filename: file.name,
+            original_file_url: storagePath,
             content_hash: contentHash,
             document_type: evaluation.document_type
           })

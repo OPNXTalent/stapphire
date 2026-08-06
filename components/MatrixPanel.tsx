@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type Evaluation = {
   overall_match: number;
@@ -16,6 +16,8 @@ type Candidate = {
   id: string;
   full_name: string;
   document_type: string;
+  source_filename: string | null;
+  original_file_url: string | null;
   evaluations: Evaluation[];
 };
 
@@ -37,6 +39,37 @@ function rankBadgeClass(rank: number) {
 export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
   const [filter, setFilter] = useState('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [printingId, setPrintingId] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  useEffect(() => {
+    function clearPrint() {
+      setPrintingId(null);
+    }
+    window.addEventListener('afterprint', clearPrint);
+    return () => window.removeEventListener('afterprint', clearPrint);
+  }, []);
+
+  function handlePrint(id: string) {
+    setPrintingId(id);
+    // Let the print-only class apply before the browser snapshots the page.
+    requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+  }
+
+  async function handleDownload(id: string) {
+    setDownloading(id);
+    try {
+      const res = await fetch(`/api/candidates/${id}/resume-url`);
+      const data = await res.json();
+      if (data.url) {
+        window.open(data.url, '_blank');
+      } else {
+        console.error(data.error);
+      }
+    } finally {
+      setDownloading(null);
+    }
+  }
 
   const scored = useMemo(
     () =>
@@ -90,8 +123,10 @@ export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
               const isOpen = expandedId === c.id;
 
               return (
-                <div className={`matrix-row ${isOpen ? 'expanded' : ''}`} key={c.id}>
-                  <div
+                <div
+                  className={`matrix-row ${isOpen ? 'expanded' : ''} ${printingId === c.id ? 'print-target' : ''}`}
+                  key={c.id}
+                >                  <div
                     className="matrix-row-head"
                     onClick={() => setExpandedId(isOpen ? null : c.id)}
                   >
@@ -178,6 +213,30 @@ export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
                           </ul>
                         </>
                       )}
+
+                      <div className="matrix-row-actions">
+                        {c.original_file_url && (
+                          <button
+                            className="qa-btn-text"
+                            disabled={downloading === c.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownload(c.id);
+                            }}
+                          >
+                            {downloading === c.id ? 'Preparing download…' : 'Download Original Resume'}
+                          </button>
+                        )}
+                        <button
+                          className="qa-btn-text"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePrint(c.id);
+                          }}
+                        >
+                          Print this evaluation
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
