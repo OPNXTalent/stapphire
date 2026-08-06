@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        const org = requisition.organizations as { id: string; credits_remaining: number };
+        const org = requisition.organizations as { id: string; credits_remaining: number; credits_total: number };
 
         send({ type: 'status', message: 'Reading resume' });
         const buffer = Buffer.from(await file.arrayBuffer());
