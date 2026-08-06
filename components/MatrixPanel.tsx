@@ -35,7 +35,6 @@ function rankBadgeClass(rank: number) {
 }
 
 export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
-  const [open, setOpen] = useState(true);
   const [filter, setFilter] = useState('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -61,16 +60,15 @@ export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
 
   return (
     <>
-      <div className={`matrix-toggle ${open ? 'open' : ''}`} onClick={() => setOpen((o) => !o)}>
+      <div className="matrix-toggle open">
         <svg className="facet-icon" viewBox="0 0 24 24" fill="none">
           <polygon points="12,1 21,7 24,14 17,23 7,23 0,14 3,7" fill="var(--sapphire)" />
         </svg>
         <div className="matrix-toggle-label">Candidate Matrix</div>
         <div className="matrix-toggle-sub">Same rubric, every candidate — tap a name for the full picture</div>
-        <div className="matrix-toggle-chev">▾</div>
       </div>
 
-      <div className={`matrix-wrap ${open ? 'open' : ''}`}>
+      <div className="matrix-wrap open">
         <div className="matrix-scroll">
           <div className="filter-row">
             {FILTERS.map((f) => (

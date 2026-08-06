@@ -5,7 +5,6 @@ import { useSearchParams } from 'next/navigation';
 import { TopBar } from '@/components/TopBar';
 import { RequisitionPanel } from '@/components/RequisitionPanel';
 import { MatrixPanel } from '@/components/MatrixPanel';
-import { CandidateCard } from '@/components/CandidateCard';
 import { CollaborationPanel } from '@/components/CollaborationPanel';
 
 // NOTE: org selection is hardcoded for a single-tenant v1. Swap for a
@@ -148,20 +147,6 @@ function DashboardContent() {
 
         <div className="center-panel">
           <MatrixPanel candidates={candidates} />
-          <div className="main-view">
-            {candidates
-              .filter((c) => c.document_type === 'resume')
-              .map((c, i) => (
-                <div key={c.id} onClick={() => setActiveCandidateId(c.id)}>
-                  <CandidateCard
-                    candidate={c}
-                    index={i}
-                    onAddNote={setActiveCandidateId}
-                    onShare={(id) => handleInvite('')}
-                  />
-                </div>
-              ))}
-          </div>
         </div>
 
         <CollaborationPanel
