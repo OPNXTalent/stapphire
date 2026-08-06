@@ -228,7 +228,7 @@ export function RequisitionPanel({
           <span className="eyebrow">Open Requisition</span>
           <div className="req-box">
             <div className="req-title-row">
-              <div className="req-title">{requisition.title}</div>
+              <div className="req-title" title={requisition.title}>{requisition.title}</div>
               <TrashControl
                 requisitionId={requisition.id}
                 onRestoreCandidate={onRestoreCandidate}
@@ -321,7 +321,7 @@ export function RequisitionPanel({
               return (
                 <div key={r.id} className="req-card req-card-compact" onClick={() => onSwitchRequisition(r.id)}>
                   <div className="req-title-row">
-                    <div className="req-title req-title-compact">{r.title}</div>
+                    <div className="req-title req-title-compact" title={r.title}>{r.title}</div>
                     <TrashControl requisitionId={r.id} onRestoreCandidate={onRestoreCandidate} onEmptyTrash={onEmptyTrash} />
                   </div>
                   {rBatchLive ? (
