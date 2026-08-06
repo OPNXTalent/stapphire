@@ -165,6 +165,16 @@ create index idx_evaluations_requisition on evaluations(requisition_id);
 create index idx_collab_requisition on collaboration_events(requisition_id);
 create index idx_notes_candidate on notes(candidate_id);
 
+-- ── Free trial usage (rolling 24h window, no paid credits required) ─
+-- Orgs with 0 paid credits can still evaluate up to 5 resumes per
+-- rolling 24 hours, tracked here rather than as a fixed pool.
+create table free_trial_usage (
+  id uuid primary key default uuid_generate_v4(),
+  org_id uuid not null references organizations(id) on delete cascade,
+  used_at timestamptz not null default now()
+);
+create index idx_free_trial_usage_org on free_trial_usage(org_id, used_at);
+
 -- ── Atomic credit decrement (called from the evaluate API route) ──
 create or replace function decrement_credit_and_log(p_org_id uuid, p_candidate_id uuid)
 returns void as $$

@@ -69,10 +69,42 @@ export async function POST(req: NextRequest) {
           return;
         }
 
+        // No paid credits doesn't automatically mean "blocked" — orgs
+        // trying the product get 5 free evaluations per rolling 24
+        // hours, checked against real timestamps rather than a
+        // calendar-day reset.
+        let usingFreeTrial = false;
         if (org.credits_remaining <= 0) {
-          send({ type: 'error', message: 'No evaluation credits remaining' });
-          controller.close();
-          return;
+          if (org.credits_total > 0) {
+            // Has purchased before, just currently at zero — the free
+            // trial isn't a leak valve for paying customers who ran
+            // out; that's what upgrading is for.
+            send({ type: 'error', message: 'No evaluation credits remaining' });
+            controller.close();
+            return;
+          }
+          const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          const { count, error: trialCheckError } = await supabaseAdmin
+            .from('free_trial_usage')
+            .select('*', { count: 'exact', head: true })
+            .eq('org_id', org.id)
+            .gte('used_at', dayAgo);
+
+          if (trialCheckError) {
+            send({ type: 'error', message: trialCheckError.message });
+            controller.close();
+            return;
+          }
+
+          if ((count ?? 0) >= 5) {
+            send({
+              type: 'error',
+              message: 'Free trial limit reached — 5 evaluations per 24 hours. Upgrade for more.'
+            });
+            controller.close();
+            return;
+          }
+          usingFreeTrial = true;
         }
 
         send({ type: 'status', message: 'Checking evidence against the job description' });
@@ -199,10 +231,14 @@ export async function POST(req: NextRequest) {
 
         if (evalError) throw evalError;
 
-        await supabaseAdmin.rpc('decrement_credit_and_log', {
-          p_org_id: org.id,
-          p_candidate_id: candidate.id
-        });
+        if (usingFreeTrial) {
+          await supabaseAdmin.from('free_trial_usage').insert({ org_id: org.id });
+        } else {
+          await supabaseAdmin.rpc('decrement_credit_and_log', {
+            p_org_id: org.id,
+            p_candidate_id: candidate.id
+          });
+        }
 
         send({ type: 'done', candidate, evaluation: evalRow });
         controller.close();

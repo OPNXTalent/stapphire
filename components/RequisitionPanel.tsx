@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Requisition = {
   id: string;
@@ -11,6 +11,7 @@ type Requisition = {
 };
 
 type Org = {
+  id?: string;
   credits_remaining: number;
   credits_total: number;
   credits_refill_at: string | null;
@@ -68,6 +69,18 @@ export function RequisitionPanel({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [trialStatus, setTrialStatus] = useState<{ used: number; remaining: number; limit: number } | null>(null);
+
+  useEffect(() => {
+    if (org.credits_total > 0 || !org.id) {
+      setTrialStatus(null);
+      return;
+    }
+    fetch(`/api/organizations/${org.id}/free-trial-status`, { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => setTrialStatus(data))
+      .catch(() => {});
+  }, [org.id, org.credits_total, org.credits_remaining]);
 
   async function handleCopyLink() {
     if (!requisition.share_token) return;
@@ -133,14 +146,32 @@ export function RequisitionPanel({
       {!collapsed && (
         <div className="req-panel-inner">
           <div className="credit-block credit-block-top">
-            <div className="credit-count">
-              {org.credits_remaining}
-              <span> / {org.credits_total} profiles</span>
-            </div>
-            {org.credits_refill_at && <div className="credit-label">Refills {org.credits_refill_at}</div>}
-            <div className="credit-bar">
-              <div className="credit-bar-fill" style={{ width: `${pct}%` }} />
-            </div>
+            {trialStatus ? (
+              <>
+                <div className="credit-count">
+                  {trialStatus.remaining}
+                  <span> / {trialStatus.limit} free today</span>
+                </div>
+                <div className="credit-label">Resets on a rolling 24h basis — upgrade for more</div>
+                <div className="credit-bar">
+                  <div
+                    className="credit-bar-fill"
+                    style={{ width: `${(trialStatus.remaining / trialStatus.limit) * 100}%` }}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="credit-count">
+                  {org.credits_remaining}
+                  <span> / {org.credits_total} profiles</span>
+                </div>
+                {org.credits_refill_at && <div className="credit-label">Refills {org.credits_refill_at}</div>}
+                <div className="credit-bar">
+                  <div className="credit-bar-fill" style={{ width: `${pct}%` }} />
+                </div>
+              </>
+            )}
           </div>
 
           <button className="btn add-req-btn" onClick={onAddRequisition}>
