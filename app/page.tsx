@@ -34,6 +34,7 @@ function DashboardContent() {
   const [events, setEvents] = useState<any[]>([]);
   const [notes, setNotes] = useState<any[]>([]);
   const [activeCandidateId, setActiveCandidateId] = useState<string | null>(null);
+  const [sidePanelTab, setSidePanelTab] = useState<'notes' | 'collaboration'>('notes');
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -49,15 +50,37 @@ function DashboardContent() {
     }
   }, [activeCandidateId]);
 
-  const loadCollaboration = useCallback(async () => {
-    const res = await fetch(`/api/collaboration?requisition_id=${requisitionId}`, { cache: 'no-store' });
+  // Both Notes and Collaboration are scoped to whichever candidate is
+  // currently active — genuinely per-candidate, not just a generic
+  // sidebar. Re-fetch whenever the active candidate changes.
+  const loadNotes = useCallback(async (candidateId: string) => {
+    const res = await fetch(`/api/notes?candidate_id=${candidateId}`, { cache: 'no-store' });
     const data = await res.json();
-    setEvents(data.events ?? []);
+    setNotes(data.notes ?? []);
   }, []);
+
+  const loadCollaboration = useCallback(
+    async (candidateId?: string) => {
+      const url = candidateId
+        ? `/api/collaboration?requisition_id=${requisitionId}&candidate_id=${candidateId}`
+        : `/api/collaboration?requisition_id=${requisitionId}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      const data = await res.json();
+      setEvents(data.events ?? []);
+    },
+    [requisitionId]
+  );
 
   useEffect(() => {
     Promise.all([loadRequisition(), loadCollaboration()]).finally(() => setLoading(false));
   }, [requisitionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (activeCandidateId) {
+      loadNotes(activeCandidateId);
+      loadCollaboration(activeCandidateId);
+    }
+  }, [activeCandidateId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleUpload(file: File, onProgress: (status: string) => void) {
     const formData = new FormData();
@@ -101,9 +124,28 @@ function DashboardContent() {
   }
 
   async function handleSaveNote(body: string) {
-    // A dedicated /api/notes route mirrors the pattern of /api/collaboration;
-    // omitted here for brevity but follows the same shape.
-    console.log('save note', activeCandidateId, body);
+    if (!activeCandidateId) return;
+    await fetch('/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_id: activeCandidateId, body })
+    });
+    await loadNotes(activeCandidateId);
+  }
+
+  async function handleComment(body: string) {
+    if (!activeCandidateId) return;
+    await fetch('/api/collaboration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requisition_id: requisitionId,
+        candidate_id: activeCandidateId,
+        event_type: 'commented',
+        comment: body
+      })
+    });
+    await loadCollaboration(activeCandidateId);
   }
 
   async function handleInvite(email: string) {
@@ -112,12 +154,20 @@ function DashboardContent() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         requisition_id: requisitionId,
-        actor_id: org?.currentUserId,
         event_type: 'shared',
         comment: `Invited ${email}`
       })
     });
-    await loadCollaboration();
+    await loadCollaboration(activeCandidateId ?? undefined);
+  }
+
+  // Called from the Matrix row buttons — jumps the side panel straight
+  // to the right candidate and tab, expanding the panel if it was
+  // collapsed.
+  function handleOpenPanel(candidateId: string, tab: 'notes' | 'collaboration') {
+    setActiveCandidateId(candidateId);
+    setSidePanelTab(tab);
+    setRightCollapsed(false);
   }
 
   if (loading) return <div style={{ padding: 40 }}>Loading requisition…</div>;
@@ -130,6 +180,8 @@ function DashboardContent() {
   ]
     .filter(Boolean)
     .join(' ');
+
+  const activeCandidateName = candidates.find((c) => c.id === activeCandidateId)?.full_name ?? null;
 
   return (
     <>
@@ -146,18 +198,26 @@ function DashboardContent() {
         />
 
         <div className="center-panel">
-          <MatrixPanel candidates={candidates} />
+          <MatrixPanel
+            candidates={candidates}
+            onOpenNotes={(id) => handleOpenPanel(id, 'notes')}
+            onOpenCollaboration={(id) => handleOpenPanel(id, 'collaboration')}
+          />
         </div>
 
         <CollaborationPanel
           collapsed={rightCollapsed}
           onExpand={() => setRightCollapsed(false)}
           onCollapse={() => setRightCollapsed(true)}
+          tab={sidePanelTab}
+          onTabChange={setSidePanelTab}
           activeCandidateId={activeCandidateId}
+          activeCandidateName={activeCandidateName}
           notes={notes}
           events={events}
           hasUnread={events.length > 0}
           onSaveNote={handleSaveNote}
+          onComment={handleComment}
           onInvite={handleInvite}
         />
       </div>

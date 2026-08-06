@@ -93,7 +93,7 @@ create table collaboration_events (
 create table notes (
   id uuid primary key default uuid_generate_v4(),
   candidate_id uuid not null references candidates(id) on delete cascade,
-  author_id uuid not null references profiles(id),
+  author_id uuid references profiles(id),
   body text not null,
   updated_at timestamptz not null default now()
 );

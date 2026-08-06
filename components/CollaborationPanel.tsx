@@ -20,8 +20,8 @@ type Note = {
 
 const ICONS: Record<CollabEvent['event_type'], string> = {
   decision: '✓',
-  commented: '\ud83d\udcac',
-  viewed: '\ud83d\udc41',
+  commented: '💬',
+  viewed: '👁',
   shared: '⤴'
 };
 
@@ -43,25 +43,33 @@ export function CollaborationPanel({
   collapsed,
   onExpand,
   onCollapse,
+  tab,
+  onTabChange,
   activeCandidateId,
+  activeCandidateName,
   notes,
   events,
   hasUnread,
   onSaveNote,
+  onComment,
   onInvite
 }: {
   collapsed: boolean;
   onExpand: () => void;
   onCollapse: () => void;
+  tab: 'notes' | 'collaboration';
+  onTabChange: (tab: 'notes' | 'collaboration') => void;
   activeCandidateId: string | null;
+  activeCandidateName: string | null;
   notes: Note[];
   events: CollabEvent[];
   hasUnread: boolean;
   onSaveNote: (body: string) => void;
+  onComment: (body: string) => void;
   onInvite: (email: string) => void;
 }) {
-  const [tab, setTab] = useState<'notes' | 'collaboration'>('notes');
   const [draft, setDraft] = useState('');
+  const [commentDraft, setCommentDraft] = useState('');
   const [email, setEmail] = useState('');
 
   if (collapsed) {
@@ -78,12 +86,12 @@ export function CollaborationPanel({
         ›
       </button>
       <div className="side-tabs">
-        <button className={`side-tab ${tab === 'notes' ? 'active' : ''}`} onClick={() => setTab('notes')}>
+        <button className={`side-tab ${tab === 'notes' ? 'active' : ''}`} onClick={() => onTabChange('notes')}>
           Private Notes
         </button>
         <button
           className={`side-tab ${tab === 'collaboration' ? 'active' : ''}`}
-          onClick={() => setTab('collaboration')}
+          onClick={() => onTabChange('collaboration')}
         >
           Collaboration
           {hasUnread && <span className="tab-dot" />}
@@ -94,14 +102,22 @@ export function CollaborationPanel({
         <div className="side-content">
           {activeCandidateId ? (
             <>
+              <div className="note-target">
+                On <strong>{activeCandidateName ?? 'this candidate'}</strong>
+              </div>
               <textarea
                 className="note-input"
                 placeholder="Only you can see this..."
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                onBlur={() => draft.trim() && onSaveNote(draft)}
+                onBlur={() => {
+                  if (draft.trim()) {
+                    onSaveNote(draft);
+                    setDraft('');
+                  }
+                }}
               />
-              <div className="save-hint">Saved automatically</div>
+              <div className="save-hint">Saved when you click away</div>
             </>
           ) : (
             <div className="note-target">Select a candidate to add a note</div>
@@ -136,6 +152,35 @@ export function CollaborationPanel({
               Invite
             </button>
           </div>
+
+          {activeCandidateId ? (
+            <>
+              <div className="note-target">
+                Comment on <strong>{activeCandidateName ?? 'this candidate'}</strong>
+              </div>
+              <textarea
+                className="note-input"
+                placeholder="Visible to everyone with access to this requisition..."
+                value={commentDraft}
+                onChange={(e) => setCommentDraft(e.target.value)}
+              />
+              <button
+                className="invite-btn"
+                style={{ marginBottom: 14 }}
+                disabled={!commentDraft.trim()}
+                onClick={() => {
+                  if (commentDraft.trim()) {
+                    onComment(commentDraft);
+                    setCommentDraft('');
+                  }
+                }}
+              >
+                Post comment
+              </button>
+            </>
+          ) : (
+            <div className="note-target">Select a candidate to see or leave collaboration history</div>
+          )}
 
           {events.map((e) => (
             <div className="hist-entry" key={e.id}>

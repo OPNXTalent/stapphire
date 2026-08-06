@@ -36,7 +36,15 @@ function rankBadgeClass(rank: number) {
   return null;
 }
 
-export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
+export function MatrixPanel({
+  candidates,
+  onOpenNotes,
+  onOpenCollaboration
+}: {
+  candidates: Candidate[];
+  onOpenNotes: (candidateId: string) => void;
+  onOpenCollaboration: (candidateId: string) => void;
+}) {
   const [filter, setFilter] = useState('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
@@ -252,6 +260,24 @@ export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
                           }}
                         >
                           Print this evaluation
+                        </button>
+                        <button
+                          className="qa-btn-text"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenNotes(c.id);
+                          }}
+                        >
+                          Private Notes
+                        </button>
+                        <button
+                          className="qa-btn-text"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenCollaboration(c.id);
+                          }}
+                        >
+                          Collaboration
                         </button>
                       </div>
                     </div>
