@@ -2,17 +2,21 @@
 
 import { useMemo, useState } from 'react';
 
+type Evaluation = {
+  overall_match: number;
+  status: 'greenlight' | 'consider' | 'decline';
+  signals: Record<string, string>;
+  matrix_dimensions: Record<string, string>;
+  strengths: string[];
+  gaps: string[];
+  risk_flags: string[];
+};
+
 type Candidate = {
   id: string;
   full_name: string;
   document_type: string;
-  evaluations: {
-    overall_match: number;
-    status: 'greenlight' | 'consider' | 'decline';
-    signals: Record<string, string>;
-    matrix_dimensions: Record<string, string>;
-    risk_flags: string[];
-  }[];
+  evaluations: Evaluation[];
 };
 
 const FILTERS = ['All', 'Greenlight', 'Consider', 'Decline', 'Local', 'Relocation', 'Current Employee', 'Former Employee'];
@@ -30,19 +34,10 @@ function rankBadgeClass(rank: number) {
   return null;
 }
 
-// Matrix cells are for scanning, not reading — full reasoning belongs in
-// the candidate card below. Show a short lead-in here, full text on
-// hover via the native title tooltip.
-function shortLabel(text: string, maxLen = 28): string {
-  if (text.length <= maxLen) return text;
-  const cut = text.slice(0, maxLen);
-  const lastSpace = cut.lastIndexOf(' ');
-  return (lastSpace > 12 ? cut.slice(0, lastSpace) : cut).trim() + '…';
-}
-
 export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
   const [open, setOpen] = useState(true);
   const [filter, setFilter] = useState('All');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const scored = useMemo(
     () =>
@@ -64,11 +59,6 @@ export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
     });
   }, [scored, filter]);
 
-  const dimensionKeys = useMemo(() => {
-    const first = scored.find((c) => c.evaluations[0]?.matrix_dimensions);
-    return first ? Object.keys(first.evaluations[0].matrix_dimensions) : [];
-  }, [scored]);
-
   return (
     <>
       <div className={`matrix-toggle ${open ? 'open' : ''}`} onClick={() => setOpen((o) => !o)}>
@@ -76,7 +66,7 @@ export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
           <polygon points="12,1 21,7 24,14 17,23 7,23 0,14 3,7" fill="var(--sapphire)" />
         </svg>
         <div className="matrix-toggle-label">Candidate Matrix</div>
-        <div className="matrix-toggle-sub">Same rubric, every candidate — evidence compared side by side</div>
+        <div className="matrix-toggle-sub">Same rubric, every candidate — tap a name for the full picture</div>
         <div className="matrix-toggle-chev">▾</div>
       </div>
 
@@ -94,55 +84,108 @@ export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
             ))}
           </div>
 
-          <table className="matrix">
-            <thead>
-              <tr>
-                <th className="matrix-sticky matrix-sticky-1">Rank</th>
-                <th className="matrix-sticky matrix-sticky-2">Candidate</th>
-                <th className="matrix-sticky matrix-sticky-3">Job Match</th>
-                {dimensionKeys.map((k) => (
-                  <th key={k}>{k}</th>
-                ))}
-                <th>Key Risk</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c, i) => {
-                const evalu = c.evaluations[0];
-                const badge = rankBadgeClass(i + 1);
-                const topRisk = evalu.risk_flags?.[0];
-                return (
-                  <tr key={c.id}>
-                    <td className="matrix-sticky matrix-sticky-1">
-                      {badge ? <span className={badge}>{i + 1}</span> : i + 1}
-                    </td>
-                    <td className="cand-name matrix-sticky matrix-sticky-2">{c.full_name}</td>
-                    <td className="matrix-sticky matrix-sticky-3">
-                      <div className="facet-cell">
-                        <span className="score-num">{evalu.overall_match}%</span>
-                        <div className={`facet-mini ${facetTier(evalu.overall_match)}`} />
+          <div className="matrix-list">
+            {filtered.map((c, i) => {
+              const evalu = c.evaluations[0];
+              const badge = rankBadgeClass(i + 1);
+              const topRisk = evalu.risk_flags?.[0];
+              const isOpen = expandedId === c.id;
+
+              return (
+                <div className={`matrix-row ${isOpen ? 'expanded' : ''}`} key={c.id}>
+                  <div
+                    className="matrix-row-head"
+                    onClick={() => setExpandedId(isOpen ? null : c.id)}
+                  >
+                    <span className="matrix-row-rank">
+                      {badge ? <span className={badge}>{i + 1}</span> : <span className="rank-num">{i + 1}</span>}
+                    </span>
+
+                    <div className="matrix-row-main">
+                      <div className="matrix-row-name">{c.full_name}</div>
+                      {!isOpen && topRisk && <div className="matrix-row-risk-preview">{topRisk}</div>}
+                    </div>
+
+                    <div className="facet-cell matrix-row-match">
+                      <span className="score-num">{evalu.overall_match}%</span>
+                      <div className={`facet-mini ${facetTier(evalu.overall_match)}`} />
+                    </div>
+
+                    <span className={`rec-pill ${evalu.status}`}>
+                      {evalu.status.charAt(0).toUpperCase() + evalu.status.slice(1)}
+                    </span>
+
+                    <span className="matrix-row-chev">▾</span>
+                  </div>
+
+                  {isOpen && (
+                    <div className="matrix-row-body">
+                      {Object.keys(evalu.matrix_dimensions ?? {}).length > 0 && (
+                        <>
+                          <div className="section-label">Job-Specific Fit</div>
+                          <div className="signal-row">
+                            {Object.entries(evalu.matrix_dimensions).map(([k, v]) => (
+                              <div className="signal-chip" key={k}>
+                                <span className="signal-label">{k}</span>
+                                <span className="signal-value">{v}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+
+                      {Object.keys(evalu.signals ?? {}).length > 0 && (
+                        <>
+                          <div className="section-label">Evaluation Signals</div>
+                          <div className="signal-row">
+                            {Object.entries(evalu.signals).map(
+                              ([k, v]) =>
+                                v && (
+                                  <div className="signal-chip" key={k}>
+                                    <span className="signal-label">{k.replace(/_/g, ' ')}</span>
+                                    <span className="signal-value">{v}</span>
+                                  </div>
+                                )
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      <div className="two-col">
+                        <div>
+                          <div className="section-label">Evidence</div>
+                          <ul className="plain evidence">
+                            {evalu.strengths?.map((s, idx) => (
+                              <li key={idx}>{s}</li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div>
+                          <div className="section-label">Gaps</div>
+                          <ul className="plain gaps">
+                            {evalu.gaps?.map((g, idx) => (
+                              <li key={idx}>{g}</li>
+                            ))}
+                          </ul>
+                        </div>
                       </div>
-                    </td>
-                    {dimensionKeys.map((k) => {
-                      const value = evalu.matrix_dimensions?.[k];
-                      return (
-                        <td key={k} title={value ?? undefined}>
-                          {value ? shortLabel(value) : '—'}
-                        </td>
-                      );
-                    })}
-                    <td title={topRisk ?? undefined}>{topRisk ? shortLabel(topRisk, 34) : '—'}</td>
-                    <td>
-                      <span className={`rec-pill ${evalu.status}`}>
-                        {evalu.status.charAt(0).toUpperCase() + evalu.status.slice(1)}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+
+                      {evalu.risk_flags?.length > 0 && (
+                        <>
+                          <div className="section-label">Risk Flags</div>
+                          <ul className="plain gaps">
+                            {evalu.risk_flags.map((r, idx) => (
+                              <li key={idx}>{r}</li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </>

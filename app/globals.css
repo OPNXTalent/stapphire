@@ -187,29 +187,44 @@
   .matrix-toggle.open .matrix-toggle-chev{ transform: rotate(180deg); }
 
   .matrix-wrap{ max-height:0; overflow:hidden; background: var(--paper); border-bottom:1px solid var(--line); transition: max-height 0.25s ease; flex-shrink:0; }
-  .matrix-wrap.open{ max-height:420px; overflow-y:auto; }
-  .matrix-scroll{ padding:14px 24px 18px; overflow-x:auto; }
+  .matrix-wrap.open{ max-height:520px; overflow-y:auto; }
+  .matrix-scroll{ padding:14px 20px 18px; }
 
   .filter-row{ display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
   .filter-chip{ font-family: var(--font-mono); font-size:10.5px; padding:4px 10px; border-radius:12px; border:1px solid var(--line-strong); color: var(--ink-soft); background: var(--paper); }
   .filter-chip.active{ background: var(--deep); border-color: var(--deep); color:#fff; }
   .filter-chip:hover{ border-color: var(--sapphire); }
 
-  table.matrix{ width:max-content; min-width:100%; border-collapse:collapse; font-size:12px; }
-  table.matrix th{ text-align:left; font-family: var(--font-mono); font-size:10px; letter-spacing:0.04em; text-transform:uppercase; color: var(--ink-faint); font-weight:500; padding:0 12px 8px 0; border-bottom:1px solid var(--line-strong); white-space:nowrap; }
-  table.matrix td{ padding:9px 12px 9px 0; border-bottom:1px solid var(--line); vertical-align:top; color: var(--ink-soft); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  table.matrix tr:hover td{ background: var(--paper-cool); }
-  table.matrix tr:hover td.matrix-sticky{ background: var(--paper-cool); }
+  /* Vertical, mobile-first candidate list. Collapsed rows are for
+     scanning and skipping declines fast; tap a name for the full
+     picture instead of forcing everything into wide table columns. */
+  .matrix-list{ display:flex; flex-direction:column; border:1px solid var(--line); border-radius: var(--radius); overflow:hidden; }
+  .matrix-row{ background: var(--paper); border-bottom:1px solid var(--line); }
+  .matrix-row:last-child{ border-bottom:none; }
+  .matrix-row-head{
+    display:flex; align-items:center; gap:12px;
+    padding:11px 14px; cursor:pointer;
+  }
+  .matrix-row-head:hover{ background: var(--paper-cool); }
+  .matrix-row.expanded .matrix-row-head{ background: var(--sapphire-pale); }
+  .matrix-row-rank{ flex-shrink:0; width:22px; text-align:center; }
+  .rank-num{ font-family: var(--font-mono); font-weight:600; font-size:12px; color: var(--ink-faint); }
+  .matrix-row-main{ flex:1; min-width:0; }
+  .matrix-row-name{ font-weight:700; color: var(--ink); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .matrix-row-risk-preview{ font-size:11px; color: var(--ink-faint); margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .matrix-row-match{ flex-shrink:0; }
+  .matrix-row-chev{ flex-shrink:0; font-family: var(--font-mono); font-size:11px; color: var(--ink-faint); transition: transform 0.15s ease; }
+  .matrix-row.expanded .matrix-row-chev{ transform: rotate(180deg); }
 
-  /* Frozen columns — Rank/Candidate/Job Match stay visible while
-     scrolling through the JD-specific comparison columns. Widths are
-     fixed so the left offsets line up exactly. */
-  .matrix-sticky{ position:sticky; background: var(--paper); z-index:2; white-space:nowrap; }
-  .matrix-sticky-1{ left:0; width:38px; min-width:38px; }
-  .matrix-sticky-2{ left:38px; width:150px; min-width:150px; max-width:150px; }
-  .matrix-sticky-3{ left:188px; width:90px; min-width:90px; box-shadow: 2px 0 4px -2px rgba(11,46,107,0.15); }
-  th.matrix-sticky{ z-index:3; background: var(--paper); }
+  .matrix-row-body{ padding:4px 16px 18px; animation: cardEnter 0.2s ease; }
   .cand-name{ font-weight:700; color: var(--ink); font-size:12.5px; }
+
+  @media (max-width: 560px){
+    .matrix-row-head{ flex-wrap:wrap; row-gap:6px; }
+    .matrix-row-main{ order:1; flex-basis:100%; }
+    .matrix-row-rank{ order:0; }
+    .matrix-row-match{ order:2; }
+  }
   .rec-pill{ font-family: var(--font-mono); font-size:10px; padding:2.5px 8px; border-radius:2px; white-space:nowrap; display:inline-block; }
   .rec-pill.greenlight{ background: var(--green-tint); color: var(--green); }
   .rec-pill.consider{ background: var(--amber-tint); color: var(--amber); }
