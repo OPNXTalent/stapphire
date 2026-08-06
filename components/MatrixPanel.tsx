@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { DISPOSITIONS } from '@/lib/dispositions';
+import { MultiSelectFilter } from '@/components/MultiSelectFilter';
 
 type Evaluation = {
   overall_match: number;
@@ -50,8 +51,8 @@ export function MatrixPanel({
   onDelete: (candidateId: string) => void;
   onSetDisposition: (candidateId: string, disposition: string) => void;
 }) {
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [dispositionFilter, setDispositionFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [dispositionFilter, setDispositionFilter] = useState<string[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -112,10 +113,10 @@ export function MatrixPanel({
 
   const filtered = useMemo(() => {
     return scored.filter((c) => {
-      const statusOk = statusFilter === 'all' || c.evaluations[0].status === statusFilter;
+      const statusOk = statusFilter.length === 0 || statusFilter.includes(c.evaluations[0].status);
       const dispositionOk =
-        dispositionFilter === 'all' ||
-        (dispositionFilter === 'none' ? !c.disposition : c.disposition === dispositionFilter);
+        dispositionFilter.length === 0 ||
+        (c.disposition ? dispositionFilter.includes(c.disposition) : dispositionFilter.includes('none'));
       return statusOk && dispositionOk;
     });
   }, [scored, statusFilter, dispositionFilter]);
@@ -152,30 +153,23 @@ export function MatrixPanel({
       <div className="matrix-wrap open">
         <div className="matrix-scroll">
           <div className="filter-row">
-            <select
-              className="matrix-filter-select"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">All Statuses</option>
-              <option value="greenlight">Greenlight</option>
-              <option value="consider">Consider</option>
-              <option value="decline">Decline</option>
-            </select>
+            <MultiSelectFilter
+              label="Status"
+              options={[
+                { value: 'greenlight', label: 'Greenlight' },
+                { value: 'consider', label: 'Consider' },
+                { value: 'decline', label: 'Decline' }
+              ]}
+              selected={statusFilter}
+              onChange={setStatusFilter}
+            />
 
-            <select
-              className="matrix-filter-select"
-              value={dispositionFilter}
-              onChange={(e) => setDispositionFilter(e.target.value)}
-            >
-              <option value="all">All Dispositions</option>
-              <option value="none">No Disposition</option>
-              {DISPOSITIONS.map((d) => (
-                <option key={d.value} value={d.value}>
-                  {d.label}
-                </option>
-              ))}
-            </select>
+            <MultiSelectFilter
+              label="Disposition"
+              options={[{ value: 'none', label: 'No Disposition' }, ...DISPOSITIONS]}
+              selected={dispositionFilter}
+              onChange={setDispositionFilter}
+            />
           </div>
 
           <div className="matrix-list">

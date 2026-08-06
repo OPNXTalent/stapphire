@@ -365,14 +365,38 @@
   .filter-row{ display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
   .filter-chip{ font-family: var(--font-mono); font-size:10.5px; padding:4px 10px; border-radius:12px; border:1px solid var(--line-strong); color: var(--ink-soft); background: var(--paper); }
 
-  .matrix-filter-select{
+  .multiselect{ position:relative; }
+  .multiselect-trigger{
     font-family: var(--font-mono); font-size:11px; font-weight:600;
     color: var(--sapphire-pale);
     padding:6px 10px; border-radius:14px; border:1px solid var(--sapphire);
     background: var(--sapphire); cursor:pointer;
+    display:inline-flex; align-items:center; gap:5px;
   }
-  .matrix-filter-select:hover{ background: var(--deep); border-color: var(--deep); }
-  .matrix-filter-select:focus{ outline:none; background: var(--deep); border-color: var(--deep); }
+  .multiselect-trigger:hover{ background: var(--deep); border-color: var(--deep); }
+  .multiselect-trigger-active{ background: var(--deep); border-color: var(--deep); }
+  .multiselect-chev{ font-size:9px; }
+
+  .multiselect-panel{
+    position:absolute; top:calc(100% + 6px); left:0; z-index:20;
+    background: var(--paper); border:1px solid var(--line-strong); border-radius: var(--radius);
+    padding:8px; min-width:180px; max-height:260px; overflow-y:auto;
+    box-shadow: 0 8px 24px rgba(11,20,40,0.15);
+  }
+  .multiselect-option{
+    display:flex; align-items:center; gap:8px;
+    padding:6px 4px; font-size:12px; color: var(--ink-soft); cursor:pointer;
+    border-radius:4px;
+  }
+  .multiselect-option:hover{ background: var(--paper-cool); }
+  .multiselect-option input{ cursor:pointer; }
+  .multiselect-clear{
+    display:block; width:100%; text-align:left;
+    font-family: var(--font-mono); font-size:10px; color: var(--sapphire);
+    background:none; border:none; cursor:pointer;
+    padding:4px; margin-bottom:4px; border-bottom:1px solid var(--line);
+  }
+  .multiselect-clear:hover{ color: var(--deep); }
   .filter-chip.active{ background: var(--deep); border-color: var(--deep); color:#fff; }
   .filter-chip:hover{ border-color: var(--sapphire); }
 
