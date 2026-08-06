@@ -30,6 +30,16 @@ function rankBadgeClass(rank: number) {
   return null;
 }
 
+// Matrix cells are for scanning, not reading — full reasoning belongs in
+// the candidate card below. Show a short lead-in here, full text on
+// hover via the native title tooltip.
+function shortLabel(text: string, maxLen = 28): string {
+  if (text.length <= maxLen) return text;
+  const cut = text.slice(0, maxLen);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > 12 ? cut.slice(0, lastSpace) : cut).trim() + '…';
+}
+
 export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
   const [open, setOpen] = useState(true);
   const [filter, setFilter] = useState('All');
@@ -87,9 +97,9 @@ export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
           <table className="matrix">
             <thead>
               <tr>
-                <th>Rank</th>
-                <th>Candidate</th>
-                <th>Job Match</th>
+                <th className="matrix-sticky matrix-sticky-1">Rank</th>
+                <th className="matrix-sticky matrix-sticky-2">Candidate</th>
+                <th className="matrix-sticky matrix-sticky-3">Job Match</th>
                 {dimensionKeys.map((k) => (
                   <th key={k}>{k}</th>
                 ))}
@@ -101,20 +111,28 @@ export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
               {filtered.map((c, i) => {
                 const evalu = c.evaluations[0];
                 const badge = rankBadgeClass(i + 1);
+                const topRisk = evalu.risk_flags?.[0];
                 return (
                   <tr key={c.id}>
-                    <td>{badge ? <span className={badge}>{i + 1}</span> : i + 1}</td>
-                    <td className="cand-name">{c.full_name}</td>
-                    <td>
+                    <td className="matrix-sticky matrix-sticky-1">
+                      {badge ? <span className={badge}>{i + 1}</span> : i + 1}
+                    </td>
+                    <td className="cand-name matrix-sticky matrix-sticky-2">{c.full_name}</td>
+                    <td className="matrix-sticky matrix-sticky-3">
                       <div className="facet-cell">
                         <span className="score-num">{evalu.overall_match}%</span>
                         <div className={`facet-mini ${facetTier(evalu.overall_match)}`} />
                       </div>
                     </td>
-                    {dimensionKeys.map((k) => (
-                      <td key={k}>{evalu.matrix_dimensions?.[k] ?? '—'}</td>
-                    ))}
-                    <td>{evalu.risk_flags?.[0] ?? '—'}</td>
+                    {dimensionKeys.map((k) => {
+                      const value = evalu.matrix_dimensions?.[k];
+                      return (
+                        <td key={k} title={value ?? undefined}>
+                          {value ? shortLabel(value) : '—'}
+                        </td>
+                      );
+                    })}
+                    <td title={topRisk ?? undefined}>{topRisk ? shortLabel(topRisk, 34) : '—'}</td>
                     <td>
                       <span className={`rec-pill ${evalu.status}`}>
                         {evalu.status.charAt(0).toUpperCase() + evalu.status.slice(1)}

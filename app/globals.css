@@ -197,8 +197,18 @@
 
   table.matrix{ width:max-content; min-width:100%; border-collapse:collapse; font-size:12px; }
   table.matrix th{ text-align:left; font-family: var(--font-mono); font-size:10px; letter-spacing:0.04em; text-transform:uppercase; color: var(--ink-faint); font-weight:500; padding:0 12px 8px 0; border-bottom:1px solid var(--line-strong); white-space:nowrap; }
-  table.matrix td{ padding:9px 12px 9px 0; border-bottom:1px solid var(--line); vertical-align:top; color: var(--ink-soft); }
+  table.matrix td{ padding:9px 12px 9px 0; border-bottom:1px solid var(--line); vertical-align:top; color: var(--ink-soft); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   table.matrix tr:hover td{ background: var(--paper-cool); }
+  table.matrix tr:hover td.matrix-sticky{ background: var(--paper-cool); }
+
+  /* Frozen columns — Rank/Candidate/Job Match stay visible while
+     scrolling through the JD-specific comparison columns. Widths are
+     fixed so the left offsets line up exactly. */
+  .matrix-sticky{ position:sticky; background: var(--paper); z-index:2; white-space:nowrap; }
+  .matrix-sticky-1{ left:0; width:38px; min-width:38px; }
+  .matrix-sticky-2{ left:38px; width:150px; min-width:150px; max-width:150px; }
+  .matrix-sticky-3{ left:188px; width:90px; min-width:90px; box-shadow: 2px 0 4px -2px rgba(11,46,107,0.15); }
+  th.matrix-sticky{ z-index:3; background: var(--paper); }
   .cand-name{ font-weight:700; color: var(--ink); font-size:12.5px; }
   .rec-pill{ font-family: var(--font-mono); font-size:10px; padding:2.5px 8px; border-radius:2px; white-space:nowrap; display:inline-block; }
   .rec-pill.greenlight{ background: var(--green-tint); color: var(--green); }
