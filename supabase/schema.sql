@@ -118,6 +118,18 @@ create table requisition_shares (
   created_at timestamptz not null default now()
 );
 
+-- ── Lightweight identity for share-link visitors ────────────────
+-- Not a real login (no password) — a quick name-gate so a collaborator
+-- arriving via a share link has a real, fixed database record instead
+-- of a freely-editable text field. Real authenticated accounts remain
+-- a separate, larger piece of future work.
+create table share_collaborators (
+  id uuid primary key default uuid_generate_v4(),
+  requisition_id uuid not null references requisitions(id) on delete cascade,
+  name text not null,
+  created_at timestamptz not null default now()
+);
+
 -- ── Credit ledger (audit trail for billing) ─────────────────────
 create table credit_transactions (
   id uuid primary key default uuid_generate_v4(),

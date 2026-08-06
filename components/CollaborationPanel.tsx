@@ -19,8 +19,6 @@ type Note = {
   profiles: { full_name: string } | null;
 };
 
-const NAME_STORAGE_KEY = 'stapphire_commenter_name';
-
 const ICONS: Record<CollabEvent['event_type'], string> = {
   decision: '✓',
   commented: '💬',
@@ -59,6 +57,7 @@ export function CollaborationPanel({
   requisitionId,
   activeCandidateId,
   activeCandidateName,
+  collaboratorName,
   hideNotesTab = false
 }: {
   collapsed: boolean;
@@ -67,6 +66,7 @@ export function CollaborationPanel({
   requisitionId: string;
   activeCandidateId: string | null;
   activeCandidateName: string | null;
+  collaboratorName: string;
   hideNotesTab?: boolean;
 }) {
   const [tab, setTab] = useState<'notes' | 'collaboration'>(hideNotesTab ? 'collaboration' : 'notes');
@@ -75,17 +75,6 @@ export function CollaborationPanel({
   const [events, setEvents] = useState<CollabEvent[]>([]);
   const [draft, setDraft] = useState('');
   const [commentDraft, setCommentDraft] = useState('');
-  const [commenterName, setCommenterName] = useState('');
-
-  useEffect(() => {
-    const saved = typeof window !== 'undefined' ? window.localStorage.getItem(NAME_STORAGE_KEY) : null;
-    if (saved) setCommenterName(saved);
-  }, []);
-
-  function handleNameChange(value: string) {
-    setCommenterName(value);
-    if (typeof window !== 'undefined') window.localStorage.setItem(NAME_STORAGE_KEY, value);
-  }
 
   // Default back to candidate mode whenever a new candidate becomes active.
   useEffect(() => {
@@ -136,7 +125,7 @@ export function CollaborationPanel({
       body: JSON.stringify({
         requisition_id: requisitionId,
         candidate_id: viewMode === 'candidate' ? activeCandidateId : null,
-        actor_name: commenterName.trim() || null,
+        actor_name: collaboratorName || null,
         event_type: 'commented',
         comment: commentDraft
       })
@@ -203,13 +192,8 @@ export function CollaborationPanel({
       ) : (
         <div className="side-content">
           <div className="commenter-name-row">
-            <span className="commenter-name-label">Your name</span>
-            <input
-              type="text"
-              placeholder="e.g. Dana Pruitt"
-              value={commenterName}
-              onChange={(e) => handleNameChange(e.target.value)}
-            />
+            <span className="commenter-name-label">Commenting as</span>
+            <span className="commenter-name-fixed">{collaboratorName}</span>
           </div>
 
           <div className="filter-row" style={{ marginBottom: 14 }}>

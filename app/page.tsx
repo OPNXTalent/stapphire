@@ -155,6 +155,7 @@ function DashboardContent() {
           requisitionId={requisitionId}
           activeCandidateId={activeCandidateId}
           activeCandidateName={activeCandidateName}
+          collaboratorName="You"
         />
       </div>
     </>

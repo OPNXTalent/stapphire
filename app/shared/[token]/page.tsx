@@ -14,6 +14,15 @@ export const dynamic = 'force-dynamic';
 // candidate out of the active list and bring them back — but
 // permanently emptying trash stays exclusive to the recruiter's own
 // dashboard.
+//
+// Visitors pass through a one-time name gate before seeing anything.
+// It's not a real login (no password) — just enough to give every
+// collaborator a fixed, database-backed identity instead of an
+// editable text field, so comments are reliably attributable.
+
+function storageKey(token: string) {
+  return `stapphire_collab_${token}`;
+}
 
 export default function SharedRequisitionPage({ params }: { params: { token: string } }) {
   const [requisition, setRequisition] = useState<any>(null);
@@ -24,6 +33,46 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
   const [trashOpen, setTrashOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+
+  const [collaboratorName, setCollaboratorName] = useState<string | null>(null);
+  const [gateChecked, setGateChecked] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(storageKey(params.token));
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed?.name) setCollaboratorName(parsed.name);
+      } catch {
+        // ignore malformed storage
+      }
+    }
+    setGateChecked(true);
+  }, [params.token]);
+
+  async function handleEnter() {
+    if (!nameInput.trim()) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/shared/${params.token}/collaborators`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nameInput.trim() })
+      });
+      const data = await res.json();
+      if (data.collaborator) {
+        window.localStorage.setItem(
+          storageKey(params.token),
+          JSON.stringify({ id: data.collaborator.id, name: data.collaborator.name })
+        );
+        setCollaboratorName(data.collaborator.name);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/shared/${params.token}`, { cache: 'no-store' });
@@ -47,8 +96,8 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
   }, [requisition]);
 
   useEffect(() => {
-    load().finally(() => setLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (collaboratorName) load().finally(() => setLoading(false));
+  }, [collaboratorName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (requisition) loadTrash();
@@ -63,6 +112,42 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
   async function handleRestoreCandidate(candidateId: string) {
     await fetch(`/api/candidates/${candidateId}/restore`, { method: 'POST' });
     await Promise.all([load(), loadTrash()]);
+  }
+
+  if (!gateChecked) {
+    return null;
+  }
+
+  if (!collaboratorName) {
+    return (
+      <div className="share-gate">
+        <div className="share-gate-card">
+          <svg className="gem" viewBox="0 0 24 24" fill="none" style={{ width: 32, height: 32, marginBottom: 16 }}>
+            <polygon points="12,1 21,7 24,14 17,23 7,23 0,14 3,7" fill="url(#gateGemGrad)" />
+            <defs>
+              <linearGradient id="gateGemGrad" x1="0" y1="0" x2="24" y2="23">
+                <stop offset="0%" stopColor="#5C87F5" />
+                <stop offset="100%" stopColor="#123A8F" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <div className="share-gate-title">Who's joining?</div>
+          <div className="share-gate-sub">Your name will be shown on any comments you leave.</div>
+          <input
+            type="text"
+            className="share-gate-input"
+            placeholder="Your name"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleEnter()}
+            autoFocus
+          />
+          <button className="btn btn-primary" disabled={!nameInput.trim() || submitting} onClick={handleEnter}>
+            {submitting ? 'Joining…' : 'Continue'}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (notFound) {
@@ -118,6 +203,7 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
           requisitionId={requisition.id}
           activeCandidateId={activeCandidateId}
           activeCandidateName={activeCandidateName}
+          collaboratorName={collaboratorName}
           hideNotesTab
         />
       </div>
