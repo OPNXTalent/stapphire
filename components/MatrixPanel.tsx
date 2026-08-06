@@ -42,11 +42,13 @@ function rankBadgeClass(rank: number) {
 // candidate is currently expanded via onSelectCandidate.
 export function MatrixPanel({
   candidates,
+  requisitionTitle,
   onSelectCandidate,
   onDelete,
   onSetDisposition
 }: {
   candidates: Candidate[];
+  requisitionTitle: string;
   onSelectCandidate: (candidateId: string | null) => void;
   onDelete: (candidateId: string) => void;
   onSetDisposition: (candidateId: string, disposition: string) => void;
@@ -152,6 +154,10 @@ export function MatrixPanel({
 
       <div className="matrix-wrap open">
         <div className="matrix-scroll">
+          <div className="matrix-req-title" title={requisitionTitle}>
+            {requisitionTitle}
+          </div>
+
           <div className="filter-row">
             <MultiSelectFilter
               label="Status"

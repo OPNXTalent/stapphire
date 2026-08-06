@@ -361,6 +361,11 @@
 
   .matrix-wrap{ flex:1; overflow-y:auto; background: var(--paper); }
   .matrix-scroll{ padding:14px 20px 18px; }
+  .matrix-req-title{
+    font-family: var(--font-display); font-weight:700; font-size:18px;
+    color: var(--ink); margin-bottom:12px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
 
   .filter-row{ display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
   .filter-chip{ font-family: var(--font-mono); font-size:10.5px; padding:4px 10px; border-radius:12px; border:1px solid var(--line-strong); color: var(--ink-soft); background: var(--paper); }
@@ -656,7 +661,7 @@
     @page{ margin: 0.6in; }
 
     .brand, .req-panel, .side-panel, .pull-tab,
-    .matrix-toggle, .filter-row, .matrix-row-chev, .matrix-row-actions, .disposition-select{
+    .matrix-toggle, .filter-row, .matrix-row-chev, .matrix-row-actions, .disposition-select, .matrix-req-title{
       display:none !important;
     }
     .print-header{ display:flex !important; padding-bottom:14px; margin-bottom:20px; border-bottom:2px solid var(--sapphire); }
