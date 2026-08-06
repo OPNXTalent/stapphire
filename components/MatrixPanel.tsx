@@ -36,18 +36,17 @@ function rankBadgeClass(rank: number) {
   return null;
 }
 
+// Expanding a row IS selecting it — no separate "Private Notes" /
+// "Collaboration" buttons needed. The side panel just follows whichever
+// candidate is currently expanded via onSelectCandidate.
 export function MatrixPanel({
   candidates,
-  onOpenNotes,
-  onOpenCollaboration,
-  onDelete,
-  showPrivateActions = true
+  onSelectCandidate,
+  onDelete
 }: {
   candidates: Candidate[];
-  onOpenNotes: (candidateId: string) => void;
-  onOpenCollaboration: (candidateId: string) => void;
+  onSelectCandidate: (candidateId: string) => void;
   onDelete: (candidateId: string) => void;
-  showPrivateActions?: boolean;
 }) {
   const [filter, setFilter] = useState('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -64,7 +63,6 @@ export function MatrixPanel({
 
   function handlePrint(id: string) {
     setPrintingId(id);
-    // Let the print-only class apply before the browser snapshots the page.
     requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
   }
 
@@ -81,6 +79,12 @@ export function MatrixPanel({
     } finally {
       setDownloading(null);
     }
+  }
+
+  function handleToggleRow(id: string, isOpen: boolean) {
+    const opening = !isOpen;
+    setExpandedId(opening ? id : null);
+    if (opening) onSelectCandidate(id);
   }
 
   const scored = useMemo(
@@ -156,10 +160,8 @@ export function MatrixPanel({
                 <div
                   className={`matrix-row ${isOpen ? 'expanded' : ''} ${printingId === c.id ? 'print-target' : ''}`}
                   key={c.id}
-                >                  <div
-                    className="matrix-row-head"
-                    onClick={() => setExpandedId(isOpen ? null : c.id)}
-                  >
+                >
+                  <div className="matrix-row-head" onClick={() => handleToggleRow(c.id, isOpen)}>
                     <span className="matrix-row-rank">
                       {badge ? <span className={badge}>{i + 1}</span> : <span className="rank-num">{i + 1}</span>}
                     </span>
@@ -177,18 +179,16 @@ export function MatrixPanel({
                       {evalu.status.charAt(0).toUpperCase() + evalu.status.slice(1)}
                     </span>
 
-                    {showPrivateActions && (
-                      <button
-                        className="matrix-row-delete"
-                        title="Move to trash"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete(c.id);
-                        }}
-                      >
-                        🗑
-                      </button>
-                    )}
+                    <button
+                      className="matrix-row-delete"
+                      title="Move to trash"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(c.id);
+                      }}
+                    >
+                      🗑
+                    </button>
 
                     <span className="matrix-row-chev">▾</span>
                   </div>
@@ -277,26 +277,6 @@ export function MatrixPanel({
                           }}
                         >
                           Print this evaluation
-                        </button>
-                        {showPrivateActions && (
-                          <button
-                            className="qa-btn-text"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenNotes(c.id);
-                            }}
-                          >
-                            Private Notes
-                          </button>
-                        )}
-                        <button
-                          className="qa-btn-text"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenCollaboration(c.id);
-                          }}
-                        >
-                          Collaboration
                         </button>
                       </div>
                     </div>

@@ -207,6 +207,9 @@
   .trash-item:last-of-type{ border-bottom:none; }
   .trash-item-name{ font-size:12px; color: var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+  .shared-trash-bar{ background: var(--paper); border-bottom:1px solid var(--line); padding:10px 24px; flex-shrink:0; }
+  .shared-trash-list{ margin-top:10px; max-width:340px; }
+
   .req-footer{ margin-top:auto; padding:14px 16px; border-top:1px solid var(--line); font-family: var(--font-mono); font-size:10.5px; color: var(--ink-faint); display:flex; justify-content:space-between; }
   .req-footer a{ color: var(--ink-soft); text-decoration:none; }
 

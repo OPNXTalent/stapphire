@@ -12,6 +12,7 @@ export const revalidate = 0;
 export async function GET(req: NextRequest) {
   const requisitionId = req.nextUrl.searchParams.get('requisition_id');
   const candidateId = req.nextUrl.searchParams.get('candidate_id');
+  const scope = req.nextUrl.searchParams.get('scope');
   if (!requisitionId) return NextResponse.json({ error: 'requisition_id required' }, { status: 400 });
 
   let query = supabaseAdmin
@@ -20,11 +21,14 @@ export async function GET(req: NextRequest) {
     .eq('requisition_id', requisitionId)
     .order('created_at', { ascending: false });
 
-  // Scope to one candidate when opened from a specific row, so the
-  // panel shows that candidate's history rather than the whole
-  // requisition's noise.
   if (candidateId) {
+    // Scope to one candidate, so the panel shows that candidate's
+    // history rather than the whole requisition's noise.
     query = query.eq('candidate_id', candidateId);
+  } else if (scope === 'general') {
+    // General discussion — comments about the role/requisition itself,
+    // not tied to any one candidate.
+    query = query.is('candidate_id', null);
   }
 
   const { data, error } = await query;

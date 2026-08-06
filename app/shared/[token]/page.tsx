@@ -10,13 +10,18 @@ export const dynamic = 'force-dynamic';
 // This route is deliberately its own page, not the recruiter dashboard
 // with a flag toggled off. Structurally separating them guarantees
 // Private Notes can never leak into a shared link, no matter what.
+// Trash/restore IS available here — a hiring manager can move a
+// candidate out of the active list and bring them back — but
+// permanently emptying trash stays exclusive to the recruiter's own
+// dashboard.
 
 export default function SharedRequisitionPage({ params }: { params: { token: string } }) {
   const [requisition, setRequisition] = useState<any>(null);
   const [candidates, setCandidates] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
+  const [trashedCandidates, setTrashedCandidates] = useState<any[]>([]);
   const [activeCandidateId, setActiveCandidateId] = useState<string | null>(null);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -32,42 +37,32 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
     if (!activeCandidateId && data.candidates?.[0]) {
       setActiveCandidateId(data.candidates[0].id);
     }
-  }, [params.token, activeCandidateId]);
+  }, [params.token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadCollaboration = useCallback(
-    async (candidateId?: string) => {
-      if (!requisition) return;
-      const url = candidateId
-        ? `/api/collaboration?requisition_id=${requisition.id}&candidate_id=${candidateId}`
-        : `/api/collaboration?requisition_id=${requisition.id}`;
-      const res = await fetch(url, { cache: 'no-store' });
-      const data = await res.json();
-      setEvents(data.events ?? []);
-    },
-    [requisition]
-  );
+  const loadTrash = useCallback(async () => {
+    if (!requisition) return;
+    const res = await fetch(`/api/requisitions/${requisition.id}/trash`, { cache: 'no-store' });
+    const data = await res.json();
+    setTrashedCandidates(data.candidates ?? []);
+  }, [requisition]);
 
   useEffect(() => {
     load().finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (activeCandidateId) loadCollaboration(activeCandidateId);
-  }, [activeCandidateId, requisition]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (requisition) loadTrash();
+  }, [requisition]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleComment(body: string) {
-    if (!activeCandidateId || !requisition) return;
-    await fetch('/api/collaboration', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requisition_id: requisition.id,
-        candidate_id: activeCandidateId,
-        event_type: 'commented',
-        comment: body
-      })
-    });
-    await loadCollaboration(activeCandidateId);
+  async function handleDeleteCandidate(candidateId: string) {
+    await fetch(`/api/candidates/${candidateId}`, { method: 'DELETE' });
+    if (activeCandidateId === candidateId) setActiveCandidateId(null);
+    await Promise.all([load(), loadTrash()]);
+  }
+
+  async function handleRestoreCandidate(candidateId: string) {
+    await fetch(`/api/candidates/${candidateId}/restore`, { method: 'POST' });
+    await Promise.all([load(), loadTrash()]);
   }
 
   if (notFound) {
@@ -84,12 +79,35 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
       <TopBar requisitionTitle={`${requisition.title} — Shared View`} />
       <div className={`app shared-view ${rightCollapsed ? 'right-collapsed' : ''}`}>
         <div className="center-panel">
+          <div className="shared-trash-bar">
+            <span className="trash-header" onClick={() => setTrashOpen((o) => !o)} style={{ display: 'inline-flex' }}>
+              <span className="eyebrow" style={{ marginBottom: 0 }}>
+                Trash {trashedCandidates.length > 0 ? `(${trashedCandidates.length})` : ''}
+              </span>
+              {trashedCandidates.length > 0 && <span className="trash-chev">{trashOpen ? '▾' : '▸'}</span>}
+            </span>
+            {trashOpen && (
+              <div className="shared-trash-list">
+                {trashedCandidates.length === 0 ? (
+                  <div className="trash-empty-hint">Nothing in trash</div>
+                ) : (
+                  trashedCandidates.map((c: any) => (
+                    <div key={c.id} className="trash-item">
+                      <span className="trash-item-name">{c.full_name}</span>
+                      <button className="qa-btn-text" onClick={() => handleRestoreCandidate(c.id)}>
+                        Restore
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
           <MatrixPanel
             candidates={candidates}
-            showPrivateActions={false}
-            onOpenNotes={() => {}}
-            onOpenCollaboration={(id) => setActiveCandidateId(id)}
-            onDelete={() => {}}
+            onSelectCandidate={setActiveCandidateId}
+            onDelete={handleDeleteCandidate}
           />
         </div>
 
@@ -97,16 +115,9 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
           collapsed={rightCollapsed}
           onExpand={() => setRightCollapsed(false)}
           onCollapse={() => setRightCollapsed(true)}
-          tab="collaboration"
-          onTabChange={() => {}}
+          requisitionId={requisition.id}
           activeCandidateId={activeCandidateId}
           activeCandidateName={activeCandidateName}
-          notes={[]}
-          events={events}
-          hasUnread={false}
-          onSaveNote={() => {}}
-          onComment={handleComment}
-          onInvite={() => {}}
           hideNotesTab
         />
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type CollabEvent = {
   id: string;
@@ -39,40 +39,107 @@ function describeEvent(e: CollabEvent) {
   }
 }
 
+// This component owns its own data now — notes and collaboration events
+// are fetched here based on requisitionId / activeCandidateId, rather
+// than pre-fetched by the parent page. That's what makes the General
+// vs. per-candidate toggle possible without threading extra state
+// through every parent component.
 export function CollaborationPanel({
   collapsed,
   onExpand,
   onCollapse,
-  tab,
-  onTabChange,
+  requisitionId,
   activeCandidateId,
   activeCandidateName,
-  notes,
-  events,
-  hasUnread,
-  onSaveNote,
-  onComment,
-  onInvite,
   hideNotesTab = false
 }: {
   collapsed: boolean;
   onExpand: () => void;
   onCollapse: () => void;
-  tab: 'notes' | 'collaboration';
-  onTabChange: (tab: 'notes' | 'collaboration') => void;
+  requisitionId: string;
   activeCandidateId: string | null;
   activeCandidateName: string | null;
-  notes: Note[];
-  events: CollabEvent[];
-  hasUnread: boolean;
-  onSaveNote: (body: string) => void;
-  onComment: (body: string) => void;
-  onInvite: (email: string) => void;
   hideNotesTab?: boolean;
 }) {
+  const [tab, setTab] = useState<'notes' | 'collaboration'>(hideNotesTab ? 'collaboration' : 'notes');
+  const [viewMode, setViewMode] = useState<'candidate' | 'general'>(activeCandidateId ? 'candidate' : 'general');
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [events, setEvents] = useState<CollabEvent[]>([]);
   const [draft, setDraft] = useState('');
   const [commentDraft, setCommentDraft] = useState('');
   const [email, setEmail] = useState('');
+
+  // Default back to candidate mode whenever a new candidate becomes active.
+  useEffect(() => {
+    if (activeCandidateId) setViewMode('candidate');
+  }, [activeCandidateId]);
+
+  useEffect(() => {
+    if (!hideNotesTab && activeCandidateId) loadNotes();
+  }, [activeCandidateId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    loadEvents();
+  }, [requisitionId, activeCandidateId, viewMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadNotes() {
+    if (!activeCandidateId) return;
+    const res = await fetch(`/api/notes?candidate_id=${activeCandidateId}`, { cache: 'no-store' });
+    const data = await res.json();
+    setNotes(data.notes ?? []);
+  }
+
+  async function loadEvents() {
+    const url =
+      viewMode === 'candidate' && activeCandidateId
+        ? `/api/collaboration?requisition_id=${requisitionId}&candidate_id=${activeCandidateId}`
+        : `/api/collaboration?requisition_id=${requisitionId}&scope=general`;
+    const res = await fetch(url, { cache: 'no-store' });
+    const data = await res.json();
+    setEvents(data.events ?? []);
+  }
+
+  async function handleSaveNote() {
+    if (!activeCandidateId || !draft.trim()) return;
+    await fetch('/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_id: activeCandidateId, body: draft })
+    });
+    setDraft('');
+    loadNotes();
+  }
+
+  async function handlePostComment() {
+    if (!commentDraft.trim()) return;
+    await fetch('/api/collaboration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requisition_id: requisitionId,
+        candidate_id: viewMode === 'candidate' ? activeCandidateId : null,
+        event_type: 'commented',
+        comment: commentDraft
+      })
+    });
+    setCommentDraft('');
+    loadEvents();
+  }
+
+  async function handleInvite() {
+    if (!email.trim()) return;
+    await fetch('/api/collaboration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requisition_id: requisitionId,
+        event_type: 'shared',
+        comment: `Invited ${email.trim()}`
+      })
+    });
+    setEmail('');
+    loadEvents();
+  }
 
   if (collapsed) {
     return (
@@ -89,16 +156,15 @@ export function CollaborationPanel({
       </button>
       <div className="side-tabs">
         {!hideNotesTab && (
-          <button className={`side-tab ${tab === 'notes' ? 'active' : ''}`} onClick={() => onTabChange('notes')}>
+          <button className={`side-tab ${tab === 'notes' ? 'active' : ''}`} onClick={() => setTab('notes')}>
             Private Notes
           </button>
         )}
         <button
           className={`side-tab ${tab === 'collaboration' ? 'active' : ''}`}
-          onClick={() => onTabChange('collaboration')}
+          onClick={() => setTab('collaboration')}
         >
           Collaboration
-          {hasUnread && <span className="tab-dot" />}
         </button>
       </div>
 
@@ -114,17 +180,12 @@ export function CollaborationPanel({
                 placeholder="Only you can see this..."
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                onBlur={() => {
-                  if (draft.trim()) {
-                    onSaveNote(draft);
-                    setDraft('');
-                  }
-                }}
+                onBlur={handleSaveNote}
               />
               <div className="save-hint">Saved when you click away</div>
             </>
           ) : (
-            <div className="note-target">Select a candidate to add a note</div>
+            <div className="note-target">Expand a candidate to add a note</div>
           )}
           {notes.map((n) => (
             <div className="note-entry" key={n.id}>
@@ -144,47 +205,41 @@ export function CollaborationPanel({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
-            <button
-              className="invite-btn"
-              onClick={() => {
-                if (email.trim()) {
-                  onInvite(email.trim());
-                  setEmail('');
-                }
-              }}
-            >
+            <button className="invite-btn" onClick={handleInvite}>
               Invite
             </button>
           </div>
 
-          {activeCandidateId ? (
-            <>
-              <div className="note-target">
-                Comment on <strong>{activeCandidateName ?? 'this candidate'}</strong>
-              </div>
-              <textarea
-                className="note-input"
-                placeholder="Visible to everyone with access to this requisition..."
-                value={commentDraft}
-                onChange={(e) => setCommentDraft(e.target.value)}
-              />
-              <button
-                className="invite-btn"
-                style={{ marginBottom: 14 }}
-                disabled={!commentDraft.trim()}
-                onClick={() => {
-                  if (commentDraft.trim()) {
-                    onComment(commentDraft);
-                    setCommentDraft('');
-                  }
-                }}
+          <div className="filter-row" style={{ marginBottom: 14 }}>
+            <span
+              className={`filter-chip ${viewMode === 'general' ? 'active' : ''}`}
+              onClick={() => setViewMode('general')}
+            >
+              General
+            </span>
+            {activeCandidateId && (
+              <span
+                className={`filter-chip ${viewMode === 'candidate' ? 'active' : ''}`}
+                onClick={() => setViewMode('candidate')}
               >
-                Post comment
-              </button>
-            </>
-          ) : (
-            <div className="note-target">Select a candidate to see or leave collaboration history</div>
-          )}
+                {activeCandidateName ?? 'Candidate'}
+              </span>
+            )}
+          </div>
+
+          <textarea
+            className="note-input"
+            placeholder={
+              viewMode === 'general'
+                ? 'Comment on the requisition as a whole...'
+                : `Comment on ${activeCandidateName ?? 'this candidate'}...`
+            }
+            value={commentDraft}
+            onChange={(e) => setCommentDraft(e.target.value)}
+          />
+          <button className="invite-btn" style={{ marginBottom: 14 }} disabled={!commentDraft.trim()} onClick={handlePostComment}>
+            Post comment
+          </button>
 
           {events.map((e) => (
             <div className="hist-entry" key={e.id}>
