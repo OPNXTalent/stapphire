@@ -55,6 +55,7 @@ export function CollaborationPanel({
   onExpand,
   onCollapse,
   requisitionId,
+  requisitionTitle,
   activeCandidateId,
   activeCandidateName,
   collaboratorName,
@@ -64,6 +65,7 @@ export function CollaborationPanel({
   onExpand: () => void;
   onCollapse: () => void;
   requisitionId: string;
+  requisitionTitle: string;
   activeCandidateId: string | null;
   activeCandidateName: string | null;
   collaboratorName: string;
@@ -76,9 +78,15 @@ export function CollaborationPanel({
   const [draft, setDraft] = useState('');
   const [commentDraft, setCommentDraft] = useState('');
 
-  // Default back to candidate mode whenever a new candidate becomes active.
+  // No candidate expanded → this is about the requisition, not a
+  // leftover selection. Clear notes too, since they're candidate-only.
   useEffect(() => {
-    if (activeCandidateId) setViewMode('candidate');
+    if (activeCandidateId) {
+      setViewMode('candidate');
+    } else {
+      setViewMode('general');
+      setNotes([]);
+    }
   }, [activeCandidateId]);
 
   useEffect(() => {
@@ -201,7 +209,7 @@ export function CollaborationPanel({
               className={`filter-chip ${viewMode === 'general' ? 'active' : ''}`}
               onClick={() => setViewMode('general')}
             >
-              General
+              {requisitionTitle || 'General'}
             </span>
             {activeCandidateId && (
               <span
@@ -217,7 +225,7 @@ export function CollaborationPanel({
             className="note-input"
             placeholder={
               viewMode === 'general'
-                ? 'Comment on the requisition as a whole...'
+                ? `Comment on ${requisitionTitle || 'the requisition'} as a whole...`
                 : `Comment on ${activeCandidateName ?? 'this candidate'}...`
             }
             value={commentDraft}

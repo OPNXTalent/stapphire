@@ -83,9 +83,6 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
     const data = await res.json();
     setRequisition(data.requisition);
     setCandidates(data.candidates ?? []);
-    if (!activeCandidateId && data.candidates?.[0]) {
-      setActiveCandidateId(data.candidates[0].id);
-    }
   }, [params.token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadTrash = useCallback(async () => {
@@ -201,6 +198,7 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
           onExpand={() => setRightCollapsed(false)}
           onCollapse={() => setRightCollapsed(true)}
           requisitionId={requisition.id}
+          requisitionTitle={requisition.title}
           activeCandidateId={activeCandidateId}
           activeCandidateName={activeCandidateName}
           collaboratorName={collaboratorName}

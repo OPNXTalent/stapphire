@@ -45,7 +45,7 @@ export function MatrixPanel({
   onDelete
 }: {
   candidates: Candidate[];
-  onSelectCandidate: (candidateId: string) => void;
+  onSelectCandidate: (candidateId: string | null) => void;
   onDelete: (candidateId: string) => void;
 }) {
   const [filter, setFilter] = useState('All');
@@ -84,7 +84,9 @@ export function MatrixPanel({
   function handleToggleRow(id: string, isOpen: boolean) {
     const opening = !isOpen;
     setExpandedId(opening ? id : null);
-    if (opening) onSelectCandidate(id);
+    // Collapsing clears selection too — when nothing is expanded, the
+    // side panel should be about the requisition, not a stale candidate.
+    onSelectCandidate(opening ? id : null);
   }
 
   const scored = useMemo(

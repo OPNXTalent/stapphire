@@ -39,10 +39,7 @@ function DashboardContent() {
     setRequisition(data.requisition);
     setCandidates(data.candidates ?? []);
     setOrg(data.requisition?.organizations ?? null);
-    if (!activeCandidateId && data.candidates?.[0]) {
-      setActiveCandidateId(data.candidates[0].id);
-    }
-  }, [activeCandidateId]);
+  }, [requisitionId]);
 
   const loadTrash = useCallback(async () => {
     const res = await fetch(`/api/requisitions/${requisitionId}/trash`, { cache: 'no-store' });
@@ -153,6 +150,7 @@ function DashboardContent() {
           onExpand={() => setRightCollapsed(false)}
           onCollapse={() => setRightCollapsed(true)}
           requisitionId={requisitionId}
+          requisitionTitle={requisition.title}
           activeCandidateId={activeCandidateId}
           activeCandidateName={activeCandidateName}
           collaboratorName="You"
