@@ -226,14 +226,13 @@
   .matrix-row-head{
     display:flex; align-items:center; gap:12px;
     padding:11px 14px; cursor:pointer;
+    background: var(--sapphire-pale);
   }
-  .matrix-row-head:hover{ background: var(--paper-cool); }
-  .matrix-row.expanded .matrix-row-head{ background: var(--sapphire-pale); }
+  .matrix-row-head:hover{ background: #CFDBFA; }
   .matrix-row-rank{ flex-shrink:0; width:22px; text-align:center; }
   .rank-num{ font-family: var(--font-mono); font-weight:600; font-size:12px; color: var(--ink-faint); }
   .matrix-row-main{ flex:1; min-width:0; }
   .matrix-row-name{ font-weight:700; color: var(--ink); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .matrix-row-risk-preview{ font-size:11px; color: var(--ink-faint); margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .matrix-row-match{ flex-shrink:0; }
   .matrix-row-chev{ flex-shrink:0; font-family: var(--font-mono); font-size:11px; color: var(--ink-faint); transition: transform 0.15s ease; }
   .matrix-row.expanded .matrix-row-chev{ transform: rotate(180deg); }

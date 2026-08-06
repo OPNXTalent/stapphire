@@ -138,7 +138,6 @@ export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
             {filtered.map((c, i) => {
               const evalu = c.evaluations[0];
               const badge = rankBadgeClass(i + 1);
-              const topRisk = evalu.risk_flags?.[0];
               const isOpen = expandedId === c.id;
 
               return (
@@ -155,7 +154,6 @@ export function MatrixPanel({ candidates }: { candidates: Candidate[] }) {
 
                     <div className="matrix-row-main">
                       <div className="matrix-row-name">{c.full_name}</div>
-                      {!isOpen && topRisk && <div className="matrix-row-risk-preview">{topRisk}</div>}
                     </div>
 
                     <div className="facet-cell matrix-row-match">
