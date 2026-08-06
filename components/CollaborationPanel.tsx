@@ -199,11 +199,6 @@ export function CollaborationPanel({
         </div>
       ) : (
         <div className="side-content">
-          <div className="commenter-name-row">
-            <span className="commenter-name-label">Commenting as</span>
-            <span className="commenter-name-fixed">{collaboratorName}</span>
-          </div>
-
           <div className="filter-row" style={{ marginBottom: 14 }}>
             <span
               className={`filter-chip ${viewMode === 'general' ? 'active' : ''}`}
@@ -225,15 +220,19 @@ export function CollaborationPanel({
             className="note-input"
             placeholder={
               viewMode === 'general'
-                ? `Comment on ${requisitionTitle || 'the requisition'} as a whole...`
-                : `Comment on ${activeCandidateName ?? 'this candidate'}...`
+                ? `Comment on ${requisitionTitle || 'the requisition'} as a whole... (Enter to post)`
+                : `Comment on ${activeCandidateName ?? 'this candidate'}... (Enter to post)`
             }
             value={commentDraft}
             onChange={(e) => setCommentDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handlePostComment();
+              }
+            }}
+            style={{ marginBottom: 14 }}
           />
-          <button className="invite-btn" style={{ marginBottom: 14 }} disabled={!commentDraft.trim()} onClick={handlePostComment}>
-            Post comment
-          </button>
 
           {events.map((e) => (
             <div className="hist-entry" key={e.id}>
