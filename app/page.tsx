@@ -40,7 +40,7 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
 
   const loadRequisition = useCallback(async () => {
-    const res = await fetch(`/api/requisitions/${requisitionId}`);
+    const res = await fetch(`/api/requisitions/${requisitionId}`, { cache: 'no-store' });
     const data = await res.json();
     setRequisition(data.requisition);
     setCandidates(data.candidates ?? []);
@@ -51,7 +51,7 @@ function DashboardContent() {
   }, [activeCandidateId]);
 
   const loadCollaboration = useCallback(async () => {
-    const res = await fetch(`/api/collaboration?requisition_id=${requisitionId}`);
+    const res = await fetch(`/api/collaboration?requisition_id=${requisitionId}`, { cache: 'no-store' });
     const data = await res.json();
     setEvents(data.events ?? []);
   }, []);
