@@ -634,6 +634,9 @@
     cursor:pointer;
   }
   .qa-btn-text:hover{ color: var(--deep); border-bottom-color: var(--deep); }
+
+  .qa-btn-icon{ display:inline-flex; align-items:center; gap:6px; }
+  .qa-btn-icon-glyph{ font-size:12px; line-height:1; }
   .qa-btn-text:disabled{ color: var(--ink-faint); border-bottom-color: var(--ink-faint); cursor:default; }
 
   .share-link-btn{

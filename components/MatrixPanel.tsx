@@ -293,23 +293,25 @@ export function MatrixPanel({
                       <div className="matrix-row-actions">
                         {c.original_file_url && (
                           <button
-                            className="qa-btn-text"
+                            className="qa-btn-text qa-btn-icon"
                             disabled={downloading === c.id}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDownload(c.id);
                             }}
                           >
+                            <span className="qa-btn-icon-glyph">📄</span>
                             {downloading === c.id ? 'Preparing download…' : 'Download Original Resume'}
                           </button>
                         )}
                         <button
-                          className="qa-btn-text"
+                          className="qa-btn-text qa-btn-icon"
                           onClick={(e) => {
                             e.stopPropagation();
                             handlePrint(c.id);
                           }}
                         >
+                          <span className="qa-btn-icon-glyph">🖨</span>
                           Print this evaluation
                         </button>
                       </div>
