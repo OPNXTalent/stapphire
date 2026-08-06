@@ -133,6 +133,8 @@
   }
 
   .credit-block-top{ margin-bottom:20px; }
+  .add-req-btn{ justify-content:center; margin-bottom:20px; font-weight:600; }
+  .add-req-btn:hover{ background: var(--paper-cool); }
 
   .req-box{
     border:1.5px solid var(--sapphire);

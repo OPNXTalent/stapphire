@@ -26,7 +26,8 @@ export function RequisitionPanel({
   candidateCount,
   trashedCandidates,
   onRestoreCandidate,
-  onEmptyTrash
+  onEmptyTrash,
+  onAddRequisition
 }: {
   requisition: Requisition;
   org: Org;
@@ -38,6 +39,7 @@ export function RequisitionPanel({
   trashedCandidates: { id: string; full_name: string }[];
   onRestoreCandidate: (id: string) => void;
   onEmptyTrash: () => void;
+  onAddRequisition: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -102,6 +104,10 @@ export function RequisitionPanel({
               <div className="credit-bar-fill" style={{ width: `${pct}%` }} />
             </div>
           </div>
+
+          <button className="btn add-req-btn" onClick={onAddRequisition}>
+            <span>+ Add Requisition</span>
+          </button>
 
           <span className="eyebrow">Open Requisition</span>
           <div className="req-box">
@@ -203,8 +209,7 @@ export function RequisitionPanel({
       )}
 
       {!collapsed && (
-        <div className="req-footer">
-          <a href="/requisitions/new">+ New requisition</a>
+        <div className="req-footer" style={{ justifyContent: 'flex-end' }}>
           <a href="/sign-out">Sign out</a>
         </div>
       )}

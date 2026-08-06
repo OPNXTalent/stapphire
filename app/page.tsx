@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { TopBar } from '@/components/TopBar';
 import { RequisitionPanel } from '@/components/RequisitionPanel';
 import { MatrixPanel } from '@/components/MatrixPanel';
 import { CollaborationPanel } from '@/components/CollaborationPanel';
+import { NewRequisitionForm } from '@/components/NewRequisitionForm';
 
 const DEMO_ORG_ID = process.env.NEXT_PUBLIC_DEMO_ORG_ID ?? '';
 const DEMO_REQUISITION_ID = process.env.NEXT_PUBLIC_DEMO_REQUISITION_ID ?? '';
@@ -22,6 +23,7 @@ export default function DashboardPage() {
 
 function DashboardContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const requisitionId = searchParams.get('requisition') ?? DEMO_REQUISITION_ID;
 
   const [requisition, setRequisition] = useState<any>(null);
@@ -32,6 +34,7 @@ function DashboardContent() {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [creatingRequisition, setCreatingRequisition] = useState(false);
 
   const loadRequisition = useCallback(async () => {
     const res = await fetch(`/api/requisitions/${requisitionId}`, { cache: 'no-store' });
@@ -107,6 +110,11 @@ function DashboardContent() {
     await loadTrash();
   }
 
+  function handleRequisitionCreated(newId: string) {
+    setCreatingRequisition(false);
+    router.push(`/?requisition=${newId}`);
+  }
+
   if (loading) return <div style={{ padding: 40 }}>Loading requisition…</div>;
   if (!requisition) return <div style={{ padding: 40 }}>Requisition not found.</div>;
 
@@ -135,14 +143,21 @@ function DashboardContent() {
           trashedCandidates={trashedCandidates}
           onRestoreCandidate={handleRestoreCandidate}
           onEmptyTrash={handleEmptyTrash}
+          onAddRequisition={() => setCreatingRequisition(true)}
         />
 
         <div className="center-panel">
-          <MatrixPanel
-            candidates={candidates}
-            onSelectCandidate={setActiveCandidateId}
-            onDelete={handleDeleteCandidate}
-          />
+          {creatingRequisition ? (
+            <div className="matrix-wrap">
+              <NewRequisitionForm onCreated={handleRequisitionCreated} onCancel={() => setCreatingRequisition(false)} />
+            </div>
+          ) : (
+            <MatrixPanel
+              candidates={candidates}
+              onSelectCandidate={setActiveCandidateId}
+              onDelete={handleDeleteCandidate}
+            />
+          )}
         </div>
 
         <CollaborationPanel
