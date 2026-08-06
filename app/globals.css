@@ -188,14 +188,14 @@
 
   .matrix-wrap{ max-height:0; overflow:hidden; background: var(--paper); border-bottom:1px solid var(--line); transition: max-height 0.25s ease; flex-shrink:0; }
   .matrix-wrap.open{ max-height:420px; overflow-y:auto; }
-  .matrix-scroll{ padding:14px 24px 18px; }
+  .matrix-scroll{ padding:14px 24px 18px; overflow-x:auto; }
 
   .filter-row{ display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
   .filter-chip{ font-family: var(--font-mono); font-size:10.5px; padding:4px 10px; border-radius:12px; border:1px solid var(--line-strong); color: var(--ink-soft); background: var(--paper); }
   .filter-chip.active{ background: var(--deep); border-color: var(--deep); color:#fff; }
   .filter-chip:hover{ border-color: var(--sapphire); }
 
-  table.matrix{ width:100%; border-collapse:collapse; font-size:12px; }
+  table.matrix{ width:max-content; min-width:100%; border-collapse:collapse; font-size:12px; }
   table.matrix th{ text-align:left; font-family: var(--font-mono); font-size:10px; letter-spacing:0.04em; text-transform:uppercase; color: var(--ink-faint); font-weight:500; padding:0 12px 8px 0; border-bottom:1px solid var(--line-strong); white-space:nowrap; }
   table.matrix td{ padding:9px 12px 9px 0; border-bottom:1px solid var(--line); vertical-align:top; color: var(--ink-soft); }
   table.matrix tr:hover td{ background: var(--paper-cool); }
