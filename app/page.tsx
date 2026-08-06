@@ -31,6 +31,7 @@ function DashboardContent() {
   const [requisition, setRequisition] = useState<any>(null);
   const [org, setOrg] = useState<any>(null);
   const [candidates, setCandidates] = useState<any[]>([]);
+  const [trashedCandidates, setTrashedCandidates] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [notes, setNotes] = useState<any[]>([]);
   const [activeCandidateId, setActiveCandidateId] = useState<string | null>(null);
@@ -71,8 +72,14 @@ function DashboardContent() {
     [requisitionId]
   );
 
+  const loadTrash = useCallback(async () => {
+    const res = await fetch(`/api/requisitions/${requisitionId}/trash`, { cache: 'no-store' });
+    const data = await res.json();
+    setTrashedCandidates(data.candidates ?? []);
+  }, [requisitionId]);
+
   useEffect(() => {
-    Promise.all([loadRequisition(), loadCollaboration()]).finally(() => setLoading(false));
+    Promise.all([loadRequisition(), loadCollaboration(), loadTrash()]).finally(() => setLoading(false));
   }, [requisitionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -170,6 +177,22 @@ function DashboardContent() {
     setRightCollapsed(false);
   }
 
+  async function handleDeleteCandidate(candidateId: string) {
+    await fetch(`/api/candidates/${candidateId}`, { method: 'DELETE' });
+    if (activeCandidateId === candidateId) setActiveCandidateId(null);
+    await Promise.all([loadRequisition(), loadTrash()]);
+  }
+
+  async function handleRestoreCandidate(candidateId: string) {
+    await fetch(`/api/candidates/${candidateId}/restore`, { method: 'POST' });
+    await Promise.all([loadRequisition(), loadTrash()]);
+  }
+
+  async function handleEmptyTrash() {
+    await fetch(`/api/requisitions/${requisitionId}/empty-trash`, { method: 'POST' });
+    await loadTrash();
+  }
+
   if (loading) return <div style={{ padding: 40 }}>Loading requisition…</div>;
   if (!requisition) return <div style={{ padding: 40 }}>Requisition not found.</div>;
 
@@ -195,6 +218,9 @@ function DashboardContent() {
           onToggleCollapse={() => setLeftCollapsed((c) => !c)}
           onUpload={handleUpload}
           candidateCount={candidates.length}
+          trashedCandidates={trashedCandidates}
+          onRestoreCandidate={handleRestoreCandidate}
+          onEmptyTrash={handleEmptyTrash}
         />
 
         <div className="center-panel">
@@ -202,6 +228,7 @@ function DashboardContent() {
             candidates={candidates}
             onOpenNotes={(id) => handleOpenPanel(id, 'notes')}
             onOpenCollaboration={(id) => handleOpenPanel(id, 'collaboration')}
+            onDelete={handleDeleteCandidate}
           />
         </div>
 

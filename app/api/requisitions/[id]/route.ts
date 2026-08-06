@@ -19,6 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .from('candidates')
     .select('*, evaluations(*)')
     .eq('requisition_id', params.id)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
   if (candError) {

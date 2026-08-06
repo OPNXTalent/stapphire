@@ -198,6 +198,13 @@
   .req-list-name{ font-size:12.5px; font-weight:600; }
   .req-list-meta{ font-family: var(--font-mono); font-size:10.5px; color: var(--ink-faint); }
 
+  .trash-header{ display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:2px 0; }
+  .trash-chev{ font-family: var(--font-mono); font-size:10px; color: var(--ink-faint); }
+  .trash-empty-hint{ font-size:11.5px; color: var(--ink-faint); padding:6px 0; }
+  .trash-item{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 0; border-bottom:1px solid var(--line); }
+  .trash-item:last-of-type{ border-bottom:none; }
+  .trash-item-name{ font-size:12px; color: var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
   .req-footer{ margin-top:auto; padding:14px 16px; border-top:1px solid var(--line); font-family: var(--font-mono); font-size:10.5px; color: var(--ink-faint); display:flex; justify-content:space-between; }
   .req-footer a{ color: var(--ink-soft); text-decoration:none; }
 
@@ -221,7 +228,7 @@
      scanning and skipping declines fast; tap a name for the full
      picture instead of forcing everything into wide table columns. */
   .matrix-list{ display:flex; flex-direction:column; border:1px solid var(--line); border-radius: var(--radius); overflow:hidden; }
-  .matrix-row{ background: var(--paper); border-bottom:1px solid var(--line); }
+  .matrix-row{ background: var(--paper); border-bottom:2px solid var(--line-strong); }
   .matrix-row:last-child{ border-bottom:none; }
   .matrix-row-head{
     display:flex; align-items:center; gap:12px;
@@ -236,6 +243,17 @@
   .matrix-row-match{ flex-shrink:0; }
   .matrix-row-chev{ flex-shrink:0; font-family: var(--font-mono); font-size:11px; color: var(--ink-faint); transition: transform 0.15s ease; }
   .matrix-row.expanded .matrix-row-chev{ transform: rotate(180deg); }
+
+  .matrix-row-delete{
+    flex-shrink:0;
+    width:24px; height:24px;
+    display:flex; align-items:center; justify-content:center;
+    border:none; background:none; border-radius:4px;
+    font-size:12px; opacity:0; transition: opacity 0.15s ease, background 0.15s ease;
+    cursor:pointer;
+  }
+  .matrix-row-head:hover .matrix-row-delete{ opacity:0.55; }
+  .matrix-row-delete:hover{ opacity:1 !important; background: var(--red-tint); }
 
   .matrix-row-body{ padding:4px 16px 18px; animation: cardEnter 0.2s ease; }
   .cand-name{ font-weight:700; color: var(--ink); font-size:12.5px; }
@@ -418,7 +436,7 @@
     @page{ margin: 0.6in; }
 
     .brand, .req-panel, .side-panel, .pull-tab,
-    .matrix-toggle, .filter-row, .matrix-row-chev, .matrix-row-actions{
+    .matrix-toggle, .filter-row, .matrix-row-chev, .matrix-row-actions, .matrix-row-delete{
       display:none !important;
     }
     .print-header{ display:flex !important; padding-bottom:14px; margin-bottom:20px; border-bottom:2px solid var(--sapphire); }

@@ -22,7 +22,10 @@ export function RequisitionPanel({
   collapsed,
   onToggleCollapse,
   onUpload,
-  candidateCount
+  candidateCount,
+  trashedCandidates,
+  onRestoreCandidate,
+  onEmptyTrash
 }: {
   requisition: Requisition;
   org: Org;
@@ -31,10 +34,14 @@ export function RequisitionPanel({
   onToggleCollapse: () => void;
   onUpload: (file: File, onProgress: (status: string) => void) => Promise<void>;
   candidateCount: number;
+  trashedCandidates: { id: string; full_name: string }[];
+  onRestoreCandidate: (id: string) => void;
+  onEmptyTrash: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
+  const [trashOpen, setTrashOpen] = useState(false);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -141,6 +148,47 @@ export function RequisitionPanel({
                 </span>
               </div>
             ))}
+          </div>
+
+          <div className="req-list">
+            <div className="trash-header" onClick={() => setTrashOpen((o) => !o)}>
+              <span className="eyebrow" style={{ marginBottom: 0 }}>
+                Trash {trashedCandidates.length > 0 ? `(${trashedCandidates.length})` : ''}
+              </span>
+              {trashedCandidates.length > 0 && (
+                <span className="trash-chev">{trashOpen ? '▾' : '▸'}</span>
+              )}
+            </div>
+
+            {trashOpen && (
+              <>
+                {trashedCandidates.length === 0 ? (
+                  <div className="trash-empty-hint">Nothing in trash</div>
+                ) : (
+                  <>
+                    {trashedCandidates.map((c) => (
+                      <div key={c.id} className="trash-item">
+                        <span className="trash-item-name">{c.full_name}</span>
+                        <button className="qa-btn-text" onClick={() => onRestoreCandidate(c.id)}>
+                          Restore
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      className="qa-btn-text"
+                      style={{ marginTop: 10, color: 'var(--red)', borderBottomColor: 'var(--red)' }}
+                      onClick={() => {
+                        if (window.confirm(`Permanently delete ${trashedCandidates.length} candidate(s)? This cannot be undone.`)) {
+                          onEmptyTrash();
+                        }
+                      }}
+                    >
+                      Empty Trash
+                    </button>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}

@@ -39,11 +39,13 @@ function rankBadgeClass(rank: number) {
 export function MatrixPanel({
   candidates,
   onOpenNotes,
-  onOpenCollaboration
+  onOpenCollaboration,
+  onDelete
 }: {
   candidates: Candidate[];
   onOpenNotes: (candidateId: string) => void;
   onOpenCollaboration: (candidateId: string) => void;
+  onDelete: (candidateId: string) => void;
 }) {
   const [filter, setFilter] = useState('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -172,6 +174,17 @@ export function MatrixPanel({
                     <span className={`rec-pill ${evalu.status}`}>
                       {evalu.status.charAt(0).toUpperCase() + evalu.status.slice(1)}
                     </span>
+
+                    <button
+                      className="matrix-row-delete"
+                      title="Move to trash"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(c.id);
+                      }}
+                    >
+                      🗑
+                    </button>
 
                     <span className="matrix-row-chev">▾</span>
                   </div>

@@ -50,6 +50,9 @@ create table candidates (
   content_hash text not null,
   document_type text not null default 'resume' check (document_type in ('resume','non_resume')),
   created_at timestamptz not null default now(),
+  -- soft delete — deleted candidates go to trash and stay recoverable
+  -- until the trash is explicitly emptied
+  deleted_at timestamptz,
   unique (requisition_id, content_hash)
 );
 
