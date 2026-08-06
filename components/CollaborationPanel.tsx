@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { dispositionLabel } from '@/lib/dispositions';
+import { supabase } from '@/lib/supabaseClient';
 
 type CollabEvent = {
   id: string;
@@ -104,12 +105,41 @@ export function CollaborationPanel({
     loadEvents();
   }, [requisitionId, activeCandidateId, viewMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Live updates — without this, a comment posted by anyone else (or
+  // even yourself in another tab) only shows up after switching
+  // candidates or a hard refresh. One subscription per requisition
+  // covers every candidate and general-scope event; loadEvents() below
+  // already filters by whatever's currently in view.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`collaboration-${requisitionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'collaboration_events',
+          filter: `requisition_id=eq.${requisitionId}`
+        },
+        () => {
+          loadEventsRef.current();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [requisitionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function loadNotes() {
     if (!activeCandidateId) return;
     const res = await fetch(`/api/notes?candidate_id=${activeCandidateId}`, { cache: 'no-store' });
     const data = await res.json();
     setNotes(data.notes ?? []);
   }
+
+  const loadEventsRef = useRef<() => void>(() => {});
 
   async function loadEvents() {
     const url =
@@ -120,6 +150,7 @@ export function CollaborationPanel({
     const data = await res.json();
     setEvents(data.events ?? []);
   }
+  loadEventsRef.current = loadEvents;
 
   async function handleSaveNote() {
     if (!activeCandidateId || !draft.trim()) return;
