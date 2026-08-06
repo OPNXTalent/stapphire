@@ -16,13 +16,31 @@ type Org = {
   credits_refill_at: string | null;
 };
 
+type BatchItem = {
+  name: string;
+  status: 'pending' | 'processing' | 'done' | 'duplicate' | 'non_resume' | 'error';
+  message: string;
+};
+
+const STATUS_ICON: Record<BatchItem['status'], string> = {
+  pending: '·',
+  processing: '…',
+  done: '✓',
+  duplicate: '⤳',
+  non_resume: '—',
+  error: '✕'
+};
+
 export function RequisitionPanel({
   requisition,
   org,
   otherRequisitions,
   collapsed,
   onToggleCollapse,
-  onUpload,
+  onBatchUpload,
+  batchQueue,
+  batchActive,
+  onClearBatch,
   candidateCount,
   trashedCandidates,
   onRestoreCandidate,
@@ -34,7 +52,10 @@ export function RequisitionPanel({
   otherRequisitions: { id: string; title: string; status: string; candidateCount: number }[];
   collapsed: boolean;
   onToggleCollapse: () => void;
-  onUpload: (file: File, onProgress: (status: string) => void) => Promise<void>;
+  onBatchUpload: (files: File[]) => void;
+  batchQueue: BatchItem[];
+  batchActive: boolean;
+  onClearBatch: () => void;
   candidateCount: number;
   trashedCandidates: { id: string; full_name: string }[];
   onRestoreCandidate: (id: string) => void;
@@ -42,8 +63,6 @@ export function RequisitionPanel({
   onAddRequisition: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [statusMsg, setStatusMsg] = useState('');
   const [trashOpen, setTrashOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
@@ -55,21 +74,31 @@ export function RequisitionPanel({
     setTimeout(() => setLinkCopied(false), 2000);
   }
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setStatusMsg('Starting\u2026');
-    try {
-      await onUpload(file, setStatusMsg);
-    } finally {
-      setUploading(false);
-      setStatusMsg('');
-      if (fileInputRef.current) fileInputRef.current.value = '';
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+
+    if (files.length > org.credits_remaining) {
+      const proceed = window.confirm(
+        `You selected ${files.length} resumes but only have ${org.credits_remaining} credits remaining. ` +
+          `The first ${org.credits_remaining} will be evaluated; the rest will fail for lack of credits. Continue?`
+      );
+      if (!proceed) {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
     }
+
+    onBatchUpload(files);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   const pct = org.credits_total > 0 ? (org.credits_remaining / org.credits_total) * 100 : 0;
+
+  const doneCount = batchQueue.filter((i) => i.status !== 'pending' && i.status !== 'processing').length;
+  const successCount = batchQueue.filter((i) => i.status === 'done').length;
+  const duplicateCount = batchQueue.filter((i) => i.status === 'duplicate').length;
+  const errorCount = batchQueue.filter((i) => i.status === 'error' || i.status === 'non_resume').length;
 
   return (
     <div className="req-panel">
@@ -122,35 +151,78 @@ export function RequisitionPanel({
               ref={fileInputRef}
               type="file"
               accept=".pdf,.docx,.txt"
+              multiple
               style={{ display: 'none' }}
               onChange={handleFileChange}
             />
-            <button
-              className={`btn btn-upload ${uploading ? 'spent' : ''}`}
-              disabled={uploading || org.credits_remaining <= 0}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <span className="btn-upload-content">
-                {uploading && (
-                  <svg className="gem-loader" viewBox="0 0 24 24" fill="none">
-                    <polygon points="12,1 21,7 24,14 17,23 7,23 0,14 3,7" fill="url(#gemLoaderGrad)" />
-                    <polygon className="facet-a" points="12,1 21,7 12,9" fill="#fff" opacity="0.3" />
-                    <polygon className="facet-b" points="3,7 12,1 12,9" fill="#fff" opacity="0.12" />
-                    <polygon className="facet-c" points="0,14 3,7 12,9 7,23" fill="#0A2452" opacity="0.3" />
-                    <defs>
-                      <linearGradient id="gemLoaderGrad" x1="0" y1="0" x2="24" y2="23">
-                        <stop offset="0%" stopColor="#5C87F5" />
-                        <stop offset="100%" stopColor="#123A8F" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
+
+            {!batchActive && batchQueue.length === 0 && (
+              <button
+                className="btn btn-upload"
+                disabled={org.credits_remaining <= 0}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <span className="btn-upload-content">Upload resumes</span>
+                <span style={{ color: 'var(--ink-faint)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                  1 credit each
+                </span>
+              </button>
+            )}
+
+            {(batchActive || batchQueue.length > 0) && (
+              <div className="batch-panel">
+                <div className="batch-summary">
+                  {batchActive ? (
+                    <span className="btn-upload-content">
+                      <svg className="gem-loader" viewBox="0 0 24 24" fill="none">
+                        <polygon points="12,1 21,7 24,14 17,23 7,23 0,14 3,7" fill="url(#gemLoaderGrad)" />
+                        <polygon className="facet-a" points="12,1 21,7 12,9" fill="#fff" opacity="0.3" />
+                        <polygon className="facet-b" points="3,7 12,1 12,9" fill="#fff" opacity="0.12" />
+                        <polygon className="facet-c" points="0,14 3,7 12,9 7,23" fill="#0A2452" opacity="0.3" />
+                        <defs>
+                          <linearGradient id="gemLoaderGrad" x1="0" y1="0" x2="24" y2="23">
+                            <stop offset="0%" stopColor="#5C87F5" />
+                            <stop offset="100%" stopColor="#123A8F" />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                      Evaluating {doneCount} / {batchQueue.length}
+                    </span>
+                  ) : (
+                    <span>
+                      Done — {successCount} evaluated
+                      {duplicateCount > 0 ? `, ${duplicateCount} duplicate` : ''}
+                      {errorCount > 0 ? `, ${errorCount} skipped` : ''}
+                    </span>
+                  )}
+                </div>
+
+                <div className="batch-list">
+                  {batchQueue.map((item, i) => (
+                    <div className={`batch-item batch-item-${item.status}`} key={i}>
+                      <span className="batch-item-icon">{STATUS_ICON[item.status]}</span>
+                      <span className="batch-item-name">{item.name}</span>
+                      {item.status === 'processing' && item.message && (
+                        <span className="batch-item-msg">{item.message}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {!batchActive && (
+                  <button
+                    className="qa-btn-text"
+                    style={{ marginTop: 10 }}
+                    onClick={() => {
+                      onClearBatch();
+                      fileInputRef.current?.click();
+                    }}
+                  >
+                    Upload more
+                  </button>
                 )}
-                {uploading ? statusMsg || 'Evaluating…' : 'Upload resume'}
-              </span>
-              <span style={{ color: 'var(--ink-faint)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                1 credit
-              </span>
-            </button>
+              </div>
+            )}
           </div>
 
           <div className="req-list">

@@ -35,6 +35,10 @@ function DashboardContent() {
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [creatingRequisition, setCreatingRequisition] = useState(false);
+  const [batchQueue, setBatchQueue] = useState<
+    { name: string; status: 'pending' | 'processing' | 'done' | 'duplicate' | 'non_resume' | 'error'; message: string }[]
+  >([]);
+  const [batchActive, setBatchActive] = useState(false);
 
   const loadRequisition = useCallback(async () => {
     const res = await fetch(`/api/requisitions/${requisitionId}`, { cache: 'no-store' });
@@ -54,21 +58,28 @@ function DashboardContent() {
     Promise.all([loadRequisition(), loadTrash()]).finally(() => setLoading(false));
   }, [requisitionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleUpload(file: File, onProgress: (status: string) => void) {
+  // Evaluates one file, reading its progress stream, and reports back
+  // the final outcome without touching any batch-wide state itself —
+  // that's handled by the caller so this stays reusable for both a
+  // single upload and one slot in a concurrent batch.
+  async function evaluateOneFile(
+    file: File,
+    onProgress: (message: string) => void
+  ): Promise<{ status: 'done' | 'duplicate' | 'non_resume' | 'error'; message: string }> {
     const formData = new FormData();
     formData.append('requisition_id', requisitionId);
     formData.append('file', file);
 
     const res = await fetch('/api/evaluate', { method: 'POST', body: formData });
-
-    if (!res.body) {
-      console.error('No response stream from evaluate route');
-      return;
-    }
+    if (!res.body) return { status: 'error', message: 'No response from server' };
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let outcome: { status: 'done' | 'duplicate' | 'non_resume' | 'error'; message: string } = {
+      status: 'error',
+      message: 'Did not complete'
+    };
 
     while (true) {
       const { done, value } = await reader.read();
@@ -85,13 +96,50 @@ function DashboardContent() {
         if (event.type === 'status' || event.type === 'progress') {
           onProgress(event.message);
         } else if (event.type === 'error') {
-          console.error(event.message);
-          onProgress('Something went wrong');
+          outcome = { status: 'error', message: event.message };
         } else if (event.type === 'done') {
-          await loadRequisition();
+          if (event.deduped) outcome = { status: 'duplicate', message: 'Already evaluated' };
+          else if (event.skipped === 'non_resume') outcome = { status: 'non_resume', message: 'Not a resume' };
+          else outcome = { status: 'done', message: '' };
         }
       }
     }
+
+    return outcome;
+  }
+
+  // Runs a fixed number of files at once instead of strictly one after
+  // another — real wall-clock speedup for a large batch, since each
+  // evaluation's 10-15s isn't spent waiting in a single-file line.
+  async function handleBatchUpload(files: File[]) {
+    setBatchQueue(files.map((f) => ({ name: f.name, status: 'pending', message: '' })));
+    setBatchActive(true);
+
+    const CONCURRENCY = 3;
+    let nextIndex = 0;
+
+    async function worker() {
+      while (nextIndex < files.length) {
+        const myIndex = nextIndex++;
+        const file = files[myIndex];
+
+        setBatchQueue((q) => q.map((item, i) => (i === myIndex ? { ...item, status: 'processing' } : item)));
+
+        const result = await evaluateOneFile(file, (msg) => {
+          setBatchQueue((q) => q.map((item, i) => (i === myIndex ? { ...item, message: msg } : item)));
+        });
+
+        setBatchQueue((q) =>
+          q.map((item, i) => (i === myIndex ? { ...item, status: result.status, message: result.message } : item))
+        );
+        await loadRequisition();
+      }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, worker));
+
+    setBatchActive(false);
+    await loadTrash();
   }
 
   async function handleDeleteCandidate(candidateId: string) {
@@ -138,7 +186,10 @@ function DashboardContent() {
           otherRequisitions={[]}
           collapsed={leftCollapsed}
           onToggleCollapse={() => setLeftCollapsed((c) => !c)}
-          onUpload={handleUpload}
+          onBatchUpload={handleBatchUpload}
+          batchQueue={batchQueue}
+          batchActive={batchActive}
+          onClearBatch={() => setBatchQueue([])}
           candidateCount={candidates.length}
           trashedCandidates={trashedCandidates}
           onRestoreCandidate={handleRestoreCandidate}
