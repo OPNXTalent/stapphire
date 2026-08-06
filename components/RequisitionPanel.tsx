@@ -95,10 +95,11 @@ export function RequisitionPanel({
           <span className="eyebrow">Open Requisition</span>
           <div className="req-active">
             <div className="req-title">{requisition.title}</div>
-            <div className="req-status">{requisition.status === 'open' ? 'Open' : requisition.status}</div>
+            <div className="req-status">{requisition.status !== 'open' && requisition.status}</div>
 
-            <button className="qa-btn-text" style={{ marginBottom: 12 }} onClick={handleCopyLink}>
-              {linkCopied ? 'Link copied ✓' : 'Copy shareable link'}
+            <button className="qa-btn-text share-link-btn" style={{ marginBottom: 12 }} onClick={handleCopyLink}>
+              <span>{linkCopied ? 'Link copied' : 'Share Link'}</span>
+              <span className="share-link-icon">{linkCopied ? '✓' : '⧉'}</span>
             </button>
             <div className="upload-hint" style={{ marginTop: -8, marginBottom: 10 }}>
               Read-only — Private Notes never appear in this link

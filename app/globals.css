@@ -455,6 +455,12 @@
   .qa-btn-text:hover{ color: var(--deep); border-bottom-color: var(--deep); }
   .qa-btn-text:disabled{ color: var(--ink-faint); border-bottom-color: var(--ink-faint); cursor:default; }
 
+  .share-link-btn{
+    display:flex; align-items:center; justify-content:space-between;
+    width:100%; padding:8px 0;
+  }
+  .share-link-icon{ font-size:13px; }
+
   /* Print letterhead — hidden on screen, shown only when printing */
   .print-header{
     display:none;
