@@ -38,6 +38,7 @@ export function RequisitionPanel({
   onSwitchRequisition,
   onArchiveRequisition,
   onOpenTrashModal,
+  onOpenArchiveModal,
   collapsed,
   onToggleCollapse,
   onBatchUpload,
@@ -54,6 +55,7 @@ export function RequisitionPanel({
   onSwitchRequisition: (id: string) => void;
   onArchiveRequisition: (id: string) => void;
   onOpenTrashModal: () => void;
+  onOpenArchiveModal: () => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onBatchUpload: (files: File[]) => void;
@@ -94,11 +96,9 @@ export function RequisitionPanel({
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  function handleArchiveClick(e: React.MouseEvent, id: string, title: string) {
+  function handleArchiveClick(e: React.MouseEvent, id: string) {
     e.stopPropagation();
-    if (window.confirm(`Archive "${title}"? You can restore it anytime from Trash & Archive.`)) {
-      onArchiveRequisition(id);
-    }
+    onArchiveRequisition(id);
   }
 
   const pct = org.credits_total > 0 ? (org.credits_remaining / org.credits_total) * 100 : 0;
@@ -154,7 +154,7 @@ export function RequisitionPanel({
               <button
                 className="archive-icon-btn"
                 title="Archive requisition"
-                onClick={(e) => handleArchiveClick(e, requisition.id, requisition.title)}
+                onClick={(e) => handleArchiveClick(e, requisition.id)}
               >
                 📦
               </button>
@@ -249,7 +249,7 @@ export function RequisitionPanel({
                     <button
                       className="archive-icon-btn archive-icon-btn-compact"
                       title="Archive requisition"
-                      onClick={(e) => handleArchiveClick(e, r.id, r.title)}
+                      onClick={(e) => handleArchiveClick(e, r.id)}
                     >
                       📦
                     </button>
@@ -275,10 +275,18 @@ export function RequisitionPanel({
       )}
 
       {!collapsed && (
-        <div className="req-footer">
-          <button className="trash-bin-btn" title="Trash & Archive" onClick={onOpenTrashModal}>
-            🗑
+        <div className="req-footer-links">
+          <button className="footer-icon-link" onClick={onOpenArchiveModal}>
+            <span className="footer-icon">📦</span> Archive
           </button>
+          <button className="footer-icon-link" onClick={onOpenTrashModal}>
+            <span className="footer-icon">🗑</span> Trash
+          </button>
+        </div>
+      )}
+
+      {!collapsed && (
+        <div className="req-footer">
           <a href="/sign-out">Sign out</a>
         </div>
       )}

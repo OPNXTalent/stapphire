@@ -216,12 +216,20 @@
   .batch-meta{ color: var(--sapphire); font-weight:600; }
   .req-status::before{ content:""; width:6px; height:6px; background: var(--green); border-radius:1px; }
 
-  /* Trash & Archive — larger footer icon + global modal */
-  .trash-bin-btn{
-    font-size:19px; background:none; border:none; cursor:pointer;
-    color: var(--ink-faint); padding:2px 4px; line-height:1;
+  /* Archive / Trash footer links — each its own row, icon + label */
+  .req-footer-links{
+    display:flex; flex-direction:column; gap:2px;
+    padding:10px 16px 0; margin-top:auto;
   }
-  .trash-bin-btn:hover{ color: var(--sapphire); }
+  .footer-icon-link{
+    display:flex; align-items:center; gap:8px;
+    background:none; border:none; cursor:pointer;
+    padding:6px 4px; border-radius: var(--radius);
+    font-family: var(--font-mono); font-size:11.5px; color: var(--ink-soft);
+    text-align:left; width:100%;
+  }
+  .footer-icon-link:hover{ background: var(--paper-cool); color: var(--sapphire); }
+  .footer-icon{ font-size:15px; line-height:1; }
 
   .trash-modal-backdrop{
     position:fixed; inset:0; background: rgba(11,20,40,0.42);
@@ -334,7 +342,7 @@
   }
   .share-gate-input:focus{ outline:none; border-color: var(--sapphire); }
 
-  .req-footer{ margin-top:auto; padding:14px 16px; border-top:1px solid var(--line); font-family: var(--font-mono); font-size:10.5px; color: var(--ink-faint); display:flex; justify-content:space-between; }
+  .req-footer{ padding:14px 16px; border-top:1px solid var(--line); font-family: var(--font-mono); font-size:10.5px; color: var(--ink-faint); display:flex; justify-content:space-between; }
   .req-footer a{ color: var(--ink-soft); text-decoration:none; }
 
   /* ===== CENTER ===== */

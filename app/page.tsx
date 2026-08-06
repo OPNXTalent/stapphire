@@ -7,7 +7,8 @@ import { RequisitionPanel } from '@/components/RequisitionPanel';
 import { MatrixPanel } from '@/components/MatrixPanel';
 import { CollaborationPanel } from '@/components/CollaborationPanel';
 import { NewRequisitionForm } from '@/components/NewRequisitionForm';
-import { TrashArchiveModal } from '@/components/TrashArchiveModal';
+import { TrashModal } from '@/components/TrashModal';
+import { ArchiveModal } from '@/components/ArchiveModal';
 
 const DEMO_ORG_ID = process.env.NEXT_PUBLIC_DEMO_ORG_ID ?? '';
 const DEMO_REQUISITION_ID = process.env.NEXT_PUBLIC_DEMO_REQUISITION_ID ?? '';
@@ -41,6 +42,7 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [creatingRequisition, setCreatingRequisition] = useState(false);
   const [trashModalOpen, setTrashModalOpen] = useState(false);
+  const [archiveModalOpen, setArchiveModalOpen] = useState(false);
   const [batchQueue, setBatchQueue] = useState<
     { name: string; status: 'pending' | 'processing' | 'done' | 'duplicate' | 'non_resume' | 'error'; message: string }[]
   >([]);
@@ -255,6 +257,7 @@ function DashboardContent() {
           onSwitchRequisition={handleSwitchRequisition}
           onArchiveRequisition={handleArchiveRequisition}
           onOpenTrashModal={() => setTrashModalOpen(true)}
+          onOpenArchiveModal={() => setArchiveModalOpen(true)}
           collapsed={leftCollapsed}
           onToggleCollapse={() => setLeftCollapsed((c) => !c)}
           onBatchUpload={handleBatchUpload}
@@ -296,13 +299,18 @@ function DashboardContent() {
         />
       </div>
 
-      <TrashArchiveModal
+      <TrashModal
         open={trashModalOpen}
         onClose={() => setTrashModalOpen(false)}
         orgId={DEMO_ORG_ID}
         onRestoreCandidate={handleRestoreCandidate}
-        onRestoreRequisition={handleRestoreRequisition}
         onEmptyTrash={handleEmptyAllTrash}
+      />
+      <ArchiveModal
+        open={archiveModalOpen}
+        onClose={() => setArchiveModalOpen(false)}
+        orgId={DEMO_ORG_ID}
+        onRestoreRequisition={handleRestoreRequisition}
       />
     </>
   );
