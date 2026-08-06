@@ -92,69 +92,63 @@ export function RequisitionPanel({
 
       {!collapsed && (
         <div className="req-panel-inner">
-          <span className="eyebrow">Open Requisition</span>
-          <div className="req-active">
-            <div className="req-title">{requisition.title}</div>
-            <div className="req-status">{requisition.status !== 'open' && requisition.status}</div>
-
-            <button className="qa-btn-text share-link-btn" style={{ marginBottom: 12 }} onClick={handleCopyLink}>
-              <span>{linkCopied ? 'Link copied' : 'Share Link'}</span>
-              <span className="share-link-icon">{linkCopied ? '✓' : '⧉'}</span>
-            </button>
-            <div className="upload-hint" style={{ marginTop: -8, marginBottom: 10 }}>
-              Read-only — Private Notes never appear in this link
+          <div className="credit-block credit-block-top">
+            <div className="credit-count">
+              {org.credits_remaining}
+              <span> / {org.credits_total} profiles</span>
             </div>
-
-            <div className="credit-block">
-              <div className="credit-count">
-                {org.credits_remaining}
-                <span> / {org.credits_total} profiles</span>
-              </div>
-              {org.credits_refill_at && <div className="credit-label">Refills {org.credits_refill_at}</div>}
-              <div className="credit-bar">
-                <div className="credit-bar-fill" style={{ width: `${pct}%` }} />
-              </div>
-            </div>
-
-            <div className="jd-drop">
-              <strong>Job description on file</strong>
-              Parsed into evaluation pillars
+            {org.credits_refill_at && <div className="credit-label">Refills {org.credits_refill_at}</div>}
+            <div className="credit-bar">
+              <div className="credit-bar-fill" style={{ width: `${pct}%` }} />
             </div>
           </div>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.docx,.txt"
-            style={{ display: 'none' }}
-            onChange={handleFileChange}
-          />
-          <button
-            className={`btn btn-upload ${uploading ? 'spent' : ''}`}
-            disabled={uploading || org.credits_remaining <= 0}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <span className="btn-upload-content">
-              {uploading && (
-                <svg className="gem-loader" viewBox="0 0 24 24" fill="none">
-                  <polygon points="12,1 21,7 24,14 17,23 7,23 0,14 3,7" fill="url(#gemLoaderGrad)" />
-                  <polygon className="facet-a" points="12,1 21,7 12,9" fill="#fff" opacity="0.3" />
-                  <polygon className="facet-b" points="3,7 12,1 12,9" fill="#fff" opacity="0.12" />
-                  <polygon className="facet-c" points="0,14 3,7 12,9 7,23" fill="#0A2452" opacity="0.3" />
-                  <defs>
-                    <linearGradient id="gemLoaderGrad" x1="0" y1="0" x2="24" y2="23">
-                      <stop offset="0%" stopColor="#5C87F5" />
-                      <stop offset="100%" stopColor="#123A8F" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-              )}
-              {uploading ? statusMsg || 'Evaluating…' : 'Upload resume'}
-            </span>
-            <span style={{ color: 'var(--ink-faint)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-              1 credit
-            </span>
-          </button>
+          <span className="eyebrow">Open Requisition</span>
+          <div className="req-box">
+            <div className="req-title">{requisition.title}</div>
+
+            <button className="qa-btn-text share-link-btn" onClick={handleCopyLink}>
+              <span>{linkCopied ? 'Link copied' : 'Share Link'}</span>
+              <span className="share-link-icon">{linkCopied ? '✓' : '⧉'}</span>
+            </button>
+            <div className="upload-hint" style={{ marginTop: -8, marginBottom: 14 }}>
+              Read-only — Private Notes never appear in this link
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.txt"
+              style={{ display: 'none' }}
+              onChange={handleFileChange}
+            />
+            <button
+              className={`btn btn-upload ${uploading ? 'spent' : ''}`}
+              disabled={uploading || org.credits_remaining <= 0}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <span className="btn-upload-content">
+                {uploading && (
+                  <svg className="gem-loader" viewBox="0 0 24 24" fill="none">
+                    <polygon points="12,1 21,7 24,14 17,23 7,23 0,14 3,7" fill="url(#gemLoaderGrad)" />
+                    <polygon className="facet-a" points="12,1 21,7 12,9" fill="#fff" opacity="0.3" />
+                    <polygon className="facet-b" points="3,7 12,1 12,9" fill="#fff" opacity="0.12" />
+                    <polygon className="facet-c" points="0,14 3,7 12,9 7,23" fill="#0A2452" opacity="0.3" />
+                    <defs>
+                      <linearGradient id="gemLoaderGrad" x1="0" y1="0" x2="24" y2="23">
+                        <stop offset="0%" stopColor="#5C87F5" />
+                        <stop offset="100%" stopColor="#123A8F" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                )}
+                {uploading ? statusMsg || 'Evaluating…' : 'Upload resume'}
+              </span>
+              <span style={{ color: 'var(--ink-faint)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                1 credit
+              </span>
+            </button>
+          </div>
 
           <div className="req-list">
             <span className="eyebrow">Other Requisitions</span>
