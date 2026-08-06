@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type CollabEvent = {
   id: string;
@@ -8,6 +8,8 @@ type CollabEvent = {
   comment: string | null;
   decision: string | null;
   actor_name: string | null;
+  attachment_path: string | null;
+  attachment_filename: string | null;
   created_at: string;
   profiles: { full_name: string; role: string } | null;
 };
@@ -77,6 +79,10 @@ export function CollaborationPanel({
   const [events, setEvents] = useState<CollabEvent[]>([]);
   const [draft, setDraft] = useState('');
   const [commentDraft, setCommentDraft] = useState('');
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [posting, setPosting] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // No candidate expanded → this is about the requisition, not a
   // leftover selection. Clear notes too, since they're candidate-only.
@@ -126,20 +132,37 @@ export function CollaborationPanel({
   }
 
   async function handlePostComment() {
-    if (!commentDraft.trim()) return;
-    await fetch('/api/collaboration', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requisition_id: requisitionId,
-        candidate_id: viewMode === 'candidate' ? activeCandidateId : null,
-        actor_name: collaboratorName || null,
-        event_type: 'commented',
-        comment: commentDraft
-      })
-    });
-    setCommentDraft('');
-    loadEvents();
+    if (!commentDraft.trim() && !attachedFile) return;
+    setPosting(true);
+    try {
+      const formData = new FormData();
+      formData.append('requisition_id', requisitionId);
+      if (viewMode === 'candidate' && activeCandidateId) formData.append('candidate_id', activeCandidateId);
+      formData.append('actor_name', collaboratorName || '');
+      formData.append('event_type', 'commented');
+      formData.append('comment', commentDraft);
+      if (attachedFile) formData.append('file', attachedFile);
+
+      await fetch('/api/collaboration', { method: 'POST', body: formData });
+
+      setCommentDraft('');
+      setAttachedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      loadEvents();
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  async function handleDownloadAttachment(eventId: string) {
+    setDownloadingId(eventId);
+    try {
+      const res = await fetch(`/api/collaboration/${eventId}/attachment-url`);
+      const data = await res.json();
+      if (data.url) window.open(data.url, '_blank');
+    } finally {
+      setDownloadingId(null);
+    }
   }
 
   if (collapsed) {
@@ -216,23 +239,56 @@ export function CollaborationPanel({
             )}
           </div>
 
-          <textarea
-            className="note-input"
-            placeholder={
-              viewMode === 'general'
-                ? `Comment on ${requisitionTitle || 'the requisition'} as a whole... (Enter to post)`
-                : `Comment on ${activeCandidateName ?? 'this candidate'}... (Enter to post)`
-            }
-            value={commentDraft}
-            onChange={(e) => setCommentDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handlePostComment();
+          <div className="comment-compose">
+            <textarea
+              className="note-input"
+              placeholder={
+                viewMode === 'general'
+                  ? `Comment on ${requisitionTitle || 'the requisition'} as a whole... (Enter to post)`
+                  : `Comment on ${activeCandidateName ?? 'this candidate'}... (Enter to post)`
               }
-            }}
-            style={{ marginBottom: 14 }}
-          />
+              value={commentDraft}
+              onChange={(e) => setCommentDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handlePostComment();
+                }
+              }}
+              disabled={posting}
+            />
+            <div className="comment-compose-footer">
+              <input
+                ref={fileInputRef}
+                type="file"
+                style={{ display: 'none' }}
+                onChange={(e) => setAttachedFile(e.target.files?.[0] ?? null)}
+              />
+              <button
+                type="button"
+                className="attach-btn"
+                title="Attach a document"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                📎
+              </button>
+              {attachedFile && (
+                <span className="attach-pending">
+                  {attachedFile.name}
+                  <button
+                    type="button"
+                    className="attach-remove"
+                    onClick={() => {
+                      setAttachedFile(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+            </div>
+          </div>
 
           {events.map((e) => (
             <div className="hist-entry" key={e.id}>
@@ -242,6 +298,15 @@ export function CollaborationPanel({
               <div className="hist-body">
                 <div className="hist-line">{describeEvent(e)}</div>
                 {e.comment && <div className="hist-comment">{e.comment}</div>}
+                {e.attachment_path && (
+                  <button
+                    className="hist-attachment"
+                    disabled={downloadingId === e.id}
+                    onClick={() => handleDownloadAttachment(e.id)}
+                  >
+                    📎 {downloadingId === e.id ? 'Preparing…' : e.attachment_filename ?? 'Attachment'}
+                  </button>
+                )}
                 <div className="hist-time">{new Date(e.created_at).toLocaleString()}</div>
               </div>
             </div>

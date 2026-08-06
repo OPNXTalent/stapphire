@@ -94,6 +94,9 @@ create table collaboration_events (
   event_type text not null check (event_type in ('shared','viewed','commented','decision')),
   comment text,
   decision text check (decision in ('advance','hold','decline')),
+  -- optional document shared alongside a comment
+  attachment_path text,
+  attachment_filename text,
   created_at timestamptz not null default now()
 );
 -- append-only by convention: no update/delete policy is granted below.

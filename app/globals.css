@@ -408,6 +408,34 @@
   .hist-time{ font-family: var(--font-mono); font-size:9.5px; color: var(--ink-faint); margin-top:2px; }
   .hist-comment{ font-size:12.5px; color: var(--ink-soft); margin-top:4px; background: var(--paper-cool); border-radius: var(--radius); padding:8px 10px; line-height:1.5; }
 
+  .comment-compose{ margin-bottom:14px; }
+  .comment-compose .note-input{ margin-bottom:0; }
+  .comment-compose-footer{ display:flex; align-items:center; gap:8px; padding:6px 2px; flex-wrap:wrap; }
+  .attach-btn{
+    width:26px; height:26px; border:1px solid var(--line-strong); border-radius: var(--radius);
+    background: var(--paper); font-size:13px; cursor:pointer; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .attach-btn:hover{ border-color: var(--sapphire); }
+  .attach-pending{
+    display:inline-flex; align-items:center; gap:6px;
+    font-family: var(--font-mono); font-size:10.5px; color: var(--ink-soft);
+    background: var(--sapphire-pale); border-radius:12px; padding:4px 8px 4px 10px;
+    max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .attach-remove{ border:none; background:none; color: var(--ink-faint); cursor:pointer; font-size:10px; flex-shrink:0; }
+  .attach-remove:hover{ color: var(--red); }
+
+  .hist-attachment{
+    display:inline-flex; align-items:center; gap:5px;
+    margin-top:5px; padding:5px 9px;
+    border:1px solid var(--line-strong); border-radius: var(--radius);
+    background: var(--paper); font-family: var(--font-mono); font-size:11px; color: var(--sapphire);
+    cursor:pointer;
+  }
+  .hist-attachment:hover{ border-color: var(--sapphire); color: var(--deep); }
+  .hist-attachment:disabled{ color: var(--ink-faint); cursor:default; }
+
   .invite-row{ display:flex; align-items:center; gap:8px; padding:10px; background: var(--paper-cool); border-radius: var(--radius); margin-bottom:14px; }
 
   .commenter-name-row{
