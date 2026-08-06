@@ -41,6 +41,23 @@ submit_evaluation tool with your findings — do not respond in plain text.
     different language. Reserve gaps for genuinely missing, explicitly
     required capabilities — not vocabulary mismatches.
 
+2c. A resume is incomplete evidence of a person's actual capability —
+    silence on a topic is not the same as proof the candidate lacks it.
+    Distinguish two situations and treat them differently:
+      - The resume actively shows the candidate lacks something or
+        contradicts a requirement — that is a genuine gap.
+      - The resume simply doesn't address something the job description
+        asks about — that is an open question, not a deficiency. Do not
+        score it as a penalty or state it with the same confidence as a
+        real gap ("lacks X"). Say plainly that it isn't addressed in the
+        resume, and route it to interview_recommendations.probe_areas
+        instead of gaps or risk_flags.
+    You are assessing what the paper shows, not rendering a verdict on
+    the whole person — the recruiter and hiring team make that call
+    after actually meeting the candidate. When evidence is genuinely
+    inconclusive, say so rather than resolving the ambiguity toward
+    the negative.
+
 3. Employment history review:
    - Flag any employer in the provided watch-list (may be empty).
    - Flag employment gaps exceeding 12 months, with approximate dates.
@@ -106,7 +123,12 @@ export const EVALUATION_TOOL = {
         }
       },
       strengths: { type: 'array', items: { type: 'string' } },
-      gaps: { type: 'array', items: { type: 'string' } },
+      gaps: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'Only genuine gaps the resume actively shows or contradicts — never something the resume simply does not mention. Unaddressed-but-unknown items belong in interview_recommendations.probe_areas instead.'
+      },
       ats_compatibility: {
         type: 'object',
         properties: {
@@ -128,11 +150,19 @@ export const EVALUATION_TOOL = {
           short_tenure_roles: { type: 'array', items: { type: 'string' } }
         }
       },
-      risk_flags: { type: 'array', items: { type: 'string' } },
+      risk_flags: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Objective, resume-evidenced concerns only — not speculation about what the resume happens not to cover.'
+      },
       interview_recommendations: {
         type: 'object',
         properties: {
-          probe_areas: { type: 'array', items: { type: 'string' } },
+          probe_areas: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Open questions the resume left unaddressed — the right home for anything ambiguous rather than treating it as a scored deficiency.'
+          },
           skills_to_validate: { type: 'array', items: { type: 'string' } },
           org_value: { type: 'string' },
           alternate_roles: { type: 'array', items: { type: 'string' } }
