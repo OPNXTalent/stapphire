@@ -301,9 +301,39 @@ function DashboardContent() {
   if (creatingRequisition) {
     return (
       <>
-        <TopBar />
-        <div className="composer-page">
-          <NewRequisitionForm onCreated={handleRequisitionCreated} onCancel={() => setCreatingRequisition(false)} />
+        <TopBar requisitionTitle={requisition.title} />
+        <div className={`app composer-view ${leftCollapsed ? 'left-collapsed' : ''}`}>
+          <RequisitionPanel
+            requisition={requisition}
+            org={org ?? { credits_remaining: 0, credits_total: 0, credits_refill_at: null }}
+            otherRequisitions={allRequisitions
+              .filter((r) => r.id !== requisitionId)
+              .map((r) => ({
+                id: r.id,
+                title: r.title,
+                status: r.status,
+                candidateCount: r.candidates?.[0]?.count ?? 0
+              }))}
+            onSwitchRequisition={handleSwitchRequisition}
+            onArchiveRequisition={handleArchiveRequisition}
+            onOpenTrashModal={() => setTrashModalOpen(true)}
+            onOpenArchiveModal={() => setArchiveModalOpen(true)}
+            collapsed={leftCollapsed}
+            onToggleCollapse={() => setLeftCollapsed((c) => !c)}
+            onBatchUpload={handleBatchUpload}
+            batchQueue={batchQueue}
+            batchActive={batchActive}
+            batchRequisitionId={batchRequisitionId}
+            onClearBatch={() => {
+              setBatchQueue([]);
+              setBatchRequisitionId(null);
+            }}
+            candidateCount={candidates.length}
+            onAddRequisition={() => setCreatingRequisition(true)}
+          />
+          <div className="composer-page">
+            <NewRequisitionForm onCreated={handleRequisitionCreated} onCancel={() => setCreatingRequisition(false)} />
+          </div>
         </div>
       </>
     );

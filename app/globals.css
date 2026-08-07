@@ -92,11 +92,12 @@
   .app.left-collapsed.right-collapsed{ grid-template-columns: 56px 1fr 0px; }
   .app.shared-view{ grid-template-columns: 1fr 288px; }
   .app.shared-view.right-collapsed{ grid-template-columns: 1fr 0px; }
+  .app.composer-view{ grid-template-columns: 300px 1fr; }
+  .app.composer-view.left-collapsed{ grid-template-columns: 56px 1fr; }
 
   .composer-page{
-    margin-top:48px; min-height: calc(100vh - 48px);
     display:flex; align-items:flex-start; justify-content:center;
-    background: var(--paper); overflow-y:auto;
+    background: var(--paper); overflow-y:auto; height:100%;
   }
 
   /* ===== LEFT: REQUISITION ===== */
