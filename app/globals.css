@@ -374,6 +374,7 @@
 
   .bulk-bar{
     display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    min-height:38px;
     padding:8px 12px; margin-bottom:10px;
     background: var(--paper-cool); border:1px solid var(--line); border-radius: var(--radius);
   }
@@ -381,6 +382,12 @@
     display:flex; align-items:center; gap:7px;
     font-family: var(--font-mono); font-size:11px; color: var(--ink-soft); cursor:pointer;
   }
+  .bulk-actions{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    opacity:0; visibility:hidden; pointer-events:none;
+    transition: opacity 0.15s ease;
+  }
+  .bulk-actions-visible{ opacity:1; visibility:visible; pointer-events:auto; }
   .matrix-row-checkbox{ flex-shrink:0; margin-right:4px; cursor:pointer; }
 
   .multiselect{ position:relative; }

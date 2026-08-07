@@ -228,32 +228,35 @@ export function MatrixPanel({
               {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
             </label>
 
-            {selectedIds.size > 0 && (
-              <>
-                <select
-                  className="disposition-select"
-                  value={bulkDisposition}
-                  onChange={(e) => setBulkDisposition(e.target.value)}
-                >
-                  <option value="">Set disposition…</option>
-                  {DISPOSITIONS.map((d) => (
-                    <option key={d.value} value={d.value}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  className="qa-btn-text"
-                  disabled={!bulkDisposition || applyingBulk}
-                  onClick={handleApplyBulk}
-                >
-                  {applyingBulk ? 'Applying…' : 'Apply'}
-                </button>
-                <button className="qa-btn-text" onClick={() => setSelectedIds(new Set())}>
-                  Clear
-                </button>
-              </>
-            )}
+            <div className={`bulk-actions ${selectedIds.size > 0 ? 'bulk-actions-visible' : ''}`}>
+              <select
+                className="disposition-select"
+                value={bulkDisposition}
+                onChange={(e) => setBulkDisposition(e.target.value)}
+                disabled={selectedIds.size === 0}
+              >
+                <option value="">Set disposition…</option>
+                {DISPOSITIONS.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="qa-btn-text"
+                disabled={!bulkDisposition || applyingBulk || selectedIds.size === 0}
+                onClick={handleApplyBulk}
+              >
+                {applyingBulk ? 'Applying…' : 'Apply'}
+              </button>
+              <button
+                className="qa-btn-text"
+                disabled={selectedIds.size === 0}
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Clear
+              </button>
+            </div>
           </div>
 
           <div className="matrix-list">
