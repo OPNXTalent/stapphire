@@ -211,6 +211,7 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
           <MatrixPanel
             candidates={candidates}
             requisitionTitle={requisition.title}
+            evaluationPillars={requisition.evaluation_pillars}
             onSelectCandidate={setActiveCandidateId}
             onDelete={handleDeleteCandidate}
             onSetDisposition={handleSetDisposition}

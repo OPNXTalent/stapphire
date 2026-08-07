@@ -22,6 +22,14 @@ new categories, change the weights themselves, or override what the job
 description actually requires. If evaluation_priorities is absent or
 empty, evaluate using the job description alone.
 
+evaluation_pillars carries an explicit weight per dimension (they sum
+to 100) — this is the recruiter's stated priority for this specific
+role, refined directly by them, not a suggestion. Weigh matrix_dimensions
+accordingly within Job Responsibilities Match: a dimension weighted at
+30 should visibly matter more to overall_match than one weighted at 5.
+Every matrix_dimensions entry must correspond to a pillar's requirement
+exactly as given — do not rename, merge, or drop any of them.
+
 1. Weighted scoring (do not disclose these weights as a decision — they
    produce evidence, not a verdict):
    - Job Responsibilities Match: 50%

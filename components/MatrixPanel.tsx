@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { DISPOSITIONS } from '@/lib/dispositions';
+import { normalizePillars } from '@/lib/pillars';
 import { MultiSelectFilter } from '@/components/MultiSelectFilter';
 
 type Evaluation = {
@@ -50,8 +51,8 @@ export function MatrixPanel({
   onSetDisposition,
   onBulkSetDisposition,
   onBulkReevaluate,
-  evaluationPriorities,
-  onSavePriorities
+  evaluationPillars,
+  onRefinePillars
 }: {
   candidates: Candidate[];
   requisitionTitle: string;
@@ -61,8 +62,8 @@ export function MatrixPanel({
   onSetDisposition: (candidateId: string, disposition: string) => void;
   onBulkSetDisposition: (candidateIds: string[], disposition: string) => void;
   onBulkReevaluate?: (candidateIds: string[]) => void;
-  evaluationPriorities?: string | null;
-  onSavePriorities?: (text: string) => Promise<void>;
+  evaluationPillars?: unknown;
+  onRefinePillars?: (prompt: string) => Promise<void>;
 }) {
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [dispositionFilter, setDispositionFilter] = useState<string[]>([]);
@@ -72,15 +73,12 @@ export function MatrixPanel({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDisposition, setBulkDisposition] = useState('');
   const [applyingBulk, setApplyingBulk] = useState(false);
-  const [promptText, setPromptText] = useState(evaluationPriorities ?? '');
+  const [promptText, setPromptText] = useState('');
   const [savingPrompt, setSavingPrompt] = useState(false);
-  const [promptSaved, setPromptSaved] = useState(false);
   const [promptError, setPromptError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
-  useEffect(() => {
-    setPromptText(evaluationPriorities ?? '');
-  }, [evaluationPriorities]);
+  const pillars = useMemo(() => normalizePillars(evaluationPillars), [evaluationPillars]);
 
   function handlePrint() {
     window.print();
@@ -163,16 +161,15 @@ export function MatrixPanel({
     }
   }
 
-  async function handleSavePrompt() {
-    if (!onSavePriorities) return;
+  async function handleSubmitPrompt() {
+    if (!onRefinePillars || !promptText.trim()) return;
     setSavingPrompt(true);
     setPromptError(null);
     try {
-      await onSavePriorities(promptText.trim());
-      setPromptSaved(true);
-      setTimeout(() => setPromptSaved(false), 2000);
+      await onRefinePillars(promptText.trim());
+      setPromptText('');
     } catch (err: any) {
-      setPromptError(err?.message ?? 'Something went wrong saving this.');
+      setPromptError(err?.message ?? 'Something went wrong updating the criteria.');
     } finally {
       setSavingPrompt(false);
     }
@@ -264,17 +261,18 @@ export function MatrixPanel({
             )}
           </div>
 
-          {onSavePriorities && (
+          {onRefinePillars && (
             <div className="prompt-box">
               <textarea
                 className="prompt-input"
-                placeholder="+ Prompt Stapphire — update what matters most for this role... (Enter to save, Shift+Enter for a new line)"
+                placeholder="+ Prompt Stapphire — e.g. 'drop the bilingual requirement, weight call center experience higher'... (Enter to submit, Shift+Enter for a new line)"
                 value={promptText}
                 onChange={(e) => setPromptText(e.target.value)}
+                disabled={savingPrompt}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    handleSavePrompt();
+                    handleSubmitPrompt();
                   }
                 }}
               />
@@ -283,13 +281,39 @@ export function MatrixPanel({
                   {promptError ? (
                     <span style={{ color: 'var(--red)' }}>{promptError}</span>
                   ) : (
-                    'Applies to new and re-run evaluations only — never changes past results automatically.'
+                    'Updates the criteria below immediately. Existing candidates only reflect it once re-evaluated.'
                   )}
                 </span>
-                <button className="qa-btn-text" disabled={savingPrompt} onClick={handleSavePrompt}>
-                  {savingPrompt ? 'Saving…' : promptSaved ? 'Saved ✓' : 'Save'}
+                <button
+                  className="qa-btn-text"
+                  disabled={savingPrompt || !promptText.trim()}
+                  onClick={handleSubmitPrompt}
+                >
+                  {savingPrompt ? 'Updating criteria…' : 'Submit'}
                 </button>
               </div>
+            </div>
+          )}
+
+          {pillars.length > 0 && (
+            <div className="pillars-table-wrap">
+              <div className="section-label">Job-Specific Fit Criteria</div>
+              <table className="pillars-table">
+                <thead>
+                  <tr>
+                    <th>Requirement</th>
+                    <th>Weight</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pillars.map((p, i) => (
+                    <tr key={i}>
+                      <td>{p.requirement}</td>
+                      <td>{p.weight !== null ? `${p.weight}%` : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 

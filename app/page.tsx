@@ -196,15 +196,15 @@ function DashboardContent() {
     await loadRequisition();
   }
 
-  async function handleSavePriorities(text: string) {
-    const res = await fetch(`/api/requisitions/${requisitionId}/priorities`, {
-      method: 'PATCH',
+  async function handleRefinePillars(prompt: string) {
+    const res = await fetch(`/api/requisitions/${requisitionId}/refine-pillars`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ evaluation_priorities: text })
+      body: JSON.stringify({ prompt })
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw new Error(data.error ?? 'Failed to save');
+      throw new Error(data.error ?? 'Failed to update criteria');
     }
     await loadRequisition();
   }
@@ -337,8 +337,8 @@ function DashboardContent() {
               onSetDisposition={handleSetDisposition}
               onBulkSetDisposition={handleBulkSetDisposition}
               onBulkReevaluate={handleBulkReevaluate}
-              evaluationPriorities={requisition.evaluation_priorities}
-              onSavePriorities={handleSavePriorities}
+              evaluationPillars={requisition.evaluation_pillars}
+              onRefinePillars={handleRefinePillars}
             />
           )}
         </div>

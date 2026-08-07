@@ -11,7 +11,7 @@ export const revalidate = 0;
 export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
   const { data: requisition, error: reqError } = await supabaseAdmin
     .from('requisitions')
-    .select('id, title, status, job_description')
+    .select('id, title, status, job_description, evaluation_pillars')
     .eq('share_token', params.token)
     .single();
 

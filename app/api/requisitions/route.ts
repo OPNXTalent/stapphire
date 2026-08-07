@@ -9,20 +9,29 @@ const JD_PARSE_PROMPT = `
 Parse the job description into its natural evaluation dimensions for a
 candidate comparison matrix (e.g. "Call Center Experience", "CRM /
 Systems", "Complaint Resolution" — dimensions should reflect this
-specific role, not a generic template). Produce 4-7 dimensions, then
-call the submit_pillars tool with them.
+specific role, not a generic template). Produce 4-7 dimensions, each
+with a relative importance weight reflecting how much the job
+description itself emphasizes it — weights must be whole numbers that
+sum to exactly 100. Then call the submit_pillars tool with them.
 `.trim();
 
 const JD_PARSE_TOOL = {
   name: 'submit_pillars',
-  description: 'Submit the parsed evaluation dimensions for this job description.',
+  description: 'Submit the parsed, weighted evaluation dimensions for this job description.',
   input_schema: {
     type: 'object' as const,
     properties: {
       pillars: {
         type: 'array',
-        items: { type: 'string' },
-        description: '4-7 short column-header strings for the comparison matrix'
+        items: {
+          type: 'object',
+          properties: {
+            requirement: { type: 'string', description: 'Short label for this evaluation dimension' },
+            weight: { type: 'number', description: 'Relative importance as a whole-number percentage' }
+          },
+          required: ['requirement', 'weight']
+        },
+        description: '4-7 weighted evaluation dimensions specific to this role, weights summing to exactly 100'
       }
     },
     required: ['pillars']

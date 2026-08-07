@@ -381,6 +381,17 @@
   }
   .prompt-input:focus{ outline:none; }
   .prompt-footer{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:6px; }
+  .prompt-input:disabled{ opacity:0.6; }
+
+  .pillars-table-wrap{ margin-bottom:20px; }
+  .pillars-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .pillars-table th{
+    text-align:left; font-family: var(--font-mono); font-size:10px; letter-spacing:0.03em; text-transform:uppercase;
+    color: var(--ink-faint); padding:6px 10px; border-bottom:1px solid var(--line-strong);
+  }
+  .pillars-table td{ padding:8px 10px; border-bottom:1px solid var(--line); color: var(--ink-soft); }
+  .pillars-table tr:last-child td{ border-bottom:none; }
+  .pillars-table td:last-child{ font-family: var(--font-mono); font-weight:600; color: var(--sapphire); width:70px; }
 
   .matrix-title-row{
     display:flex; align-items:flex-end; justify-content:space-between; gap:16px;
@@ -702,7 +713,7 @@
     @page{ margin: 0.6in; }
 
     .brand, .req-panel, .side-panel, .pull-tab,
-    .matrix-toggle, .matrix-title-row, .prompt-box, .matrix-list-pane, .matrix-row-actions{
+    .matrix-toggle, .matrix-title-row, .prompt-box, .pillars-table-wrap, .matrix-list-pane, .matrix-row-actions{
       display:none !important;
     }
     .print-header{ display:flex !important; padding-bottom:14px; margin-bottom:20px; border-bottom:2px solid var(--sapphire); }
