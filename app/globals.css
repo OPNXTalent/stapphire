@@ -93,6 +93,12 @@
   .app.shared-view{ grid-template-columns: 1fr 288px; }
   .app.shared-view.right-collapsed{ grid-template-columns: 1fr 0px; }
 
+  .composer-page{
+    margin-top:48px; min-height: calc(100vh - 48px);
+    display:flex; align-items:flex-start; justify-content:center;
+    background: var(--paper); overflow-y:auto;
+  }
+
   /* ===== LEFT: REQUISITION ===== */
   .req-panel{
     background: var(--paper);

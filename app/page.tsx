@@ -298,6 +298,17 @@ function DashboardContent() {
 
   const activeCandidateName = candidates.find((c) => c.id === activeCandidateId)?.full_name ?? null;
 
+  if (creatingRequisition) {
+    return (
+      <>
+        <TopBar />
+        <div className="composer-page">
+          <NewRequisitionForm onCreated={handleRequisitionCreated} onCancel={() => setCreatingRequisition(false)} />
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <TopBar requisitionTitle={requisition.title} />
@@ -332,24 +343,18 @@ function DashboardContent() {
         />
 
         <div className="center-panel">
-          {creatingRequisition ? (
-            <div className="matrix-wrap">
-              <NewRequisitionForm onCreated={handleRequisitionCreated} onCancel={() => setCreatingRequisition(false)} />
-            </div>
-          ) : (
-            <MatrixPanel
-              candidates={candidates}
-              requisitionTitle={requisition.title}
-              shareToken={requisition.share_token}
-              onSelectCandidate={setActiveCandidateId}
-              onDelete={handleDeleteCandidate}
-              onSetDisposition={handleSetDisposition}
-              onBulkSetDisposition={handleBulkSetDisposition}
-              onBulkReevaluate={handleBulkReevaluate}
-              evaluationPillars={requisition.evaluation_pillars}
-              onRefinePillars={handleRefinePillars}
-            />
-          )}
+          <MatrixPanel
+            candidates={candidates}
+            requisitionTitle={requisition.title}
+            shareToken={requisition.share_token}
+            onSelectCandidate={setActiveCandidateId}
+            onDelete={handleDeleteCandidate}
+            onSetDisposition={handleSetDisposition}
+            onBulkSetDisposition={handleBulkSetDisposition}
+            onBulkReevaluate={handleBulkReevaluate}
+            evaluationPillars={requisition.evaluation_pillars}
+            onRefinePillars={handleRefinePillars}
+          />
         </div>
 
         <CollaborationPanel

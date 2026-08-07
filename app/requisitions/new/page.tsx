@@ -13,7 +13,9 @@ export default function NewRequisitionPage() {
   return (
     <>
       <TopBar />
-      <NewRequisitionForm onCreated={(id) => router.push(`/?requisition=${id}`)} />
+      <div className="composer-page">
+        <NewRequisitionForm onCreated={(id) => router.push(`/?requisition=${id}`)} />
+      </div>
     </>
   );
 }
