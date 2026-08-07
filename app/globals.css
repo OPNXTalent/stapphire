@@ -400,8 +400,7 @@
 
   .matrix-title-row{
     display:flex; align-items:flex-end; justify-content:space-between; gap:16px;
-    padding-bottom:12px; margin-bottom:16px;
-    border-bottom:3px solid var(--sapphire);
+    margin-bottom:16px;
   }
   .matrix-req-title{
     font-family: var(--font-display); font-weight:800; font-size:26px;
