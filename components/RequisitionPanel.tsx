@@ -174,7 +174,7 @@ export function RequisitionPanel({
             className={`btn add-req-btn ${isAddingRequisition ? 'add-req-btn-active' : ''}`}
             onClick={onAddRequisition}
           >
-            <span>{isAddingRequisition ? 'Hiring Quality Control' : '+ Add Requisition'}</span>
+            <span>{isAddingRequisition ? 'Processing Hiring QC...' : '+ Add Requisition'}</span>
           </button>
 
           <span className="eyebrow">Open Requisition</span>
