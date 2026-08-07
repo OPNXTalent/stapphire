@@ -196,19 +196,6 @@ function DashboardContent() {
     await loadRequisition();
   }
 
-  async function handleRefinePillars(prompt: string) {
-    const res = await fetch(`/api/requisitions/${requisitionId}/refine-pillars`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error ?? 'Failed to update criteria');
-    }
-    await loadRequisition();
-  }
-
   async function handleBulkReevaluate(candidateIds: string[]) {
     const CONCURRENCY = 3;
     let nextIndex = 0;
@@ -338,15 +325,18 @@ function DashboardContent() {
           ) : (
             <MatrixPanel
               candidates={candidates}
+              requisitionId={requisitionId}
               requisitionTitle={requisition.title}
               shareToken={requisition.share_token}
+              hiringProfile={requisition.evaluation_pillars}
+              profileRevision={requisition.profile_revision}
+              discoverySource="recruiter_discovery"
+              onProfileUpdated={loadRequisition}
               onSelectCandidate={setActiveCandidateId}
               onDelete={handleDeleteCandidate}
               onSetDisposition={handleSetDisposition}
               onBulkSetDisposition={handleBulkSetDisposition}
               onBulkReevaluate={handleBulkReevaluate}
-              evaluationPillars={requisition.evaluation_pillars}
-              onRefinePillars={handleRefinePillars}
             />
           )}
         </div>

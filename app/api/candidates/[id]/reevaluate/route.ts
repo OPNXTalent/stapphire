@@ -79,9 +79,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const userMessage = buildEvaluationUserMessage({
       jobDescription: requisition.job_description,
-      evaluationPillars: requisition.evaluation_pillars,
+      hiringProfile: requisition.evaluation_pillars,
       employerWatchlist: requisition.employer_watchlist ?? [],
-      evaluationPriorities: requisition.evaluation_priorities,
       resumeText
     });
 
@@ -107,8 +106,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         candidate_id: candidate.id,
         requisition_id: requisition.id,
         overall_match: evaluation.overall_match,
+        job_description_match: evaluation.job_description_match ?? null,
+        profile_revision: requisition.profile_revision ?? null,
         status: evaluation.status,
-        scores: evaluation.scores,
+        scores: evaluation.category_scores ?? evaluation.scores ?? null,
         signals: evaluation.signals,
         strengths: evaluation.strengths,
         gaps: evaluation.gaps,

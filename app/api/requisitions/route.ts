@@ -2,39 +2,75 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { anthropic, EVALUATION_MODEL } from '@/lib/anthropic';
 import { extractTextFromBuffer } from '@/lib/extractText';
+import { HIRING_CATEGORIES, normalizeProfileWeights, type HiringProfile } from '@/lib/hiringProfile';
 
 export const maxDuration = 60;
 
+// Builds Hiring Profile Revision 1 from the raw Job Description. This
+// is a starting point, not a final answer — discovery (the
+// /discovery endpoint) is what lets it actually evolve.
 const JD_PARSE_PROMPT = `
-Parse the job description into its natural evaluation dimensions for a
-candidate comparison matrix (e.g. "Call Center Experience", "CRM /
-Systems", "Complaint Resolution" — dimensions should reflect this
-specific role, not a generic template). Produce 4-7 dimensions, each
-with a relative importance weight reflecting how much the job
-description itself emphasizes it — weights must be whole numbers that
-sum to exactly 100. Then call the submit_pillars tool with them.
+You are building the initial Hiring Decision Model from a Job
+Description. This model is organized under exactly five permanent
+categories — never add, remove, or rename them:
+
+1. Core Responsibilities
+2. Minimum & Preferred Qualifications
+3. Hard Skills
+4. Soft Skills
+5. Keyword & Terminology Relevance
+
+For each category, extract specific, measurable subcriteria from the
+Job Description — not a summary, actual distinct requirements (e.g.
+under Hard Skills: "Oracle Fusion", "SQL", not just "technical
+skills"). A category may have zero subcriteria if the JD gives it
+nothing, but do not force subcriteria into a category that doesn't fit.
+
+Weight every subcriterion using contextual judgment — frequency of
+mention, emphasis, placement, required-vs-preferred language, scope of
+responsibility, apparent business impact, technical specificity,
+seniority signals, and repeated themes. Do not default to equal
+weights, and do not inflate formal requirements (like a degree) simply
+because they're easy to identify — a degree should not automatically
+outweigh the actual work performed unless the JD clearly establishes
+that importance.
+
+All subcriteria weights across all five categories must be whole
+numbers summing to exactly 100.
+
+Call submit_hiring_profile with the result.
 `.trim();
 
-const JD_PARSE_TOOL = {
-  name: 'submit_pillars',
-  description: 'Submit the parsed, weighted evaluation dimensions for this job description.',
+const HIRING_PROFILE_TOOL = {
+  name: 'submit_hiring_profile',
+  description: 'Submit the initial weighted Hiring Decision Model parsed from the job description.',
   input_schema: {
     type: 'object' as const,
     properties: {
-      pillars: {
+      categories: {
         type: 'array',
         items: {
           type: 'object',
           properties: {
-            requirement: { type: 'string', description: 'Short label for this evaluation dimension' },
-            weight: { type: 'number', description: 'Relative importance as a whole-number percentage' }
+            name: { type: 'string', enum: [...HIRING_CATEGORIES] },
+            subcriteria: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  weight: { type: 'number', description: 'Whole-number percentage' }
+                },
+                required: ['name', 'weight']
+              }
+            }
           },
-          required: ['requirement', 'weight']
+          required: ['name', 'subcriteria']
         },
-        description: '4-7 weighted evaluation dimensions specific to this role, weights summing to exactly 100'
+        description: 'Exactly the five fixed categories, in order, each with its extracted subcriteria'
       }
     },
-    required: ['pillars']
+    required: ['categories']
   }
 };
 
@@ -79,31 +115,54 @@ export async function POST(req: NextRequest) {
 
     const parseResponse = await anthropic.messages.create({
       model: EVALUATION_MODEL,
-      max_tokens: 512,
+      max_tokens: 1536,
       system: JD_PARSE_PROMPT,
-      tools: [JD_PARSE_TOOL],
-      tool_choice: { type: 'tool', name: 'submit_pillars' },
+      tools: [HIRING_PROFILE_TOOL],
+      tool_choice: { type: 'tool', name: 'submit_hiring_profile' },
       messages: [{ role: 'user', content: job_description }]
     });
 
     const toolUseBlock = parseResponse.content.find((b) => b.type === 'tool_use');
-    const pillars =
-      toolUseBlock && toolUseBlock.type === 'tool_use' ? (toolUseBlock.input as any).pillars : [];
+    const rawCategories =
+      toolUseBlock && toolUseBlock.type === 'tool_use' ? (toolUseBlock.input as any).categories : [];
 
-    const { data, error } = await supabaseAdmin
+    const profile: HiringProfile = normalizeProfileWeights({
+      categories: Array.isArray(rawCategories)
+        ? rawCategories.map((c: any) => ({
+            name: c.name,
+            weight: 0,
+            subcriteria: Array.isArray(c.subcriteria)
+              ? c.subcriteria.map((s: any) => ({ name: s.name, weight: Number(s.weight) || 0, source: ['Job Description'] }))
+              : []
+          }))
+        : []
+    });
+
+    const { data: requisition, error } = await supabaseAdmin
       .from('requisitions')
       .insert({
         org_id,
         title,
         job_description,
-        evaluation_pillars: pillars,
+        evaluation_pillars: profile,
+        profile_revision: 1,
         created_by
       })
       .select()
       .single();
 
     if (error) throw error;
-    return NextResponse.json({ requisition: data });
+
+    await supabaseAdmin.from('hiring_profile_revisions').insert({
+      requisition_id: requisition.id,
+      revision: 1,
+      source: 'job_description',
+      change_summary: 'Initial Hiring Profile parsed from the job description.',
+      profile_snapshot: profile,
+      changes: null
+    });
+
+    return NextResponse.json({ requisition });
   } catch (err: any) {
     console.error('Create requisition failed:', err);
     return NextResponse.json({ error: err.message ?? 'Failed to create requisition' }, { status: 500 });

@@ -31,8 +31,17 @@ create table requisitions (
   title text not null,
   status text not null default 'open' check (status in ('open','on_hold','filled')),
   job_description text not null,
-  -- parsed once at creation; drives Evaluation Signals + Matrix filters
+  -- The Hiring Decision Model — a living structure, not a static JD
+  -- parse. Shape: { categories: [{ name, weight, subcriteria: [{ name,
+  -- weight, source: string[] }] }] }. Categories are always exactly the
+  -- fixed five (Core Responsibilities, Minimum & Preferred
+  -- Qualifications, Hard Skills, Soft Skills, Keyword & Terminology
+  -- Relevance); only their subcriteria and weights evolve through
+  -- discovery. Always current — history lives in hiring_profile_revisions.
   evaluation_pillars jsonb,
+  -- increments every time the Hiring Profile actually changes; each
+  -- evaluation records which revision it was measured against
+  profile_revision integer not null default 1,
   -- per-requisition configurable, defaults empty — no hardcoded customer data
   employer_watchlist text[] not null default '{}',
   created_by uuid references profiles(id),
@@ -44,11 +53,43 @@ create table requisitions (
   -- Unlike candidate trash, there is no permanent-deletion path for
   -- requisitions; archiving is a soft, non-destructive action.
   archived_at timestamptz,
-  -- freeform, editable-anytime emphasis for how evaluations should
-  -- weigh evidence within the fixed rubric — applies to evaluations run
-  -- from the moment it's saved forward, never retroactively
+  -- superseded by the Hiring Profile / discovery model — kept for
+  -- backward compatibility with rows written before that existed
   evaluation_priorities text
 );
+
+-- ── Hiring Profile revision history ──────────────────────────────
+-- Append-only. Every time discovery materially changes the model, a
+-- new row captures the complete resulting snapshot alongside what
+-- changed and why — the Job Description is the seed, this is the
+-- evolving record of shared understanding built on top of it.
+create table hiring_profile_revisions (
+  id uuid primary key default uuid_generate_v4(),
+  requisition_id uuid not null references requisitions(id) on delete cascade,
+  revision integer not null,
+  source text not null check (source in (
+    'job_description','recruiter_discovery','hiring_leader_discovery','joint_calibration'
+  )),
+  change_summary text,
+  profile_snapshot jsonb not null,  -- full { categories: [...] } after this revision
+  changes jsonb,                    -- [{ criterion, action, old_weight, new_weight, reason }]
+  created_at timestamptz not null default now(),
+  unique (requisition_id, revision)
+);
+create index idx_hpr_requisition on hiring_profile_revisions(requisition_id, revision);
+
+-- ── Discovery conversation ────────────────────────────────────────
+-- The chat thread that shapes the Hiring Profile over time — kept
+-- distinct from Collaboration (which is about candidates, not the
+-- role definition itself).
+create table discovery_messages (
+  id uuid primary key default uuid_generate_v4(),
+  requisition_id uuid not null references requisitions(id) on delete cascade,
+  role text not null check (role in ('user','assistant')),
+  content text not null,
+  created_at timestamptz not null default now()
+);
+create index idx_discovery_requisition on discovery_messages(requisition_id, created_at);
 
 -- ── Core object 2: Candidate (normalized profile, not the raw PDF) ─
 create table candidates (
@@ -79,7 +120,15 @@ create table evaluations (
   candidate_id uuid not null references candidates(id) on delete cascade,
   requisition_id uuid not null references requisitions(id) on delete cascade,
 
+  -- Job Description Match vs Hiring Profile Match — the two can
+  -- diverge meaningfully as discovery refines the model beyond the
+  -- original JD. overall_match is the Profile Match (the current
+  -- standard); job_description_match is against the original JD alone.
   overall_match integer not null,
+  job_description_match integer,
+  -- which Hiring Profile revision this evaluation was measured
+  -- against — evaluations from before this existed have no revision.
+  profile_revision integer,
   status text not null check (status in ('greenlight','consider','decline')),
 
   scores jsonb not null,              -- job_responsibilities, hard_skills, soft_skills, keyword_relevance

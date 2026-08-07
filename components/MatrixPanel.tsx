@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DISPOSITIONS } from '@/lib/dispositions';
-import { normalizePillars } from '@/lib/pillars';
+import { normalizeHiringProfile, type HiringProfile } from '@/lib/hiringProfile';
 import { MultiSelectFilter } from '@/components/MultiSelectFilter';
 
 type Evaluation = {
   overall_match: number;
+  job_description_match: number | null;
   status: 'greenlight' | 'consider' | 'decline';
   signals: Record<string, string>;
   matrix_dimensions: Record<string, string>;
@@ -25,6 +26,8 @@ type Candidate = {
   evaluations: Evaluation[];
 };
 
+type DiscoveryMessage = { id: string; role: 'user' | 'assistant'; content: string; created_at: string };
+
 function facetTier(score: number): 'strong' | 'moderate' | 'limited' {
   if (score >= 85) return 'strong';
   if (score >= 69) return 'moderate';
@@ -38,32 +41,38 @@ function rankBadgeClass(rank: number) {
   return null;
 }
 
-// Master-detail layout: the top pane always shows one candidate's full
-// evaluation (whichever is "focused"), the bottom pane is a compact,
-// scannable list used to change focus and run bulk actions. Clicking a
-// name in the list sets focus — it doesn't expand the row itself.
+// Master-detail layout: the top pane is role-level only — title, and
+// a toggleable discovery chat that shapes the living Hiring Decision
+// Model. The bottom pane is everything candidate-related: the compact
+// list plus whichever row is expanded.
 export function MatrixPanel({
   candidates,
+  requisitionId,
   requisitionTitle,
   shareToken,
+  hiringProfile,
+  profileRevision,
+  discoverySource = 'recruiter_discovery',
+  onProfileUpdated,
   onSelectCandidate,
   onDelete,
   onSetDisposition,
   onBulkSetDisposition,
-  onBulkReevaluate,
-  evaluationPillars,
-  onRefinePillars
+  onBulkReevaluate
 }: {
   candidates: Candidate[];
+  requisitionId: string;
   requisitionTitle: string;
   shareToken?: string;
+  hiringProfile?: unknown;
+  profileRevision?: number;
+  discoverySource?: 'recruiter_discovery' | 'hiring_leader_discovery';
+  onProfileUpdated?: () => void;
   onSelectCandidate: (candidateId: string | null) => void;
   onDelete: (candidateId: string) => void;
   onSetDisposition: (candidateId: string, disposition: string) => void;
   onBulkSetDisposition: (candidateIds: string[], disposition: string) => void;
   onBulkReevaluate?: (candidateIds: string[]) => void;
-  evaluationPillars?: unknown;
-  onRefinePillars?: (prompt: string) => Promise<void>;
 }) {
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [dispositionFilter, setDispositionFilter] = useState<string[]>([]);
@@ -73,13 +82,73 @@ export function MatrixPanel({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDisposition, setBulkDisposition] = useState('');
   const [applyingBulk, setApplyingBulk] = useState(false);
-  const [promptText, setPromptText] = useState('');
-  const [savingPrompt, setSavingPrompt] = useState(false);
-  const [promptError, setPromptError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [promptOpen, setPromptOpen] = useState(false);
+  const [discoveryOpen, setDiscoveryOpen] = useState(false);
 
-  const pillars = useMemo(() => normalizePillars(evaluationPillars), [evaluationPillars]);
+  const [messages, setMessages] = useState<DiscoveryMessage[]>([]);
+  const [messagesLoaded, setMessagesLoaded] = useState(false);
+  const [chatText, setChatText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [liveProfile, setLiveProfile] = useState<HiringProfile | null>(null);
+  const [liveRevision, setLiveRevision] = useState<number | undefined>(profileRevision);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const profile = liveProfile ?? normalizeHiringProfile(hiringProfile);
+
+  useEffect(() => {
+    setLiveProfile(null);
+    setLiveRevision(profileRevision);
+  }, [requisitionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (discoveryOpen && !messagesLoaded) {
+      fetch(`/api/requisitions/${requisitionId}/discovery`, { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((data) => {
+          setMessages(data.messages ?? []);
+          setMessagesLoaded(true);
+        });
+    }
+  }, [discoveryOpen, messagesLoaded, requisitionId]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  async function handleSendChat() {
+    if (!chatText.trim() || sending) return;
+    const text = chatText.trim();
+    setChatText('');
+    setSending(true);
+    setChatError(null);
+    setMessages((prev) => [...prev, { id: `local-${Date.now()}`, role: 'user', content: text, created_at: new Date().toISOString() }]);
+
+    try {
+      const res = await fetch(`/api/requisitions/${requisitionId}/discovery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, source: discoverySource })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Discovery failed');
+
+      setMessages((prev) => [
+        ...prev,
+        { id: `local-reply-${Date.now()}`, role: 'assistant', content: data.reply ?? '', created_at: new Date().toISOString() }
+      ]);
+
+      if (data.profile_changed) {
+        setLiveProfile(data.profile);
+        setLiveRevision(data.revision);
+        onProfileUpdated?.();
+      }
+    } catch (err: any) {
+      setChatError(err?.message ?? 'Something went wrong.');
+    } finally {
+      setSending(false);
+    }
+  }
 
   function handlePrint() {
     window.print();
@@ -159,25 +228,11 @@ export function MatrixPanel({
     const ids = Array.from(selectedIds);
     if (
       window.confirm(
-        `Re-evaluate ${ids.length} candidate${ids.length !== 1 ? 's' : ''} against the current job description and prompt? This uses ${ids.length} credit${ids.length !== 1 ? 's' : ''} — one per candidate, same as a fresh evaluation.`
+        `Re-evaluate ${ids.length} candidate${ids.length !== 1 ? 's' : ''} against the current Hiring Decision Model? This uses ${ids.length} credit${ids.length !== 1 ? 's' : ''} — one per candidate, same as a fresh evaluation.`
       )
     ) {
       onBulkReevaluate(ids);
       setSelectedIds(new Set());
-    }
-  }
-
-  async function handleSubmitPrompt() {
-    if (!onRefinePillars || !promptText.trim()) return;
-    setSavingPrompt(true);
-    setPromptError(null);
-    try {
-      await onRefinePillars(promptText.trim());
-      setPromptText('');
-    } catch (err: any) {
-      setPromptError(err?.message ?? 'Something went wrong updating the criteria.');
-    } finally {
-      setSavingPrompt(false);
     }
   }
 
@@ -243,16 +298,13 @@ export function MatrixPanel({
       </div>
 
       <div className="matrix-split">
-        {/* ── Top: role-level only — title, and a toggleable prompt + criteria table. No candidate content here. ── */}
+        {/* ── Top: role-level only — title, and a toggleable discovery chat that shapes the Hiring Decision Model. ── */}
         <div className="matrix-role-pane">
-          <div
-            className="matrix-title-row"
-            onClick={() => onRefinePillars && setPromptOpen((o) => !o)}
-            style={{ cursor: onRefinePillars ? 'pointer' : 'default' }}
-          >
+          <div className="matrix-title-row" onClick={() => setDiscoveryOpen((o) => !o)} style={{ cursor: 'pointer' }}>
             <div className="matrix-req-title" title={requisitionTitle}>
-              {onRefinePillars && <span className="matrix-title-chev">{promptOpen ? '▾' : '▸'}</span>}
+              <span className="matrix-title-chev">{discoveryOpen ? '▾' : '▸'}</span>
               {requisitionTitle}
+              {liveRevision !== undefined && <span className="profile-revision-badge">Rev {liveRevision}</span>}
             </div>
             {shareToken && (
               <button
@@ -268,60 +320,79 @@ export function MatrixPanel({
             )}
           </div>
 
-          {onRefinePillars && promptOpen && (
+          {discoveryOpen && (
             <div onClick={(e) => e.stopPropagation()}>
-              <div className="section-label">Job Specific Fit Prompt</div>
-              <div className="prompt-box">
-                <textarea
-                  className="prompt-input"
-                  placeholder="Tell me..."
-                  value={promptText}
-                  onChange={(e) => setPromptText(e.target.value)}
-                  disabled={savingPrompt}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSubmitPrompt();
-                    }
-                  }}
-                />
-                <div className="prompt-footer">
-                  <span className="upload-hint" style={{ margin: 0 }}>
-                    {promptError ? (
-                      <span style={{ color: 'var(--red)' }}>{promptError}</span>
-                    ) : (
-                      'Updates the criteria below immediately. Existing candidates only reflect it once re-evaluated.'
-                    )}
-                  </span>
-                  <button
-                    className="qa-btn-text"
-                    disabled={savingPrompt || !promptText.trim()}
-                    onClick={handleSubmitPrompt}
-                  >
-                    {savingPrompt ? 'Updating criteria…' : 'Submit'}
-                  </button>
+              <div className="section-label">Hiring Discovery</div>
+              <div className="discovery-chat">
+                <div className="discovery-messages">
+                  {!messagesLoaded ? (
+                    <div className="trash-empty-hint">Loading…</div>
+                  ) : messages.length === 0 ? (
+                    <div className="trash-empty-hint">
+                      Tell me what matters most for this role — I'll shape the Hiring Decision Model as we talk.
+                    </div>
+                  ) : (
+                    messages.map((m) => (
+                      <div key={m.id} className={`discovery-msg discovery-msg-${m.role}`}>
+                        {m.content}
+                      </div>
+                    ))
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                <div className="prompt-box" style={{ marginTop: 8 }}>
+                  <textarea
+                    className="prompt-input"
+                    placeholder="+ Stapphire Prompt"
+                    value={chatText}
+                    onChange={(e) => setChatText(e.target.value)}
+                    disabled={sending}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendChat();
+                      }
+                    }}
+                  />
+                  <div className="prompt-footer">
+                    <span className="upload-hint" style={{ margin: 0 }}>
+                      {chatError ? (
+                        <span style={{ color: 'var(--red)' }}>{chatError}</span>
+                      ) : (
+                        'Updates the model when it materially changes understanding of the role. Existing candidates only reflect it once re-evaluated.'
+                      )}
+                    </span>
+                    <button className="qa-btn-text" disabled={sending || !chatText.trim()} onClick={handleSendChat}>
+                      {sending ? 'Thinking…' : 'Send'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {pillars.length > 0 && (
+              {profile.categories.length > 0 && (
                 <div className="pillars-table-wrap">
-                  <div className="section-label">Job-Specific Fit Criteria</div>
-                  <table className="pillars-table">
-                    <thead>
-                      <tr>
-                        <th>Requirement</th>
-                        <th>Weight</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pillars.map((p, i) => (
-                        <tr key={i}>
-                          <td>{p.requirement}</td>
-                          <td>{p.weight !== null ? `${p.weight}%` : '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="section-label">Hiring Decision Model</div>
+                  {profile.categories.map((cat) => (
+                    <div className="hdm-category" key={cat.name}>
+                      <div className="hdm-category-head">
+                        <span>{cat.name}</span>
+                        <span>{cat.weight}%</span>
+                      </div>
+                      {cat.subcriteria.length > 0 && (
+                        <table className="pillars-table">
+                          <tbody>
+                            {cat.subcriteria.map((s, i) => (
+                              <tr key={i}>
+                                <td>{s.name}</td>
+                                <td>{s.weight}%</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -456,6 +527,19 @@ export function MatrixPanel({
 
                   {isOpen && (
                     <div className="matrix-row-body">
+                      {evalu.job_description_match !== null && evalu.job_description_match !== undefined && (
+                        <div className="dual-match-row">
+                          <div className="dual-match-item">
+                            <span className="signal-label">Job Description Match</span>
+                            <span className="dual-match-num">{evalu.job_description_match}%</span>
+                          </div>
+                          <div className="dual-match-item">
+                            <span className="signal-label">Hiring Profile Match</span>
+                            <span className="dual-match-num dual-match-primary">{evalu.overall_match}%</span>
+                          </div>
+                        </div>
+                      )}
+
                       {Object.keys(evalu.matrix_dimensions ?? {}).length > 0 && (
                         <>
                           <div className="section-label">Job-Specific Fit</div>

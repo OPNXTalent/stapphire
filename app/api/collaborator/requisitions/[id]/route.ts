@@ -31,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const { data: requisition, error: reqError } = await supabaseAdmin
     .from('requisitions')
-    .select('id, title, status, job_description, evaluation_pillars')
+    .select('id, title, status, job_description, evaluation_pillars, profile_revision')
     .eq('id', params.id)
     .single();
 

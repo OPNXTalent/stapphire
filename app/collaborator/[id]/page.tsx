@@ -108,8 +108,12 @@ export default function CollaboratorRequisitionPage({ params }: { params: { id: 
         <div className="center-panel">
           <MatrixPanel
             candidates={candidates}
+            requisitionId={requisition.id}
             requisitionTitle={requisition.title}
-            evaluationPillars={requisition.evaluation_pillars}
+            hiringProfile={requisition.evaluation_pillars}
+            profileRevision={requisition.profile_revision}
+            discoverySource="hiring_leader_discovery"
+            onProfileUpdated={load}
             onSelectCandidate={setActiveCandidateId}
             onDelete={handleDeleteCandidate}
             onSetDisposition={handleSetDisposition}
