@@ -77,6 +77,7 @@ export function MatrixPanel({
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [promptError, setPromptError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
 
   const pillars = useMemo(() => normalizePillars(evaluationPillars), [evaluationPillars]);
 
@@ -247,22 +248,33 @@ export function MatrixPanel({
       </div>
 
       <div className="matrix-split">
-        {/* ── Top: detail pane for the focused candidate ── */}
-        <div className="matrix-detail-pane">
-          <div className="matrix-title-row">
+        {/* ── Top: role-level only — title, and a toggleable prompt + criteria table. No candidate content here. ── */}
+        <div className="matrix-role-pane">
+          <div
+            className="matrix-title-row"
+            onClick={() => onRefinePillars && setPromptOpen((o) => !o)}
+            style={{ cursor: onRefinePillars ? 'pointer' : 'default' }}
+          >
             <div className="matrix-req-title" title={requisitionTitle}>
+              {onRefinePillars && <span className="matrix-title-chev">{promptOpen ? '▾' : '▸'}</span>}
               {requisitionTitle}
             </div>
             {shareToken && (
-              <button className="qa-btn-text share-link-btn matrix-share-link" onClick={handleCopyLink}>
+              <button
+                className="qa-btn-text share-link-btn matrix-share-link"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopyLink();
+                }}
+              >
                 <span>{linkCopied ? 'Link copied' : 'Share Link'}</span>
                 <span className="share-link-icon">{linkCopied ? '✓' : '⧉'}</span>
               </button>
             )}
           </div>
 
-          {onRefinePillars && (
-            <>
+          {onRefinePillars && promptOpen && (
+            <div onClick={(e) => e.stopPropagation()}>
               <div className="section-label">Job Specific Fit Prompt</div>
               <div className="prompt-box">
                 <textarea
@@ -270,155 +282,58 @@ export function MatrixPanel({
                   placeholder="+ Stapphire Prompt"
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}
-                disabled={savingPrompt}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmitPrompt();
-                  }
-                }}
-              />
-              <div className="prompt-footer">
-                <span className="upload-hint" style={{ margin: 0 }}>
-                  {promptError ? (
-                    <span style={{ color: 'var(--red)' }}>{promptError}</span>
-                  ) : (
-                    'Updates the criteria below immediately. Existing candidates only reflect it once re-evaluated.'
-                  )}
-                </span>
-                <button
-                  className="qa-btn-text"
-                  disabled={savingPrompt || !promptText.trim()}
-                  onClick={handleSubmitPrompt}
-                >
-                  {savingPrompt ? 'Updating criteria…' : 'Submit'}
-                </button>
-              </div>
-              </div>
-            </>
-          )}
-
-          {pillars.length > 0 && (
-            <div className="pillars-table-wrap">
-              <div className="section-label">Job-Specific Fit Criteria</div>
-              <table className="pillars-table">
-                <thead>
-                  <tr>
-                    <th>Requirement</th>
-                    <th>Weight</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pillars.map((p, i) => (
-                    <tr key={i}>
-                      <td>{p.requirement}</td>
-                      <td>{p.weight !== null ? `${p.weight}%` : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {!focused || !focusedEval ? (
-            <div className="trash-empty-hint">Select a candidate below to see the full evaluation.</div>
-          ) : (
-            <div className="matrix-detail-card">
-              <div className="matrix-detail-head">
-                <div className="matrix-row-name" style={{ fontSize: 18 }}>
-                  {focused.full_name}
-                </div>
-                <div className="facet-cell matrix-row-match">
-                  <span className="score-num">{focusedEval.overall_match}%</span>
-                  <div className={`facet-mini ${facetTier(focusedEval.overall_match)}`} />
-                </div>
-                <span className={`rec-pill ${focusedEval.status}`}>
-                  {focusedEval.status.charAt(0).toUpperCase() + focusedEval.status.slice(1)}
-                </span>
-              </div>
-
-              {Object.keys(focusedEval.matrix_dimensions ?? {}).length > 0 && (
-                <>
-                  <div className="section-label">Job-Specific Fit</div>
-                  <div className="signal-row">
-                    {Object.entries(focusedEval.matrix_dimensions).map(([k, v]) => (
-                      <div className="signal-chip" key={k}>
-                        <span className="signal-label">{k}</span>
-                        <span className="signal-value">{v}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {Object.keys(focusedEval.signals ?? {}).length > 0 && (
-                <>
-                  <div className="section-label">Evaluation Signals</div>
-                  <div className="signal-row">
-                    {Object.entries(focusedEval.signals).map(
-                      ([k, v]) =>
-                        v && (
-                          <div className="signal-chip" key={k}>
-                            <span className="signal-label">{k.replace(/_/g, ' ')}</span>
-                            <span className="signal-value">{v}</span>
-                          </div>
-                        )
+                  disabled={savingPrompt}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmitPrompt();
+                    }
+                  }}
+                />
+                <div className="prompt-footer">
+                  <span className="upload-hint" style={{ margin: 0 }}>
+                    {promptError ? (
+                      <span style={{ color: 'var(--red)' }}>{promptError}</span>
+                    ) : (
+                      'Updates the criteria below immediately. Existing candidates only reflect it once re-evaluated.'
                     )}
-                  </div>
-                </>
-              )}
-
-              <div className="two-col">
-                <div>
-                  <div className="section-label">Evidence</div>
-                  <ul className="plain evidence">
-                    {focusedEval.strengths?.map((s, idx) => (
-                      <li key={idx}>{s}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <div className="section-label">Gaps</div>
-                  <ul className="plain gaps">
-                    {focusedEval.gaps?.map((g, idx) => (
-                      <li key={idx}>{g}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              {focusedEval.risk_flags?.length > 0 && (
-                <>
-                  <div className="section-label">Risk Flags</div>
-                  <ul className="plain gaps">
-                    {focusedEval.risk_flags.map((r, idx) => (
-                      <li key={idx}>{r}</li>
-                    ))}
-                  </ul>
-                </>
-              )}
-
-              <div className="matrix-row-actions">
-                {focused.original_file_url && (
+                  </span>
                   <button
-                    className="qa-btn-text qa-btn-icon"
-                    disabled={downloading === focused.id}
-                    onClick={() => handleDownload(focused.id)}
+                    className="qa-btn-text"
+                    disabled={savingPrompt || !promptText.trim()}
+                    onClick={handleSubmitPrompt}
                   >
-                    <span className="qa-btn-icon-glyph">📄</span>
-                    {downloading === focused.id ? 'Preparing download…' : 'Download Original Resume'}
+                    {savingPrompt ? 'Updating criteria…' : 'Submit'}
                   </button>
-                )}
-                <button className="qa-btn-text qa-btn-icon" onClick={handlePrint}>
-                  <span className="qa-btn-icon-glyph">🖨</span>
-                  Print this evaluation
-                </button>
+                </div>
               </div>
+
+              {pillars.length > 0 && (
+                <div className="pillars-table-wrap">
+                  <div className="section-label">Job-Specific Fit Criteria</div>
+                  <table className="pillars-table">
+                    <thead>
+                      <tr>
+                        <th>Requirement</th>
+                        <th>Weight</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pillars.map((p, i) => (
+                        <tr key={i}>
+                          <td>{p.requirement}</td>
+                          <td>{p.weight !== null ? `${p.weight}%` : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* ── Bottom: compact scannable list ── */}
+        {/* ── Bottom: everything candidate-related — the compact list, and the focused candidate's full evaluation. ── */}
         <div className="matrix-list-pane">
           <div className="filter-row">
             <MultiSelectFilter
@@ -543,6 +458,105 @@ export function MatrixPanel({
               );
             })}
           </div>
+
+          {!focused || !focusedEval ? (
+            <div className="trash-empty-hint" style={{ marginTop: 14 }}>
+              Select a candidate above to see the full evaluation.
+            </div>
+          ) : (
+            <div className="matrix-detail-card">
+              <div className="matrix-detail-head">
+                <div className="matrix-row-name" style={{ fontSize: 18 }}>
+                  {focused.full_name}
+                </div>
+                <div className="facet-cell matrix-row-match">
+                  <span className="score-num">{focusedEval.overall_match}%</span>
+                  <div className={`facet-mini ${facetTier(focusedEval.overall_match)}`} />
+                </div>
+                <span className={`rec-pill ${focusedEval.status}`}>
+                  {focusedEval.status.charAt(0).toUpperCase() + focusedEval.status.slice(1)}
+                </span>
+              </div>
+
+              {Object.keys(focusedEval.matrix_dimensions ?? {}).length > 0 && (
+                <>
+                  <div className="section-label">Job-Specific Fit</div>
+                  <div className="signal-row">
+                    {Object.entries(focusedEval.matrix_dimensions).map(([k, v]) => (
+                      <div className="signal-chip" key={k}>
+                        <span className="signal-label">{k}</span>
+                        <span className="signal-value">{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {Object.keys(focusedEval.signals ?? {}).length > 0 && (
+                <>
+                  <div className="section-label">Evaluation Signals</div>
+                  <div className="signal-row">
+                    {Object.entries(focusedEval.signals).map(
+                      ([k, v]) =>
+                        v && (
+                          <div className="signal-chip" key={k}>
+                            <span className="signal-label">{k.replace(/_/g, ' ')}</span>
+                            <span className="signal-value">{v}</span>
+                          </div>
+                        )
+                    )}
+                  </div>
+                </>
+              )}
+
+              <div className="two-col">
+                <div>
+                  <div className="section-label">Evidence</div>
+                  <ul className="plain evidence">
+                    {focusedEval.strengths?.map((s, idx) => (
+                      <li key={idx}>{s}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <div className="section-label">Gaps</div>
+                  <ul className="plain gaps">
+                    {focusedEval.gaps?.map((g, idx) => (
+                      <li key={idx}>{g}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {focusedEval.risk_flags?.length > 0 && (
+                <>
+                  <div className="section-label">Risk Flags</div>
+                  <ul className="plain gaps">
+                    {focusedEval.risk_flags.map((r, idx) => (
+                      <li key={idx}>{r}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              <div className="matrix-row-actions">
+                {focused.original_file_url && (
+                  <button
+                    className="qa-btn-text qa-btn-icon"
+                    disabled={downloading === focused.id}
+                    onClick={() => handleDownload(focused.id)}
+                  >
+                    <span className="qa-btn-icon-glyph">📄</span>
+                    {downloading === focused.id ? 'Preparing download…' : 'Download Original Resume'}
+                  </button>
+                )}
+                <button className="qa-btn-text qa-btn-icon" onClick={handlePrint}>
+                  <span className="qa-btn-icon-glyph">🖨</span>
+                  Print this evaluation
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>
