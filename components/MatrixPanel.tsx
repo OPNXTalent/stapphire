@@ -274,7 +274,7 @@ export function MatrixPanel({
               <div className="prompt-box">
                 <textarea
                   className="prompt-input"
-                  placeholder="+ Stapphire Prompt"
+                  placeholder="Tell me..."
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}
                   disabled={savingPrompt}
