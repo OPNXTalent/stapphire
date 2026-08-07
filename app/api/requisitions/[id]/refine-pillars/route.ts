@@ -76,7 +76,7 @@ the complete resulting list (not just the changed items).
 
     const response = await anthropic.messages.create({
       model: EVALUATION_MODEL,
-      max_tokens: 1024,
+      max_tokens: 1536,
       system: systemPrompt,
       tools: [REFINE_TOOL],
       tool_choice: { type: 'tool', name: 'submit_refined_pillars' },
@@ -90,14 +90,34 @@ the complete resulting list (not just the changed items).
 
     const newPillars = (toolUseBlock.input as any).pillars;
 
+    if (!Array.isArray(newPillars) || newPillars.length === 0) {
+      console.error('Refine pillars returned empty/invalid result:', toolUseBlock.input);
+      return NextResponse.json(
+        { error: 'The model did not return usable criteria — nothing was changed. Try rephrasing the direction.' },
+        { status: 500 }
+      );
+    }
+
+    const cleanPillars = newPillars.filter(
+      (p: any) => p && typeof p.requirement === 'string' && p.requirement.trim() && typeof p.weight === 'number'
+    );
+
+    if (cleanPillars.length === 0) {
+      console.error('Refine pillars returned no valid entries after filtering:', newPillars);
+      return NextResponse.json(
+        { error: 'The model did not return usable criteria — nothing was changed. Try rephrasing the direction.' },
+        { status: 500 }
+      );
+    }
+
     const { error: updateError } = await supabaseAdmin
       .from('requisitions')
-      .update({ evaluation_pillars: newPillars })
+      .update({ evaluation_pillars: cleanPillars })
       .eq('id', params.id);
 
     if (updateError) throw updateError;
 
-    return NextResponse.json({ pillars: newPillars });
+    return NextResponse.json({ pillars: cleanPillars });
   } catch (err: any) {
     console.error('Refine pillars failed:', err);
     return NextResponse.json({ error: err.message ?? 'Failed to update criteria' }, { status: 500 });
