@@ -262,6 +262,15 @@ function DashboardContent() {
     await loadAllRequisitions();
   }
 
+  async function handleDeleteRequisitionPermanently(id: string) {
+    const res = await fetch(`/api/requisitions/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? 'Failed to permanently delete');
+    }
+    await loadAllRequisitions();
+  }
+
   async function handleEmptyAllTrash() {
     await fetch(`/api/organizations/${DEMO_ORG_ID}/empty-trash`, { method: 'POST' });
     await loadTrash();
@@ -367,6 +376,7 @@ function DashboardContent() {
         onClose={() => setArchiveModalOpen(false)}
         orgId={DEMO_ORG_ID}
         onRestoreRequisition={handleRestoreRequisition}
+        onDeleteRequisition={handleDeleteRequisitionPermanently}
       />
     </>
   );

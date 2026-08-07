@@ -168,7 +168,7 @@ create table credit_transactions (
   org_id uuid not null references organizations(id) on delete cascade,
   amount integer not null,          -- negative = consumed, positive = purchased/refilled
   reason text not null,             -- 'resume_evaluation' | 'stripe_purchase' | 'monthly_refill'
-  candidate_id uuid references candidates(id),
+  candidate_id uuid references candidates(id) on delete set null,
   stripe_event_id text,
   created_at timestamptz not null default now()
 );
