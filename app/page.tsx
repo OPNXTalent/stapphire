@@ -196,6 +196,15 @@ function DashboardContent() {
     await loadRequisition();
   }
 
+  async function handleSavePriorities(text: string) {
+    await fetch(`/api/requisitions/${requisitionId}/priorities`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ evaluation_priorities: text })
+    });
+    await loadRequisition();
+  }
+
   async function handleBulkReevaluate(candidateIds: string[]) {
     const CONCURRENCY = 3;
     let nextIndex = 0;
@@ -323,6 +332,8 @@ function DashboardContent() {
               onSetDisposition={handleSetDisposition}
               onBulkSetDisposition={handleBulkSetDisposition}
               onBulkReevaluate={handleBulkReevaluate}
+              evaluationPriorities={requisition.evaluation_priorities}
+              onSavePriorities={handleSavePriorities}
             />
           )}
         </div>

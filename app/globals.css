@@ -284,13 +284,6 @@
   .btn-upload{ margin-top:14px; position:relative; overflow:hidden; }
   .btn-upload.spent{ background: var(--sapphire-pale); border-color: var(--sapphire); color: var(--deep); pointer-events:none; }
   .upload-hint{ font-family: var(--font-mono); font-size:10px; color: var(--ink-faint); margin-top:6px; line-height:1.4; }
-  .priorities-input{
-    width:100%; min-height:70px; padding:9px 10px;
-    border:1px solid var(--line-strong); border-radius: var(--radius);
-    font-size:12px; font-family: var(--font-body); color: var(--ink);
-    resize:vertical;
-  }
-  .priorities-input:focus{ outline:none; border-color: var(--sapphire); }
 
   /* Glowing gem — shown in the upload button while a resume is being
      evaluated. One orchestrated moment: a slow overall pulse plus each
@@ -366,8 +359,29 @@
   .matrix-toggle-label{ font-family: var(--font-display); font-weight:700; font-size:13.5px; }
   .matrix-toggle-sub{ font-size:11.5px; color: var(--ink-faint); }
 
-  .matrix-wrap{ flex:1; overflow-y:auto; background: var(--paper); }
-  .matrix-scroll{ padding:14px 20px 18px; }
+  .matrix-split{ flex:1; min-height:0; display:flex; flex-direction:column; }
+
+  .matrix-detail-pane{
+    flex:0 0 56%; min-height:0; overflow-y:auto;
+    padding:14px 20px 18px; background: var(--paper);
+    border-bottom:2px solid var(--sapphire);
+  }
+  .matrix-list-pane{
+    flex:1; min-height:0; overflow-y:auto;
+    padding:14px 20px 18px; background: var(--paper-cool);
+  }
+
+  .prompt-box{
+    border:1px solid var(--line-strong); border-radius: var(--radius);
+    background: var(--paper-cool); padding:10px 12px; margin-bottom:16px;
+  }
+  .prompt-input{
+    width:100%; min-height:44px; padding:0; border:none; background:none;
+    font-size:13px; font-family: var(--font-body); color: var(--ink); resize:vertical;
+  }
+  .prompt-input:focus{ outline:none; }
+  .prompt-footer{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:6px; }
+
   .matrix-req-title{
     font-family: var(--font-display); font-weight:800; font-size:26px;
     color: var(--deep); letter-spacing:-0.01em;
@@ -383,7 +397,7 @@
     display:flex; align-items:center; gap:10px; flex-wrap:wrap;
     min-height:38px;
     padding:8px 12px; margin-bottom:10px;
-    background: var(--paper-cool); border:1px solid var(--line); border-radius: var(--radius);
+    background: var(--paper); border:1px solid var(--line); border-radius: var(--radius);
   }
   .bulk-select-all{
     display:flex; align-items:center; gap:7px;
@@ -432,25 +446,20 @@
   .filter-chip.active{ background: var(--deep); border-color: var(--deep); color:#fff; }
   .filter-chip:hover{ border-color: var(--sapphire); }
 
-  /* Vertical, mobile-first candidate list. Collapsed rows are for
-     scanning and skipping declines fast; tap a name for the full
-     picture instead of forcing everything into wide table columns. */
-  .matrix-list{ display:flex; flex-direction:column; border:1px solid var(--line); border-radius: var(--radius); overflow:hidden; }
-  .matrix-row{ background: var(--paper); border-bottom:2px solid var(--line-strong); }
-  .matrix-row:last-child{ border-bottom:none; }
-  .matrix-row-head{
+  /* Compact list rows in the bottom pane — purely a selector for the
+     top detail pane, never expands itself. */
+  .matrix-list{ display:flex; flex-direction:column; gap:2px; }
+  .matrix-row-compact{
     display:flex; align-items:center; gap:12px;
-    padding:11px 14px; cursor:pointer;
-    background: var(--sapphire-pale);
+    padding:9px 12px; border-radius: var(--radius);
+    background: var(--paper); border:1px solid var(--line);
   }
-  .matrix-row-head:hover{ background: #CFDBFA; }
+  .matrix-row-focused{ border-color: var(--sapphire); background: var(--sapphire-pale); }
   .matrix-row-rank{ flex-shrink:0; width:22px; text-align:center; }
   .rank-num{ font-family: var(--font-mono); font-weight:600; font-size:12px; color: var(--ink-faint); }
-  .matrix-row-main{ flex:1; min-width:0; }
+  .matrix-row-main{ flex:1; min-width:0; cursor:pointer; }
   .matrix-row-name{ font-weight:700; color: var(--ink); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .matrix-row-match{ flex-shrink:0; }
-  .matrix-row-chev{ flex-shrink:0; font-family: var(--font-mono); font-size:11px; color: var(--ink-faint); transition: transform 0.15s ease; }
-  .matrix-row.expanded .matrix-row-chev{ transform: rotate(180deg); }
+  .matrix-row-match{ flex-shrink:0; cursor:pointer; }
 
   .disposition-select{
     flex-shrink:0;
@@ -463,16 +472,14 @@
   .disposition-select:hover{ border-color: var(--sapphire); }
   .disposition-select.disposition-set{ color: var(--deep); border-color: var(--sapphire); background: var(--sapphire-pale); font-weight:600; }
 
-  .matrix-row-body{ padding:4px 16px 18px; animation: cardEnter 0.2s ease; }
+  .matrix-detail-card{ animation: cardEnter 0.2s ease; }
+  .matrix-detail-head{ display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
   .cand-name{ font-weight:700; color: var(--ink); font-size:12.5px; }
 
   @media (max-width: 560px){
-    .matrix-row-head{ flex-wrap:wrap; row-gap:6px; }
-    .matrix-row-main{ order:1; flex-basis:100%; }
-    .matrix-row-rank{ order:0; }
-    .matrix-row-match{ order:2; }
+    .matrix-detail-pane{ flex-basis:60%; }
   }
-  .rec-pill{ font-family: var(--font-mono); font-size:10px; padding:2.5px 8px; border-radius:2px; white-space:nowrap; display:inline-block; }
+  .rec-pill{ font-family: var(--font-mono); font-size:10px; padding:2.5px 8px; border-radius:2px; white-space:nowrap; display:inline-block; cursor:pointer; }
   .rec-pill.greenlight{ background: var(--green-tint); color: var(--green); }
   .rec-pill.consider{ background: var(--amber-tint); color: var(--amber); }
   .rec-pill.decline{ background: var(--red-tint); color: var(--red); }
@@ -691,36 +698,33 @@
     @page{ margin: 0.6in; }
 
     .brand, .req-panel, .side-panel, .pull-tab,
-    .matrix-toggle, .filter-row, .matrix-row-chev, .matrix-row-actions, .disposition-select, .matrix-req-title, .bulk-bar, .matrix-row-checkbox{
+    .matrix-toggle, .matrix-req-title, .prompt-box, .matrix-list-pane, .matrix-row-actions{
       display:none !important;
     }
     .print-header{ display:flex !important; padding-bottom:14px; margin-bottom:20px; border-bottom:2px solid var(--sapphire); }
 
     .app{ display:block !important; height:auto !important; margin-top:0 !important; }
     .center-panel{ display:block !important; height:auto !important; overflow:visible !important; }
-    .matrix-wrap{ overflow:visible !important; flex:none !important; }
-    .matrix-scroll{ padding:0 !important; }
-    .matrix-list{ border:none !important; }
-    .matrix-row{ display:none !important; }
+    .matrix-split{ display:block !important; }
+    .matrix-detail-pane{
+      overflow:visible !important; flex:none !important; padding:0 !important; border:none !important;
+    }
 
-    .matrix-row.print-target{
-      display:block !important;
+    .matrix-detail-card{
       box-sizing:border-box; width:100%; max-width:100%;
       border:1.5px solid var(--sapphire) !important;
       border-radius:8px !important;
       padding:26px !important;
       page-break-inside: avoid;
     }
-    .matrix-row.print-target .matrix-row-head{ background:none !important; padding:0 0 14px !important; }
-    .matrix-row.print-target .matrix-row-body{ padding:0 !important; }
 
     /* Nothing should overflow the frame — stack side-by-side content
        and let long text wrap instead of clipping or bleeding past the
        border on paper. */
-    .matrix-row.print-target *{ max-width:100% !important; overflow-wrap:break-word; }
-    .matrix-row.print-target .two-col{ grid-template-columns:1fr !important; gap:16px !important; }
-    .matrix-row.print-target .signal-row{ gap:6px !important; }
-    .matrix-row.print-target table.matrix{ width:100% !important; }
+    .matrix-detail-card *{ max-width:100% !important; overflow-wrap:break-word; }
+    .matrix-detail-card .two-col{ grid-template-columns:1fr !important; gap:16px !important; }
+    .matrix-detail-card .signal-row{ gap:6px !important; }
+    .matrix-detail-card table.matrix{ width:100% !important; }
 
     body{ background:#fff !important; }
   }
