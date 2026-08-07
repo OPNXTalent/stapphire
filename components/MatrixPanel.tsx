@@ -74,6 +74,8 @@ export function MatrixPanel({
   const [applyingBulk, setApplyingBulk] = useState(false);
   const [promptText, setPromptText] = useState(evaluationPriorities ?? '');
   const [savingPrompt, setSavingPrompt] = useState(false);
+  const [promptSaved, setPromptSaved] = useState(false);
+  const [promptError, setPromptError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
@@ -164,8 +166,13 @@ export function MatrixPanel({
   async function handleSavePrompt() {
     if (!onSavePriorities) return;
     setSavingPrompt(true);
+    setPromptError(null);
     try {
       await onSavePriorities(promptText.trim());
+      setPromptSaved(true);
+      setTimeout(() => setPromptSaved(false), 2000);
+    } catch (err: any) {
+      setPromptError(err?.message ?? 'Something went wrong saving this.');
     } finally {
       setSavingPrompt(false);
     }
@@ -261,16 +268,26 @@ export function MatrixPanel({
             <div className="prompt-box">
               <textarea
                 className="prompt-input"
-                placeholder="+ Prompt Stapphire — update what matters most for this role..."
+                placeholder="+ Prompt Stapphire — update what matters most for this role... (Enter to save, Shift+Enter for a new line)"
                 value={promptText}
                 onChange={(e) => setPromptText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSavePrompt();
+                  }
+                }}
               />
               <div className="prompt-footer">
                 <span className="upload-hint" style={{ margin: 0 }}>
-                  Applies to new and re-run evaluations only — never changes past results automatically.
+                  {promptError ? (
+                    <span style={{ color: 'var(--red)' }}>{promptError}</span>
+                  ) : (
+                    'Applies to new and re-run evaluations only — never changes past results automatically.'
+                  )}
                 </span>
                 <button className="qa-btn-text" disabled={savingPrompt} onClick={handleSavePrompt}>
-                  {savingPrompt ? 'Saving…' : 'Save'}
+                  {savingPrompt ? 'Saving…' : promptSaved ? 'Saved ✓' : 'Save'}
                 </button>
               </div>
             </div>

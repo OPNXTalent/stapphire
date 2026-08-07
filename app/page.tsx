@@ -197,11 +197,15 @@ function DashboardContent() {
   }
 
   async function handleSavePriorities(text: string) {
-    await fetch(`/api/requisitions/${requisitionId}/priorities`, {
+    const res = await fetch(`/api/requisitions/${requisitionId}/priorities`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ evaluation_priorities: text })
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? 'Failed to save');
+    }
     await loadRequisition();
   }
 
