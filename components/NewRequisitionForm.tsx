@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const DEMO_ORG_ID = process.env.NEXT_PUBLIC_DEMO_ORG_ID ?? '';
 
@@ -12,18 +12,55 @@ export function NewRequisitionForm({
   onCancel?: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
 
-  const [mode, setMode] = useState<'paste' | 'upload'>('paste');
   const [title, setTitle] = useState('');
   const [jdText, setJdText] = useState('');
   const [jdFile, setJdFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
 
-  const canSubmit = title.trim() && (mode === 'paste' ? jdText.trim() : jdFile);
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    setVoiceSupported(!!SpeechRecognition);
+  }, []);
+
+  const canSubmit = title.trim() && (jdText.trim() || jdFile);
+
+  function toggleListening() {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event: any) => {
+      let transcript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setJdText((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  }
 
   async function handleSubmit() {
-    if (!canSubmit) return;
+    if (!canSubmit || submitting) return;
+    if (recognitionRef.current && listening) recognitionRef.current.stop();
     setSubmitting(true);
     setError(null);
 
@@ -31,10 +68,10 @@ export function NewRequisitionForm({
       const formData = new FormData();
       formData.append('org_id', DEMO_ORG_ID);
       formData.append('title', title.trim());
-      if (mode === 'paste') {
-        formData.append('job_description', jdText.trim());
-      } else if (jdFile) {
+      if (jdFile) {
         formData.append('file', jdFile);
+      } else {
+        formData.append('job_description', jdText.trim());
       }
 
       const res = await fetch('/api/requisitions', { method: 'POST', body: formData });
@@ -55,143 +92,96 @@ export function NewRequisitionForm({
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '48px 24px 60px' }}>
-      <span className="eyebrow">New Requisition</span>
-      <h1
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontWeight: 700,
-          fontSize: 26,
-          margin: '4px 0 28px'
-        }}
-      >
-        Open a requisition
-      </h1>
-
-      <div style={{ marginBottom: 22 }}>
-        <label
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10.5,
-            letterSpacing: '0.05em',
-            textTransform: 'uppercase',
-            color: 'var(--ink-faint)',
-            display: 'block',
-            marginBottom: 7
-          }}
-        >
-          Role Title
-        </label>
+      <div className="matrix-role-pane" style={{ border: 'none', padding: 0, marginBottom: 20 }}>
         <input
           type="text"
+          className="new-req-title-input"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g. Customer Service Representative II"
-          style={{
-            width: '100%',
-            padding: '11px 13px',
-            border: '1px solid var(--line-strong)',
-            borderRadius: 'var(--radius)',
-            fontSize: 14,
-            fontFamily: 'var(--font-body)'
-          }}
+          placeholder="Untitled Requisition — type the role title"
+          autoFocus
         />
       </div>
 
-      <div style={{ marginBottom: 14 }}>
-        <label
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10.5,
-            letterSpacing: '0.05em',
-            textTransform: 'uppercase',
-            color: 'var(--ink-faint)',
-            display: 'block',
-            marginBottom: 10
+      <div className="section-label">Job Description</div>
+      <div className="prompt-box">
+        <textarea
+          className="prompt-input"
+          style={{ minHeight: 140 }}
+          placeholder="+ Paste, type, dictate, or attach the job description..."
+          value={jdText}
+          onChange={(e) => setJdText(e.target.value)}
+          disabled={submitting}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleSubmit();
+            }
           }}
-        >
-          Job Description
-        </label>
+        />
 
-        <div className="filter-row" style={{ marginBottom: 14 }}>
-          <span
-            className={`filter-chip ${mode === 'paste' ? 'active' : ''}`}
-            onClick={() => setMode('paste')}
-          >
-            Paste text
-          </span>
-          <span
-            className={`filter-chip ${mode === 'upload' ? 'active' : ''}`}
-            onClick={() => setMode('upload')}
-          >
-            Upload file
-          </span>
-        </div>
-
-        {mode === 'paste' ? (
-          <textarea
-            value={jdText}
-            onChange={(e) => setJdText(e.target.value)}
-            placeholder="Paste the full job description here..."
-            style={{
-              width: '100%',
-              minHeight: 220,
-              padding: 13,
-              border: '1px solid var(--line-strong)',
-              borderRadius: 'var(--radius)',
-              fontSize: 13.5,
-              fontFamily: 'var(--font-body)',
-              resize: 'vertical'
-            }}
-          />
-        ) : (
-          <div
-            className="jd-drop"
-            style={{ cursor: 'pointer', padding: '28px 16px' }}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.docx,.txt"
-              style={{ display: 'none' }}
-              onChange={(e) => setJdFile(e.target.files?.[0] ?? null)}
-            />
-            {jdFile ? (
-              <>
-                <strong>{jdFile.name}</strong>
-                Click to choose a different file
-              </>
-            ) : (
-              <>
-                <strong>Click to upload</strong>
-                PDF, DOCX, or TXT
-              </>
-            )}
+        {jdFile && (
+          <div className="attach-pending" style={{ marginBottom: 8 }}>
+            {jdFile.name}
+            <button type="button" className="attach-remove" onClick={() => setJdFile(null)}>
+              ✕
+            </button>
           </div>
         )}
+
+        <div className="composer-footer">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,.txt"
+            style={{ display: 'none' }}
+            onChange={(e) => setJdFile(e.target.files?.[0] ?? null)}
+          />
+          <button
+            type="button"
+            className="composer-btn"
+            title="Attach a document"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            className={`composer-btn ${listening ? 'composer-btn-active' : ''}`}
+            title={voiceSupported ? 'Dictate' : 'Voice dictation not supported in this browser'}
+            disabled={!voiceSupported}
+            onClick={toggleListening}
+          >
+            🎤
+          </button>
+          <div style={{ flex: 1 }} />
+          <button
+            type="button"
+            className="composer-send"
+            disabled={!canSubmit || submitting}
+            onClick={handleSubmit}
+            title="Create requisition"
+          >
+            {submitting ? '…' : '↑'}
+          </button>
+        </div>
       </div>
 
       {error && (
-        <div className="risk-note flagged" style={{ marginBottom: 16 }}>
+        <div className="risk-note flagged" style={{ marginTop: 14 }}>
           {error}
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <button
-          className={`btn btn-upload ${submitting ? 'spent' : ''}`}
-          disabled={!canSubmit || submitting}
-          onClick={handleSubmit}
-          style={{ width: 'auto', padding: '10px 20px' }}
-        >
-          <span>{submitting ? 'Parsing job description…' : 'Create requisition'}</span>
-        </button>
-        {onCancel && (
-          <button className="qa-btn-text" onClick={onCancel}>
-            Cancel
-          </button>
-        )}
+      <div className="upload-hint" style={{ marginTop: 10 }}>
+        Enter to create, Shift+Enter for a new line{voiceSupported ? ', 🎤 to dictate' : ''}
       </div>
+
+      {onCancel && (
+        <button className="qa-btn-text" style={{ marginTop: 14 }} onClick={onCancel}>
+          Cancel
+        </button>
+      )}
     </div>
   );
 }

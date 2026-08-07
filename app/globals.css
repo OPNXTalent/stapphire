@@ -386,6 +386,34 @@
   }
   .prompt-input:focus{ outline:none; }
   .prompt-footer{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:6px; }
+
+  .new-req-title-input{
+    width:100%; border:none; background:none; padding:0;
+    font-family: var(--font-display); font-weight:800; font-size:26px;
+    color: var(--deep); letter-spacing:-0.01em;
+  }
+  .new-req-title-input::placeholder{ color: var(--ink-faint); font-weight:700; }
+  .new-req-title-input:focus{ outline:none; }
+
+  .composer-footer{ display:flex; align-items:center; gap:8px; margin-top:6px; }
+  .composer-btn{
+    width:28px; height:28px; border-radius:50%; border:1px solid var(--line-strong);
+    background: var(--paper); font-size:14px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; color: var(--ink-soft);
+    flex-shrink:0;
+  }
+  .composer-btn:hover{ border-color: var(--sapphire); color: var(--sapphire); }
+  .composer-btn:disabled{ opacity:0.35; cursor:default; }
+  .composer-btn-active{ background: var(--red); border-color: var(--red); color:#fff; animation: pulseMic 1.2s infinite; }
+  @keyframes pulseMic{ 0%,100%{ opacity:1; } 50%{ opacity:0.6; } }
+
+  .composer-send{
+    width:30px; height:30px; border-radius:50%; border:none;
+    background: var(--sapphire); color:#fff; font-size:15px; font-weight:700; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .composer-send:hover{ background: var(--deep); }
+  .composer-send:disabled{ background: var(--line-strong); color: var(--ink-faint); cursor:default; }
   .prompt-input:disabled{ opacity:0.6; }
 
   .pillars-table-wrap{ margin-bottom:20px; }
