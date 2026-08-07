@@ -98,6 +98,7 @@
   .composer-page{
     display:flex; align-items:flex-start; justify-content:center;
     background: var(--paper); overflow-y:auto; height:100%;
+    min-width:0;
   }
 
   /* ===== LEFT: REQUISITION ===== */
@@ -141,6 +142,10 @@
 
   .credit-block-top{ margin-bottom:20px; }
   .add-req-btn{ justify-content:center; margin-bottom:20px; font-weight:600; }
+  .add-req-btn-active{
+    background: var(--navy-deep); border-color: var(--navy-deep); color:#8FA8E8;
+  }
+  .add-req-btn-active:hover{ background:#0A1B4A; border-color:#0A1B4A; }
   .add-req-btn:hover{ background: var(--paper-cool); }
 
   .batch-panel{ border:1px solid var(--line-strong); border-radius: var(--radius); background: var(--paper); overflow:hidden; }
@@ -395,9 +400,10 @@
   .prompt-footer{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:6px; }
 
   .new-req-title-input{
-    width:100%; border:none; background:none; padding:0;
+    width:100%; max-width:100%; box-sizing:border-box; border:none; background:none; padding:0;
     font-family: var(--font-display); font-weight:800; font-size:26px;
     color: var(--deep); letter-spacing:-0.01em;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
   .new-req-title-input::placeholder{ color: var(--ink-faint); font-weight:700; }
   .new-req-title-input:focus{ outline:none; }

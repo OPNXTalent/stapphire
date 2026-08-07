@@ -91,14 +91,14 @@ export function NewRequisitionForm({
   }
 
   return (
-    <div style={{ maxWidth: 640, margin: '0 auto', padding: '48px 24px 60px' }}>
+    <div style={{ width: '100%', maxWidth: 640, margin: '0 auto', padding: '48px 24px 60px' }}>
       <div className="matrix-role-pane" style={{ border: 'none', padding: 0, marginBottom: 20 }}>
         <input
           type="text"
           className="new-req-title-input"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Untitled Requisition — type the role title"
+          placeholder="Untitled Requisition"
           autoFocus
         />
       </div>

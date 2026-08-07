@@ -50,7 +50,8 @@ export function RequisitionPanel({
   batchRequisitionId,
   onClearBatch,
   candidateCount,
-  onAddRequisition
+  onAddRequisition,
+  isAddingRequisition
 }: {
   requisition: Requisition;
   org: Org;
@@ -68,6 +69,7 @@ export function RequisitionPanel({
   onClearBatch: () => void;
   candidateCount: number;
   onAddRequisition: () => void;
+  isAddingRequisition: boolean;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [manageAccessOpen, setManageAccessOpen] = useState(false);
@@ -168,8 +170,11 @@ export function RequisitionPanel({
             )}
           </div>
 
-          <button className="btn add-req-btn" onClick={onAddRequisition}>
-            <span>+ Add Requisition</span>
+          <button
+            className={`btn add-req-btn ${isAddingRequisition ? 'add-req-btn-active' : ''}`}
+            onClick={onAddRequisition}
+          >
+            <span>{isAddingRequisition ? 'Hiring Quality Control' : '+ Add Requisition'}</span>
           </button>
 
           <span className="eyebrow">Open Requisition</span>

@@ -329,7 +329,8 @@ function DashboardContent() {
               setBatchRequisitionId(null);
             }}
             candidateCount={candidates.length}
-            onAddRequisition={() => setCreatingRequisition(true)}
+            onAddRequisition={() => setCreatingRequisition(false)}
+            isAddingRequisition
           />
           <div className="composer-page">
             <NewRequisitionForm onCreated={handleRequisitionCreated} onCancel={() => setCreatingRequisition(false)} />
@@ -370,6 +371,7 @@ function DashboardContent() {
           }}
           candidateCount={candidates.length}
           onAddRequisition={() => setCreatingRequisition(true)}
+          isAddingRequisition={false}
         />
 
         <div className="center-panel">
