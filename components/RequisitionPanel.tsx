@@ -70,7 +70,6 @@ export function RequisitionPanel({
   onAddRequisition: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
   const [manageAccessOpen, setManageAccessOpen] = useState(false);
   const [trialStatus, setTrialStatus] = useState<{ used: number; remaining: number; limit: number } | null>(null);
 
@@ -84,14 +83,6 @@ export function RequisitionPanel({
       .then((data) => setTrialStatus(data))
       .catch(() => {});
   }, [org.id, org.credits_total, org.credits_remaining]);
-
-  async function handleCopyLink() {
-    if (!requisition.share_token) return;
-    const url = `${window.location.origin}/shared/${requisition.share_token}`;
-    await navigator.clipboard.writeText(url);
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
-  }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -194,10 +185,6 @@ export function RequisitionPanel({
               </button>
             </div>
 
-            <button className="qa-btn-text share-link-btn" style={{ marginBottom: 8 }} onClick={handleCopyLink}>
-              <span>{linkCopied ? 'Link copied' : 'Share Link'}</span>
-              <span className="share-link-icon">{linkCopied ? '✓' : '⧉'}</span>
-            </button>
             <button
               className="qa-btn-text share-link-btn"
               style={{ marginBottom: 14 }}

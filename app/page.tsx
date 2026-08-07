@@ -327,6 +327,7 @@ function DashboardContent() {
             <MatrixPanel
               candidates={candidates}
               requisitionTitle={requisition.title}
+              shareToken={requisition.share_token}
               onSelectCandidate={setActiveCandidateId}
               onDelete={handleDeleteCandidate}
               onSetDisposition={handleSetDisposition}

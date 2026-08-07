@@ -382,13 +382,17 @@
   .prompt-input:focus{ outline:none; }
   .prompt-footer{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:6px; }
 
+  .matrix-title-row{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:16px;
+    padding-bottom:12px; margin-bottom:16px;
+    border-bottom:3px solid var(--sapphire);
+  }
   .matrix-req-title{
     font-family: var(--font-display); font-weight:800; font-size:26px;
     color: var(--deep); letter-spacing:-0.01em;
-    padding-bottom:12px; margin-bottom:16px;
-    border-bottom:3px solid var(--sapphire);
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;
   }
+  .matrix-share-link{ flex-shrink:0; margin-bottom:2px; }
 
   .filter-row{ display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
   .filter-chip{ font-family: var(--font-mono); font-size:10.5px; padding:4px 10px; border-radius:12px; border:1px solid var(--line-strong); color: var(--ink-soft); background: var(--paper); }
@@ -698,7 +702,7 @@
     @page{ margin: 0.6in; }
 
     .brand, .req-panel, .side-panel, .pull-tab,
-    .matrix-toggle, .matrix-req-title, .prompt-box, .matrix-list-pane, .matrix-row-actions{
+    .matrix-toggle, .matrix-title-row, .prompt-box, .matrix-list-pane, .matrix-row-actions{
       display:none !important;
     }
     .print-header{ display:flex !important; padding-bottom:14px; margin-bottom:20px; border-bottom:2px solid var(--sapphire); }

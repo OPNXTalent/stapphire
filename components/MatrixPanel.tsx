@@ -44,6 +44,7 @@ function rankBadgeClass(rank: number) {
 export function MatrixPanel({
   candidates,
   requisitionTitle,
+  shareToken,
   onSelectCandidate,
   onDelete,
   onSetDisposition,
@@ -54,6 +55,7 @@ export function MatrixPanel({
 }: {
   candidates: Candidate[];
   requisitionTitle: string;
+  shareToken?: string;
   onSelectCandidate: (candidateId: string | null) => void;
   onDelete: (candidateId: string) => void;
   onSetDisposition: (candidateId: string, disposition: string) => void;
@@ -72,6 +74,7 @@ export function MatrixPanel({
   const [applyingBulk, setApplyingBulk] = useState(false);
   const [promptText, setPromptText] = useState(evaluationPriorities ?? '');
   const [savingPrompt, setSavingPrompt] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
     setPromptText(evaluationPriorities ?? '');
@@ -168,6 +171,14 @@ export function MatrixPanel({
     }
   }
 
+  async function handleCopyLink() {
+    if (!shareToken) return;
+    const url = `${window.location.origin}/shared/${shareToken}`;
+    await navigator.clipboard.writeText(url);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  }
+
   const scored = useMemo(
     () =>
       candidates
@@ -234,8 +245,16 @@ export function MatrixPanel({
       <div className="matrix-split">
         {/* ── Top: detail pane for the focused candidate ── */}
         <div className="matrix-detail-pane">
-          <div className="matrix-req-title" title={requisitionTitle}>
-            {requisitionTitle}
+          <div className="matrix-title-row">
+            <div className="matrix-req-title" title={requisitionTitle}>
+              {requisitionTitle}
+            </div>
+            {shareToken && (
+              <button className="qa-btn-text share-link-btn matrix-share-link" onClick={handleCopyLink}>
+                <span>{linkCopied ? 'Link copied' : 'Share Link'}</span>
+                <span className="share-link-icon">{linkCopied ? '✓' : '⧉'}</span>
+              </button>
+            )}
           </div>
 
           {onSavePriorities && (
