@@ -115,6 +115,19 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
     await load();
   }
 
+  async function handleBulkSetDisposition(candidateIds: string[], disposition: string) {
+    await Promise.all(
+      candidateIds.map((candidateId) =>
+        fetch(`/api/candidates/${candidateId}/disposition`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ disposition, actor_name: collaboratorName })
+        })
+      )
+    );
+    await load();
+  }
+
   async function handleRestoreCandidate(candidateId: string) {
     await fetch(`/api/candidates/${candidateId}/restore`, { method: 'POST' });
     await Promise.all([load(), loadTrash()]);
@@ -201,6 +214,7 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
             onSelectCandidate={setActiveCandidateId}
             onDelete={handleDeleteCandidate}
             onSetDisposition={handleSetDisposition}
+            onBulkSetDisposition={handleBulkSetDisposition}
           />
         </div>
 

@@ -372,6 +372,17 @@
   .filter-row{ display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
   .filter-chip{ font-family: var(--font-mono); font-size:10.5px; padding:4px 10px; border-radius:12px; border:1px solid var(--line-strong); color: var(--ink-soft); background: var(--paper); }
 
+  .bulk-bar{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:8px 12px; margin-bottom:10px;
+    background: var(--paper-cool); border:1px solid var(--line); border-radius: var(--radius);
+  }
+  .bulk-select-all{
+    display:flex; align-items:center; gap:7px;
+    font-family: var(--font-mono); font-size:11px; color: var(--ink-soft); cursor:pointer;
+  }
+  .matrix-row-checkbox{ flex-shrink:0; margin-right:4px; cursor:pointer; }
+
   .multiselect{ position:relative; }
   .multiselect-trigger{
     font-family: var(--font-mono); font-size:11px; font-weight:600;
@@ -666,7 +677,7 @@
     @page{ margin: 0.6in; }
 
     .brand, .req-panel, .side-panel, .pull-tab,
-    .matrix-toggle, .filter-row, .matrix-row-chev, .matrix-row-actions, .disposition-select, .matrix-req-title{
+    .matrix-toggle, .filter-row, .matrix-row-chev, .matrix-row-actions, .disposition-select, .matrix-req-title, .bulk-bar, .matrix-row-checkbox{
       display:none !important;
     }
     .print-header{ display:flex !important; padding-bottom:14px; margin-bottom:20px; border-bottom:2px solid var(--sapphire); }

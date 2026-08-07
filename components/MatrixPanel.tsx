@@ -45,13 +45,15 @@ export function MatrixPanel({
   requisitionTitle,
   onSelectCandidate,
   onDelete,
-  onSetDisposition
+  onSetDisposition,
+  onBulkSetDisposition
 }: {
   candidates: Candidate[];
   requisitionTitle: string;
   onSelectCandidate: (candidateId: string | null) => void;
   onDelete: (candidateId: string) => void;
   onSetDisposition: (candidateId: string, disposition: string) => void;
+  onBulkSetDisposition: (candidateIds: string[], disposition: string) => void;
 }) {
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [dispositionFilter, setDispositionFilter] = useState<string[]>([]);
@@ -59,6 +61,9 @@ export function MatrixPanel({
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [localDisposition, setLocalDisposition] = useState<Record<string, string>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDisposition, setBulkDisposition] = useState('');
+  const [applyingBulk, setApplyingBulk] = useState(false);
 
   useEffect(() => {
     function clearPrint() {
@@ -103,6 +108,41 @@ export function MatrixPanel({
     }
     setLocalDisposition((prev) => ({ ...prev, [candidateId]: value }));
     onSetDisposition(candidateId, value);
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === filtered.length && filtered.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((c) => c.id)));
+    }
+  }
+
+  async function handleApplyBulk() {
+    if (!bulkDisposition || selectedIds.size === 0) return;
+    setApplyingBulk(true);
+    try {
+      const ids = Array.from(selectedIds);
+      setLocalDisposition((prev) => {
+        const next = { ...prev };
+        ids.forEach((id) => (next[id] = bulkDisposition));
+        return next;
+      });
+      await onBulkSetDisposition(ids, bulkDisposition);
+      setSelectedIds(new Set());
+      setBulkDisposition('');
+    } finally {
+      setApplyingBulk(false);
+    }
   }
 
   const scored = useMemo(
@@ -178,6 +218,44 @@ export function MatrixPanel({
             />
           </div>
 
+          <div className="bulk-bar">
+            <label className="bulk-select-all">
+              <input
+                type="checkbox"
+                checked={selectedIds.size > 0 && selectedIds.size === filtered.length}
+                onChange={toggleSelectAll}
+              />
+              {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
+            </label>
+
+            {selectedIds.size > 0 && (
+              <>
+                <select
+                  className="disposition-select"
+                  value={bulkDisposition}
+                  onChange={(e) => setBulkDisposition(e.target.value)}
+                >
+                  <option value="">Set disposition…</option>
+                  {DISPOSITIONS.map((d) => (
+                    <option key={d.value} value={d.value}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="qa-btn-text"
+                  disabled={!bulkDisposition || applyingBulk}
+                  onClick={handleApplyBulk}
+                >
+                  {applyingBulk ? 'Applying…' : 'Apply'}
+                </button>
+                <button className="qa-btn-text" onClick={() => setSelectedIds(new Set())}>
+                  Clear
+                </button>
+              </>
+            )}
+          </div>
+
           <div className="matrix-list">
             {filtered.map((c, i) => {
               const evalu = c.evaluations[0];
@@ -190,6 +268,13 @@ export function MatrixPanel({
                   key={c.id}
                 >
                   <div className="matrix-row-head" onClick={() => handleToggleRow(c.id, isOpen)}>
+                    <input
+                      type="checkbox"
+                      className="matrix-row-checkbox"
+                      checked={selectedIds.has(c.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => toggleSelect(c.id)}
+                    />
                     <span className="matrix-row-rank">
                       {badge ? <span className={badge}>{i + 1}</span> : <span className="rank-num">{i + 1}</span>}
                     </span>
