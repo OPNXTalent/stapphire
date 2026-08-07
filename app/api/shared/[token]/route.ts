@@ -24,7 +24,8 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     .select('id, full_name, source_filename, original_file_url, document_type, disposition, evaluations(*)')
     .eq('requisition_id', requisition.id)
     .is('deleted_at', null)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .order('created_at', { foreignTable: 'evaluations', ascending: false });
 
   if (candError) {
     return NextResponse.json({ error: candError.message }, { status: 500 });

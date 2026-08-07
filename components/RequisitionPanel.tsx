@@ -9,6 +9,7 @@ type Requisition = {
   status: string;
   job_description: string;
   share_token?: string;
+  evaluation_priorities?: string | null;
 };
 
 type Org = {
@@ -71,6 +72,27 @@ export function RequisitionPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [manageAccessOpen, setManageAccessOpen] = useState(false);
+  const [prioritiesOpen, setPrioritiesOpen] = useState(false);
+  const [prioritiesText, setPrioritiesText] = useState(requisition.evaluation_priorities ?? '');
+  const [savingPriorities, setSavingPriorities] = useState(false);
+
+  useEffect(() => {
+    setPrioritiesText(requisition.evaluation_priorities ?? '');
+  }, [requisition.id, requisition.evaluation_priorities]);
+
+  async function handleSavePriorities() {
+    setSavingPriorities(true);
+    try {
+      await fetch(`/api/requisitions/${requisition.id}/priorities`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ evaluation_priorities: prioritiesText.trim() })
+      });
+      setPrioritiesOpen(false);
+    } finally {
+      setSavingPriorities(false);
+    }
+  }
   const [trialStatus, setTrialStatus] = useState<{ used: number; remaining: number; limit: number } | null>(null);
 
   useEffect(() => {
@@ -205,6 +227,31 @@ export function RequisitionPanel({
               <span>Manage Access</span>
               <span className="share-link-icon">👥</span>
             </button>
+
+            <button
+              className="qa-btn-text share-link-btn"
+              style={{ marginBottom: prioritiesOpen ? 8 : 14 }}
+              onClick={() => setPrioritiesOpen((o) => !o)}
+            >
+              <span>Evaluation Priorities{requisition.evaluation_priorities ? ' (set)' : ''}</span>
+              <span className="share-link-icon">🎯</span>
+            </button>
+            {prioritiesOpen && (
+              <div style={{ marginBottom: 14 }}>
+                <textarea
+                  className="priorities-input"
+                  placeholder="e.g. We're weighing people-management experience heavier than raw technical depth right now..."
+                  value={prioritiesText}
+                  onChange={(e) => setPrioritiesText(e.target.value)}
+                />
+                <div className="upload-hint" style={{ marginTop: 6, marginBottom: 8 }}>
+                  Applies to evaluations from now on — never changes past results.
+                </div>
+                <button className="qa-btn-text" disabled={savingPriorities} onClick={handleSavePriorities}>
+                  {savingPriorities ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            )}
 
             <input
               ref={fileInputRef}

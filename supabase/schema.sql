@@ -43,7 +43,11 @@ create table requisitions (
   -- archived — set aside from the active list, fully recoverable.
   -- Unlike candidate trash, there is no permanent-deletion path for
   -- requisitions; archiving is a soft, non-destructive action.
-  archived_at timestamptz
+  archived_at timestamptz,
+  -- freeform, editable-anytime emphasis for how evaluations should
+  -- weigh evidence within the fixed rubric — applies to evaluations run
+  -- from the moment it's saved forward, never retroactively
+  evaluation_priorities text
 );
 
 -- ── Core object 2: Candidate (normalized profile, not the raw PDF) ─

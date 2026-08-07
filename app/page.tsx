@@ -196,6 +196,30 @@ function DashboardContent() {
     await loadRequisition();
   }
 
+  async function handleBulkReevaluate(candidateIds: string[]) {
+    const CONCURRENCY = 3;
+    let nextIndex = 0;
+    const errors: string[] = [];
+
+    async function worker() {
+      while (nextIndex < candidateIds.length) {
+        const id = candidateIds[nextIndex++];
+        const res = await fetch(`/api/candidates/${id}/reevaluate`, { method: 'POST' });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          errors.push(data.error ?? `Failed to re-evaluate candidate ${id}`);
+        }
+      }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, candidateIds.length) }, worker));
+    await loadRequisition();
+
+    if (errors.length > 0) {
+      alert(`${errors.length} re-evaluation(s) didn't complete:\n\n${errors.join('\n')}`);
+    }
+  }
+
   async function handleRestoreCandidate(candidateId: string) {
     await fetch(`/api/candidates/${candidateId}/restore`, { method: 'POST' });
     await Promise.all([loadRequisition(), loadTrash()]);
@@ -298,6 +322,7 @@ function DashboardContent() {
               onDelete={handleDeleteCandidate}
               onSetDisposition={handleSetDisposition}
               onBulkSetDisposition={handleBulkSetDisposition}
+              onBulkReevaluate={handleBulkReevaluate}
             />
           )}
         </div>

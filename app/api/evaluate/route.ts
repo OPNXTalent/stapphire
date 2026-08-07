@@ -113,6 +113,7 @@ export async function POST(req: NextRequest) {
           jobDescription: requisition.job_description,
           evaluationPillars: requisition.evaluation_pillars,
           employerWatchlist: requisition.employer_watchlist ?? [],
+          evaluationPriorities: requisition.evaluation_priorities,
           resumeText
         });
 

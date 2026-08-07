@@ -46,7 +46,8 @@ export function MatrixPanel({
   onSelectCandidate,
   onDelete,
   onSetDisposition,
-  onBulkSetDisposition
+  onBulkSetDisposition,
+  onBulkReevaluate
 }: {
   candidates: Candidate[];
   requisitionTitle: string;
@@ -54,6 +55,7 @@ export function MatrixPanel({
   onDelete: (candidateId: string) => void;
   onSetDisposition: (candidateId: string, disposition: string) => void;
   onBulkSetDisposition: (candidateIds: string[], disposition: string) => void;
+  onBulkReevaluate?: (candidateIds: string[]) => void;
 }) {
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [dispositionFilter, setDispositionFilter] = useState<string[]>([]);
@@ -142,6 +144,19 @@ export function MatrixPanel({
       setBulkDisposition('');
     } finally {
       setApplyingBulk(false);
+    }
+  }
+
+  function handleReevaluateClick() {
+    if (!onBulkReevaluate || selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    if (
+      window.confirm(
+        `Re-evaluate ${ids.length} candidate${ids.length !== 1 ? 's' : ''} against the current job description and priorities? This uses ${ids.length} credit${ids.length !== 1 ? 's' : ''} — one per candidate, same as a fresh evaluation.`
+      )
+    ) {
+      onBulkReevaluate(ids);
+      setSelectedIds(new Set());
     }
   }
 
@@ -249,6 +264,16 @@ export function MatrixPanel({
               >
                 {applyingBulk ? 'Applying…' : 'Apply'}
               </button>
+              {onBulkReevaluate && (
+                <button
+                  className="qa-btn-text"
+                  disabled={selectedIds.size === 0}
+                  onClick={handleReevaluateClick}
+                  style={{ color: 'var(--deep)', borderBottomColor: 'var(--deep)' }}
+                >
+                  Re-evaluate ({selectedIds.size} credit{selectedIds.size !== 1 ? 's' : ''})
+                </button>
+              )}
               <button
                 className="qa-btn-text"
                 disabled={selectedIds.size === 0}

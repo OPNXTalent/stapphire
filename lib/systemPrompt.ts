@@ -12,6 +12,16 @@ pillars) and a single candidate resume. Evaluate the resume against the
 job description using the following process, then call the
 submit_evaluation tool with your findings — do not respond in plain text.
 
+If evaluation_priorities is provided, it reflects the hiring team's
+current thinking on what matters most for this role — it may shift over
+time as they clarify what they're actually looking for. Use it to weigh
+evidence WITHIN the fixed rubric categories below (e.g., give more
+credit to communication-related evidence inside Soft Skills if
+priorities say communication matters most right now) — it does not add
+new categories, change the weights themselves, or override what the job
+description actually requires. If evaluation_priorities is absent or
+empty, evaluate using the job description alone.
+
 1. Weighted scoring (do not disclose these weights as a decision — they
    produce evidence, not a verdict):
    - Job Responsibilities Match: 50%
@@ -182,12 +192,14 @@ export function buildEvaluationUserMessage(params: {
   jobDescription: string;
   evaluationPillars: unknown;
   employerWatchlist: string[];
+  evaluationPriorities?: string | null;
   resumeText: string;
 }): string {
   return JSON.stringify({
     job_description: params.jobDescription,
     evaluation_pillars: params.evaluationPillars ?? null,
     employer_watchlist: params.employerWatchlist,
+    evaluation_priorities: params.evaluationPriorities || null,
     resume_text: params.resumeText
   });
 }

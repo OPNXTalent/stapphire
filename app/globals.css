@@ -284,6 +284,13 @@
   .btn-upload{ margin-top:14px; position:relative; overflow:hidden; }
   .btn-upload.spent{ background: var(--sapphire-pale); border-color: var(--sapphire); color: var(--deep); pointer-events:none; }
   .upload-hint{ font-family: var(--font-mono); font-size:10px; color: var(--ink-faint); margin-top:6px; line-height:1.4; }
+  .priorities-input{
+    width:100%; min-height:70px; padding:9px 10px;
+    border:1px solid var(--line-strong); border-radius: var(--radius);
+    font-size:12px; font-family: var(--font-body); color: var(--ink);
+    resize:vertical;
+  }
+  .priorities-input:focus{ outline:none; border-color: var(--sapphire); }
 
   /* Glowing gem — shown in the upload button while a resume is being
      evaluated. One orchestrated moment: a slow overall pulse plus each

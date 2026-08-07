@@ -10,7 +10,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .select('*, evaluations(*)')
     .eq('requisition_id', params.id)
     .not('deleted_at', 'is', null)
-    .order('deleted_at', { ascending: false });
+    .order('deleted_at', { ascending: false })
+    .order('created_at', { foreignTable: 'evaluations', ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ candidates: data });
