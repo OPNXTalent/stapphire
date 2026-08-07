@@ -67,7 +67,7 @@ export function MatrixPanel({
 }) {
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [dispositionFilter, setDispositionFilter] = useState<string[]>([]);
-  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [localDisposition, setLocalDisposition] = useState<Record<string, string>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -100,9 +100,14 @@ export function MatrixPanel({
     }
   }
 
-  function handleFocus(id: string) {
-    setFocusedId(id);
-    onSelectCandidate(id);
+  function handleToggleRow(id: string) {
+    if (expandedId === id) {
+      setExpandedId(null);
+      onSelectCandidate(null);
+    } else {
+      setExpandedId(id);
+      onSelectCandidate(id);
+    }
   }
 
   function handleDispositionChange(candidateId: string, value: string) {
@@ -202,21 +207,11 @@ export function MatrixPanel({
     });
   }, [scored, statusFilter, dispositionFilter]);
 
-  // Keep focus pointed at something real — default to the top result,
-  // and re-anchor if a filter change drops the focused candidate out
-  // of view.
   useEffect(() => {
-    if (filtered.length === 0) {
-      if (focusedId !== null) setFocusedId(null);
-      return;
+    if (expandedId && !filtered.some((c) => c.id === expandedId)) {
+      setExpandedId(null);
     }
-    if (!focusedId || !filtered.some((c) => c.id === focusedId)) {
-      setFocusedId(filtered[0].id);
-    }
-  }, [filtered, focusedId]);
-
-  const focused = filtered.find((c) => c.id === focusedId) ?? null;
-  const focusedEval = focused?.evaluations?.[0];
+  }, [filtered, expandedId]);
 
   return (
     <>
@@ -410,153 +405,149 @@ export function MatrixPanel({
             {filtered.map((c, i) => {
               const evalu = c.evaluations[0];
               const badge = rankBadgeClass(i + 1);
-              const isFocused = focusedId === c.id;
+              const isOpen = expandedId === c.id;
 
               return (
-                <div className={`matrix-row-compact ${isFocused ? 'matrix-row-focused' : ''}`} key={c.id}>
-                  <input
-                    type="checkbox"
-                    className="matrix-row-checkbox"
-                    checked={selectedIds.has(c.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={() => toggleSelect(c.id)}
-                  />
-                  <span className="matrix-row-rank">
-                    {badge ? <span className={badge}>{i + 1}</span> : <span className="rank-num">{i + 1}</span>}
-                  </span>
+                <div className={`matrix-row ${isOpen ? 'expanded' : ''}`} key={c.id}>
+                  <div className="matrix-row-head" onClick={() => handleToggleRow(c.id)}>
+                    <input
+                      type="checkbox"
+                      className="matrix-row-checkbox"
+                      checked={selectedIds.has(c.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => toggleSelect(c.id)}
+                    />
+                    <span className="matrix-row-rank">
+                      {badge ? <span className={badge}>{i + 1}</span> : <span className="rank-num">{i + 1}</span>}
+                    </span>
 
-                  <div className="matrix-row-main" onClick={() => handleFocus(c.id)}>
-                    <div className="matrix-row-name">{c.full_name}</div>
+                    <div className="matrix-row-main">
+                      <div className="matrix-row-name">{c.full_name}</div>
+                    </div>
+
+                    <div className="facet-cell matrix-row-match">
+                      <span className="score-num">{evalu.overall_match}%</span>
+                      <div className={`facet-mini ${facetTier(evalu.overall_match)}`} />
+                    </div>
+
+                    <span className={`rec-pill ${evalu.status}`}>
+                      {evalu.status.charAt(0).toUpperCase() + evalu.status.slice(1)}
+                    </span>
+
+                    <select
+                      className={`disposition-select ${
+                        (localDisposition[c.id] ?? c.disposition) ? 'disposition-set' : ''
+                      }`}
+                      value={localDisposition[c.id] ?? c.disposition ?? ''}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => handleDispositionChange(c.id, e.target.value)}
+                    >
+                      <option value="">Disposition</option>
+                      {DISPOSITIONS.map((d) => (
+                        <option key={d.value} value={d.value}>
+                          {d.label}
+                        </option>
+                      ))}
+                      <option value="__trash__">Move to Trash</option>
+                    </select>
+
+                    <span className="matrix-row-chev">{isOpen ? '▾' : '▸'}</span>
                   </div>
 
-                  <div className="facet-cell matrix-row-match" onClick={() => handleFocus(c.id)}>
-                    <span className="score-num">{evalu.overall_match}%</span>
-                    <div className={`facet-mini ${facetTier(evalu.overall_match)}`} />
-                  </div>
+                  {isOpen && (
+                    <div className="matrix-row-body">
+                      {Object.keys(evalu.matrix_dimensions ?? {}).length > 0 && (
+                        <>
+                          <div className="section-label">Job-Specific Fit</div>
+                          <div className="signal-row">
+                            {Object.entries(evalu.matrix_dimensions).map(([k, v]) => (
+                              <div className="signal-chip" key={k}>
+                                <span className="signal-label">{k}</span>
+                                <span className="signal-value">{v}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
 
-                  <span className={`rec-pill ${evalu.status}`} onClick={() => handleFocus(c.id)}>
-                    {evalu.status.charAt(0).toUpperCase() + evalu.status.slice(1)}
-                  </span>
+                      {Object.keys(evalu.signals ?? {}).length > 0 && (
+                        <>
+                          <div className="section-label">Evaluation Signals</div>
+                          <div className="signal-row">
+                            {Object.entries(evalu.signals).map(
+                              ([k, v]) =>
+                                v && (
+                                  <div className="signal-chip" key={k}>
+                                    <span className="signal-label">{k.replace(/_/g, ' ')}</span>
+                                    <span className="signal-value">{v}</span>
+                                  </div>
+                                )
+                            )}
+                          </div>
+                        </>
+                      )}
 
-                  <select
-                    className={`disposition-select ${
-                      (localDisposition[c.id] ?? c.disposition) ? 'disposition-set' : ''
-                    }`}
-                    value={localDisposition[c.id] ?? c.disposition ?? ''}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => handleDispositionChange(c.id, e.target.value)}
-                  >
-                    <option value="">Disposition</option>
-                    {DISPOSITIONS.map((d) => (
-                      <option key={d.value} value={d.value}>
-                        {d.label}
-                      </option>
-                    ))}
-                    <option value="__trash__">Move to Trash</option>
-                  </select>
+                      <div className="two-col">
+                        <div>
+                          <div className="section-label">Evidence</div>
+                          <ul className="plain evidence">
+                            {evalu.strengths?.map((s, idx) => (
+                              <li key={idx}>{s}</li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div>
+                          <div className="section-label">Gaps</div>
+                          <ul className="plain gaps">
+                            {evalu.gaps?.map((g, idx) => (
+                              <li key={idx}>{g}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+
+                      {evalu.risk_flags?.length > 0 && (
+                        <>
+                          <div className="section-label">Risk Flags</div>
+                          <ul className="plain gaps">
+                            {evalu.risk_flags.map((r, idx) => (
+                              <li key={idx}>{r}</li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+
+                      <div className="matrix-row-actions">
+                        {c.original_file_url && (
+                          <button
+                            className="qa-btn-text qa-btn-icon"
+                            disabled={downloading === c.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownload(c.id);
+                            }}
+                          >
+                            <span className="qa-btn-icon-glyph">📄</span>
+                            {downloading === c.id ? 'Preparing download…' : 'Download Original Resume'}
+                          </button>
+                        )}
+                        <button
+                          className="qa-btn-text qa-btn-icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePrint();
+                          }}
+                        >
+                          <span className="qa-btn-icon-glyph">🖨</span>
+                          Print this evaluation
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
-
-          {!focused || !focusedEval ? (
-            <div className="trash-empty-hint" style={{ marginTop: 14 }}>
-              Select a candidate above to see the full evaluation.
-            </div>
-          ) : (
-            <div className="matrix-detail-card">
-              <div className="matrix-detail-head">
-                <div className="matrix-row-name" style={{ fontSize: 18 }}>
-                  {focused.full_name}
-                </div>
-                <div className="facet-cell matrix-row-match">
-                  <span className="score-num">{focusedEval.overall_match}%</span>
-                  <div className={`facet-mini ${facetTier(focusedEval.overall_match)}`} />
-                </div>
-                <span className={`rec-pill ${focusedEval.status}`}>
-                  {focusedEval.status.charAt(0).toUpperCase() + focusedEval.status.slice(1)}
-                </span>
-              </div>
-
-              {Object.keys(focusedEval.matrix_dimensions ?? {}).length > 0 && (
-                <>
-                  <div className="section-label">Job-Specific Fit</div>
-                  <div className="signal-row">
-                    {Object.entries(focusedEval.matrix_dimensions).map(([k, v]) => (
-                      <div className="signal-chip" key={k}>
-                        <span className="signal-label">{k}</span>
-                        <span className="signal-value">{v}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {Object.keys(focusedEval.signals ?? {}).length > 0 && (
-                <>
-                  <div className="section-label">Evaluation Signals</div>
-                  <div className="signal-row">
-                    {Object.entries(focusedEval.signals).map(
-                      ([k, v]) =>
-                        v && (
-                          <div className="signal-chip" key={k}>
-                            <span className="signal-label">{k.replace(/_/g, ' ')}</span>
-                            <span className="signal-value">{v}</span>
-                          </div>
-                        )
-                    )}
-                  </div>
-                </>
-              )}
-
-              <div className="two-col">
-                <div>
-                  <div className="section-label">Evidence</div>
-                  <ul className="plain evidence">
-                    {focusedEval.strengths?.map((s, idx) => (
-                      <li key={idx}>{s}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <div className="section-label">Gaps</div>
-                  <ul className="plain gaps">
-                    {focusedEval.gaps?.map((g, idx) => (
-                      <li key={idx}>{g}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              {focusedEval.risk_flags?.length > 0 && (
-                <>
-                  <div className="section-label">Risk Flags</div>
-                  <ul className="plain gaps">
-                    {focusedEval.risk_flags.map((r, idx) => (
-                      <li key={idx}>{r}</li>
-                    ))}
-                  </ul>
-                </>
-              )}
-
-              <div className="matrix-row-actions">
-                {focused.original_file_url && (
-                  <button
-                    className="qa-btn-text qa-btn-icon"
-                    disabled={downloading === focused.id}
-                    onClick={() => handleDownload(focused.id)}
-                  >
-                    <span className="qa-btn-icon-glyph">📄</span>
-                    {downloading === focused.id ? 'Preparing download…' : 'Download Original Resume'}
-                  </button>
-                )}
-                <button className="qa-btn-text qa-btn-icon" onClick={handlePrint}>
-                  <span className="qa-btn-icon-glyph">🖨</span>
-                  Print this evaluation
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </>

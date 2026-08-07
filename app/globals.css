@@ -374,7 +374,6 @@
     flex:1; min-height:0; overflow-y:auto;
     padding:14px 20px 18px; background: var(--paper-cool);
   }
-  .matrix-detail-card{ margin-top:16px; }
 
   .prompt-box{
     border:1px solid var(--line-strong); border-radius: var(--radius);
@@ -465,20 +464,24 @@
   .filter-chip.active{ background: var(--deep); border-color: var(--deep); color:#fff; }
   .filter-chip:hover{ border-color: var(--sapphire); }
 
-  /* Compact list rows in the bottom pane — purely a selector for the
-     top detail pane, never expands itself. */
-  .matrix-list{ display:flex; flex-direction:column; gap:2px; }
-  .matrix-row-compact{
+  /* Accordion list — click a row's head to expand it in place; click
+     again to collapse back to the full list. Only one open at a time. */
+  .matrix-list{ display:flex; flex-direction:column; border:1px solid var(--line); border-radius: var(--radius); overflow:hidden; }
+  .matrix-row{ background: var(--paper); border-bottom:2px solid var(--line-strong); }
+  .matrix-row:last-child{ border-bottom:none; }
+  .matrix-row-head{
     display:flex; align-items:center; gap:12px;
-    padding:9px 12px; border-radius: var(--radius);
-    background: var(--paper); border:1px solid var(--line);
+    padding:11px 14px; cursor:pointer;
+    background: var(--sapphire-pale);
   }
-  .matrix-row-focused{ border-color: var(--sapphire); background: var(--sapphire-pale); }
+  .matrix-row-head:hover{ background: #CFDBFA; }
   .matrix-row-rank{ flex-shrink:0; width:22px; text-align:center; }
   .rank-num{ font-family: var(--font-mono); font-weight:600; font-size:12px; color: var(--ink-faint); }
-  .matrix-row-main{ flex:1; min-width:0; cursor:pointer; }
+  .matrix-row-main{ flex:1; min-width:0; }
   .matrix-row-name{ font-weight:700; color: var(--ink); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .matrix-row-match{ flex-shrink:0; cursor:pointer; }
+  .matrix-row-match{ flex-shrink:0; }
+  .matrix-row-chev{ flex-shrink:0; font-family: var(--font-mono); font-size:11px; color: var(--ink-faint); transition: transform 0.15s ease; }
+  .matrix-row.expanded .matrix-row-chev{ transform: rotate(180deg); }
 
   .disposition-select{
     flex-shrink:0;
@@ -491,9 +494,15 @@
   .disposition-select:hover{ border-color: var(--sapphire); }
   .disposition-select.disposition-set{ color: var(--deep); border-color: var(--sapphire); background: var(--sapphire-pale); font-weight:600; }
 
-  .matrix-detail-card{ animation: cardEnter 0.2s ease; }
-  .matrix-detail-head{ display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+  .matrix-row-body{ padding:16px 16px 20px; animation: cardEnter 0.2s ease; }
   .cand-name{ font-weight:700; color: var(--ink); font-size:12.5px; }
+
+  @media (max-width: 560px){
+    .matrix-row-head{ flex-wrap:wrap; row-gap:6px; }
+    .matrix-row-main{ order:1; flex-basis:100%; }
+    .matrix-row-rank{ order:0; }
+    .matrix-row-match{ order:2; }
+  }
 
   .rec-pill{ font-family: var(--font-mono); font-size:10px; padding:2.5px 8px; border-radius:2px; white-space:nowrap; display:inline-block; cursor:pointer; }
   .rec-pill.greenlight{ background: var(--green-tint); color: var(--green); }
@@ -714,7 +723,7 @@
     @page{ margin: 0.6in; }
 
     .brand, .req-panel, .side-panel, .pull-tab,
-    .matrix-toggle, .matrix-role-pane, .filter-row, .bulk-bar, .matrix-list, .matrix-row-actions{
+    .matrix-toggle, .matrix-role-pane, .filter-row, .bulk-bar, .matrix-row-actions{
       display:none !important;
     }
     .print-header{ display:flex !important; padding-bottom:14px; margin-bottom:20px; border-bottom:2px solid var(--sapphire); }
@@ -725,22 +734,34 @@
     .matrix-list-pane{
       overflow:visible !important; flex:none !important; padding:0 !important; background:none !important;
     }
+    .matrix-list{ border:none !important; }
+    .matrix-row{ display:none !important; }
 
-    .matrix-detail-card{
-      box-sizing:border-box; width:100%; max-width:100%; margin-top:0 !important;
+    .matrix-row.expanded{
+      display:block !important;
+      box-sizing:border-box; width:100%; max-width:100%;
       border:1.5px solid var(--sapphire) !important;
       border-radius:8px !important;
       padding:26px !important;
       page-break-inside: avoid;
     }
+    .matrix-row.expanded .matrix-row-head{
+      background:none !important; padding:0 0 14px !important; cursor:default;
+    }
+    .matrix-row.expanded .matrix-row-checkbox,
+    .matrix-row.expanded .matrix-row-chev,
+    .matrix-row.expanded .disposition-select{
+      display:none !important;
+    }
+    .matrix-row.expanded .matrix-row-body{ padding:0 !important; }
 
     /* Nothing should overflow the frame — stack side-by-side content
        and let long text wrap instead of clipping or bleeding past the
        border on paper. */
-    .matrix-detail-card *{ max-width:100% !important; overflow-wrap:break-word; }
-    .matrix-detail-card .two-col{ grid-template-columns:1fr !important; gap:16px !important; }
-    .matrix-detail-card .signal-row{ gap:6px !important; }
-    .matrix-detail-card table.matrix{ width:100% !important; }
+    .matrix-row.expanded *{ max-width:100% !important; overflow-wrap:break-word; }
+    .matrix-row.expanded .two-col{ grid-template-columns:1fr !important; gap:16px !important; }
+    .matrix-row.expanded .signal-row{ gap:6px !important; }
+    .matrix-row.expanded table.matrix{ width:100% !important; }
 
     body{ background:#fff !important; }
   }
