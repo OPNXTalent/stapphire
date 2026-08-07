@@ -135,11 +135,10 @@
   .credit-block-top{ margin-bottom:20px; }
   .add-req-btn{ justify-content:center; margin-bottom:20px; font-weight:600; }
   .add-req-btn:hover{ border-color: var(--navy-deep); background: var(--paper-cool); }
-  .add-req-btn-active{
+  .add-req-btn.add-req-btn-active{
     background: var(--navy-deep); border-color: var(--navy-deep); color:#fff;
   }
-  .add-req-btn-active:hover{ background:#0A1B4A; border-color:#0A1B4A; }
-  .add-req-btn:hover{ background: var(--paper-cool); }
+  .add-req-btn.add-req-btn-active:hover{ background:#0A1B4A; border-color:#0A1B4A; }
 
   .batch-panel{ border:1px solid var(--line-strong); border-radius: var(--radius); background: var(--paper); overflow:hidden; }
   .batch-summary{
