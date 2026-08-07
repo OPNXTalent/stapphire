@@ -262,13 +262,14 @@ export function MatrixPanel({
           </div>
 
           {onRefinePillars && (
-            <div className="prompt-box">
-              <div className="prompt-title">Job Specific Fit Prompt</div>
-              <textarea
-                className="prompt-input"
-                placeholder="Enter to submit, Shift+Enter for a new line"
-                value={promptText}
-                onChange={(e) => setPromptText(e.target.value)}
+            <>
+              <div className="section-label">Job Specific Fit Prompt</div>
+              <div className="prompt-box">
+                <textarea
+                  className="prompt-input"
+                  placeholder="+ Stapphire Prompt"
+                  value={promptText}
+                  onChange={(e) => setPromptText(e.target.value)}
                 disabled={savingPrompt}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -293,7 +294,8 @@ export function MatrixPanel({
                   {savingPrompt ? 'Updating criteria…' : 'Submit'}
                 </button>
               </div>
-            </div>
+              </div>
+            </>
           )}
 
           {pillars.length > 0 && (
