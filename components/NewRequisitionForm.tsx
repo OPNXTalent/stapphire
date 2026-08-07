@@ -107,7 +107,7 @@ export function NewRequisitionForm({
 
       <div className="new-req-pane">
         <div className="matrix-title-row" onClick={onCancel} style={{ cursor: onCancel ? 'pointer' : 'default' }}>
-          <div className="matrix-req-title">
+          <div className="new-req-title-row">
             <span className="matrix-title-chev">▾</span>
             <input
               type="text"

@@ -13,7 +13,7 @@ export default function NewRequisitionPage() {
   return (
     <>
       <TopBar />
-      <div className="composer-page">
+      <div style={{ marginTop: 48, minHeight: 'calc(100vh - 48px)', background: 'var(--paper)' }}>
         <NewRequisitionForm onCreated={(id) => router.push(`/?requisition=${id}`)} />
       </div>
     </>

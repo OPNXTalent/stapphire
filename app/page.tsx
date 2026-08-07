@@ -298,48 +298,6 @@ function DashboardContent() {
 
   const activeCandidateName = candidates.find((c) => c.id === activeCandidateId)?.full_name ?? null;
 
-  if (creatingRequisition) {
-    return (
-      <>
-        <TopBar requisitionTitle={requisition.title} />
-        <div className={`app composer-view ${leftCollapsed ? 'left-collapsed' : ''}`}>
-          <RequisitionPanel
-            requisition={requisition}
-            org={org ?? { credits_remaining: 0, credits_total: 0, credits_refill_at: null }}
-            otherRequisitions={allRequisitions
-              .filter((r) => r.id !== requisitionId)
-              .map((r) => ({
-                id: r.id,
-                title: r.title,
-                status: r.status,
-                candidateCount: r.candidates?.[0]?.count ?? 0
-              }))}
-            onSwitchRequisition={handleSwitchRequisition}
-            onArchiveRequisition={handleArchiveRequisition}
-            onOpenTrashModal={() => setTrashModalOpen(true)}
-            onOpenArchiveModal={() => setArchiveModalOpen(true)}
-            collapsed={leftCollapsed}
-            onToggleCollapse={() => setLeftCollapsed((c) => !c)}
-            onBatchUpload={handleBatchUpload}
-            batchQueue={batchQueue}
-            batchActive={batchActive}
-            batchRequisitionId={batchRequisitionId}
-            onClearBatch={() => {
-              setBatchQueue([]);
-              setBatchRequisitionId(null);
-            }}
-            candidateCount={candidates.length}
-            onAddRequisition={() => setCreatingRequisition(false)}
-            isAddingRequisition
-          />
-          <div className="composer-page">
-            <NewRequisitionForm onCreated={handleRequisitionCreated} onCancel={() => setCreatingRequisition(false)} />
-          </div>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       <TopBar requisitionTitle={requisition.title} />
@@ -370,23 +328,27 @@ function DashboardContent() {
             setBatchRequisitionId(null);
           }}
           candidateCount={candidates.length}
-          onAddRequisition={() => setCreatingRequisition(true)}
-          isAddingRequisition={false}
+          onAddRequisition={() => setCreatingRequisition((c) => !c)}
+          isAddingRequisition={creatingRequisition}
         />
 
         <div className="center-panel">
-          <MatrixPanel
-            candidates={candidates}
-            requisitionTitle={requisition.title}
-            shareToken={requisition.share_token}
-            onSelectCandidate={setActiveCandidateId}
-            onDelete={handleDeleteCandidate}
-            onSetDisposition={handleSetDisposition}
-            onBulkSetDisposition={handleBulkSetDisposition}
-            onBulkReevaluate={handleBulkReevaluate}
-            evaluationPillars={requisition.evaluation_pillars}
-            onRefinePillars={handleRefinePillars}
-          />
+          {creatingRequisition ? (
+            <NewRequisitionForm onCreated={handleRequisitionCreated} onCancel={() => setCreatingRequisition(false)} />
+          ) : (
+            <MatrixPanel
+              candidates={candidates}
+              requisitionTitle={requisition.title}
+              shareToken={requisition.share_token}
+              onSelectCandidate={setActiveCandidateId}
+              onDelete={handleDeleteCandidate}
+              onSetDisposition={handleSetDisposition}
+              onBulkSetDisposition={handleBulkSetDisposition}
+              onBulkReevaluate={handleBulkReevaluate}
+              evaluationPillars={requisition.evaluation_pillars}
+              onRefinePillars={handleRefinePillars}
+            />
+          )}
         </div>
 
         <CollaborationPanel
