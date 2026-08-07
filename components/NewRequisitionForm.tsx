@@ -4,6 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 
 const DEMO_ORG_ID = process.env.NEXT_PUBLIC_DEMO_ORG_ID ?? '';
 
+// Deliberately mirrors MatrixPanel's own structure — same "Candidate
+// Matrix" header, same title-row + chevron pattern, same "Job Specific
+// Fit Prompt" / "Job-Specific Fit Criteria" labels — so creating a new
+// requisition looks and feels identical to editing an existing one,
+// not like a separate, differently-styled form bolted on the side.
 export function NewRequisitionForm({
   onCreated,
   onCancel
@@ -91,97 +96,102 @@ export function NewRequisitionForm({
   }
 
   return (
-    <div style={{ width: '100%', maxWidth: 640, margin: '0 auto', padding: '48px 24px 60px' }}>
-      <div className="matrix-role-pane" style={{ border: 'none', padding: 0, marginBottom: 20 }}>
-        <input
-          type="text"
-          className="new-req-title-input"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Untitled Requisition"
-          autoFocus
-        />
+    <div style={{ width: '100%' }}>
+      <div className="matrix-toggle open">
+        <svg className="facet-icon" viewBox="0 0 24 24" fill="none">
+          <polygon points="12,1 21,7 24,14 17,23 7,23 0,14 3,7" fill="var(--sapphire)" />
+        </svg>
+        <div className="matrix-toggle-label">Candidate Matrix</div>
+        <div className="matrix-toggle-sub">Same rubric, every candidate — tap a name for the full picture</div>
       </div>
 
-      <div className="section-label">Job Description</div>
-      <div className="prompt-box">
-        <textarea
-          className="prompt-input"
-          style={{ minHeight: 140 }}
-          placeholder="+ Paste, type, dictate, or attach the job description..."
-          value={jdText}
-          onChange={(e) => setJdText(e.target.value)}
-          disabled={submitting}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleSubmit();
-            }
-          }}
-        />
+      <div className="new-req-pane">
+        <div className="matrix-title-row" onClick={onCancel} style={{ cursor: onCancel ? 'pointer' : 'default' }}>
+          <div className="matrix-req-title">
+            <span className="matrix-title-chev">▾</span>
+            <input
+              type="text"
+              className="new-req-title-input"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="Job Title Here..."
+              autoFocus
+            />
+          </div>
+        </div>
 
-        {jdFile && (
-          <div className="attach-pending" style={{ marginBottom: 8 }}>
-            {jdFile.name}
-            <button type="button" className="attach-remove" onClick={() => setJdFile(null)}>
-              ✕
+        <div className="section-label">Job Specific Fit Prompt</div>
+        <div className="prompt-box" onClick={(e) => e.stopPropagation()}>
+          <textarea
+            className="prompt-input"
+            placeholder="+ Paste, type, upload or simply tell me about your requisition..."
+            value={jdText}
+            onChange={(e) => setJdText(e.target.value)}
+            disabled={submitting}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+          />
+
+          {jdFile && (
+            <div className="attach-pending" style={{ marginBottom: 8 }}>
+              {jdFile.name}
+              <button type="button" className="attach-remove" onClick={() => setJdFile(null)}>
+                ✕
+              </button>
+            </div>
+          )}
+
+          <div className="composer-footer">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.txt"
+              style={{ display: 'none' }}
+              onChange={(e) => setJdFile(e.target.files?.[0] ?? null)}
+            />
+            <button
+              type="button"
+              className="composer-btn"
+              title="Attach a document"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              +
             </button>
+            <button
+              type="button"
+              className={`composer-btn ${listening ? 'composer-btn-active' : ''}`}
+              title={voiceSupported ? 'Dictate' : 'Voice dictation not supported in this browser'}
+              disabled={!voiceSupported}
+              onClick={toggleListening}
+            >
+              🎤
+            </button>
+            <div style={{ flex: 1 }} />
+            <button
+              type="button"
+              className="composer-send"
+              disabled={!canSubmit || submitting}
+              onClick={handleSubmit}
+              title="Create requisition"
+            >
+              {submitting ? '…' : '↑'}
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="risk-note flagged" style={{ marginTop: 14 }} onClick={(e) => e.stopPropagation()}>
+            {error}
           </div>
         )}
 
-        <div className="composer-footer">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.docx,.txt"
-            style={{ display: 'none' }}
-            onChange={(e) => setJdFile(e.target.files?.[0] ?? null)}
-          />
-          <button
-            type="button"
-            className="composer-btn"
-            title="Attach a document"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            +
-          </button>
-          <button
-            type="button"
-            className={`composer-btn ${listening ? 'composer-btn-active' : ''}`}
-            title={voiceSupported ? 'Dictate' : 'Voice dictation not supported in this browser'}
-            disabled={!voiceSupported}
-            onClick={toggleListening}
-          >
-            🎤
-          </button>
-          <div style={{ flex: 1 }} />
-          <button
-            type="button"
-            className="composer-send"
-            disabled={!canSubmit || submitting}
-            onClick={handleSubmit}
-            title="Create requisition"
-          >
-            {submitting ? '…' : '↑'}
-          </button>
-        </div>
+        <div className="section-label">Job-Specific Fit Criteria</div>
       </div>
-
-      {error && (
-        <div className="risk-note flagged" style={{ marginTop: 14 }}>
-          {error}
-        </div>
-      )}
-
-      <div className="upload-hint" style={{ marginTop: 10 }}>
-        Enter to create, Shift+Enter for a new line{voiceSupported ? ', 🎤 to dictate' : ''}
-      </div>
-
-      {onCancel && (
-        <button className="qa-btn-text" style={{ marginTop: 14 }} onClick={onCancel}>
-          Cancel
-        </button>
-      )}
     </div>
   );
 }
