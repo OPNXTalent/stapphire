@@ -299,7 +299,7 @@ export function MatrixPanel({
 
       <div className="matrix-split">
         {/* ── Top: role-level only — title, and a toggleable discovery chat that shapes the Hiring Decision Model. ── */}
-        <div className="matrix-role-pane">
+        <div className={`matrix-role-pane ${discoveryOpen ? 'matrix-role-pane-full' : ''}`}>
           <div className="matrix-title-row" onClick={() => setDiscoveryOpen((o) => !o)} style={{ cursor: 'pointer' }}>
             <div className="matrix-req-title" title={requisitionTitle}>
               <span className="matrix-title-chev">{discoveryOpen ? '▾' : '▸'}</span>
@@ -400,7 +400,7 @@ export function MatrixPanel({
         </div>
 
         {/* ── Bottom: everything candidate-related — the compact list, and the focused candidate's full evaluation. ── */}
-        <div className="matrix-list-pane">
+        <div className={`matrix-list-pane ${discoveryOpen ? 'matrix-list-pane-hidden' : ''}`}>
           <div className="filter-row">
             <MultiSelectFilter
               label="Status"
