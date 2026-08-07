@@ -263,9 +263,10 @@ export function MatrixPanel({
 
           {onRefinePillars && (
             <div className="prompt-box">
+              <div className="prompt-title">Job Specific Fit Prompt</div>
               <textarea
                 className="prompt-input"
-                placeholder="+ Prompt Stapphire — e.g. 'drop the bilingual requirement, weight call center experience higher'... (Enter to submit, Shift+Enter for a new line)"
+                placeholder="Enter to submit, Shift+Enter for a new line"
                 value={promptText}
                 onChange={(e) => setPromptText(e.target.value)}
                 disabled={savingPrompt}

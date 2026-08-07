@@ -375,6 +375,10 @@
     border:1px solid var(--line-strong); border-radius: var(--radius);
     background: var(--paper-cool); padding:10px 12px; margin-bottom:16px;
   }
+  .prompt-title{
+    font-family: var(--font-mono); font-size:10px; letter-spacing:0.05em; text-transform:uppercase;
+    color: var(--ink-faint); margin-bottom:6px;
+  }
   .prompt-input{
     width:100%; min-height:44px; padding:0; border:none; background:none;
     font-size:13px; font-family: var(--font-body); color: var(--ink); resize:vertical;
