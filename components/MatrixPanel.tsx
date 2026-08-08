@@ -12,6 +12,11 @@ type ContextAssessment = {
   new_concerns?: string[];
 };
 
+type GapItem = {
+  description: string;
+  category: 'critical' | 'moderate' | 'trainable' | 'resume_gap' | 'verification' | 'employer_specific' | 'superseded';
+};
+
 type Evaluation = {
   overall_match: number;
   job_description_match: number | null;
@@ -20,6 +25,7 @@ type Evaluation = {
   matrix_dimensions: Record<string, string>;
   strengths: string[];
   gaps: string[];
+  gaps_structured?: GapItem[] | null;
   risk_flags: string[];
   resume_gap_flag?: string | null;
   context_assessment?: ContextAssessment | null;
@@ -37,6 +43,25 @@ type Candidate = {
 };
 
 type DiscoveryMessage = { id: string; role: 'user' | 'assistant'; content: string; created_at: string };
+
+const GAP_CATEGORY_LABELS: Record<GapItem['category'], string> = {
+  critical: 'Critical Gap',
+  moderate: 'Moderate Gap',
+  trainable: 'Trainable Gap',
+  resume_gap: 'Résumé Gap',
+  verification: 'Verification Item',
+  employer_specific: 'Employer-Specific Knowledge',
+  superseded: 'Superseded'
+};
+const GAP_CATEGORY_ORDER: GapItem['category'][] = [
+  'critical',
+  'moderate',
+  'resume_gap',
+  'verification',
+  'trainable',
+  'employer_specific',
+  'superseded'
+];
 
 function facetTier(score: number): 'strong' | 'moderate' | 'limited' {
   if (score >= 85) return 'strong';
@@ -804,11 +829,28 @@ export function MatrixPanel({
                         </div>
                         <div>
                           <div className="section-label">Gaps</div>
-                          <ul className="plain gaps">
-                            {evalu.gaps?.map((g, idx) => (
-                              <li key={idx}>{g}</li>
-                            ))}
-                          </ul>
+                          {evalu.gaps_structured && evalu.gaps_structured.length > 0 ? (
+                            GAP_CATEGORY_ORDER.map((cat) => {
+                              const items = evalu.gaps_structured!.filter((g) => g.category === cat);
+                              if (items.length === 0) return null;
+                              return (
+                                <div key={cat} className="gap-category-group">
+                                  <div className="gap-category-label">{GAP_CATEGORY_LABELS[cat]}</div>
+                                  <ul className="plain gaps">
+                                    {items.map((g, idx) => (
+                                      <li key={idx}>{g.description}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <ul className="plain gaps">
+                              {evalu.gaps?.map((g, idx) => (
+                                <li key={idx}>{g}</li>
+                              ))}
+                            </ul>
+                          )}
                         </div>
                       </div>
 

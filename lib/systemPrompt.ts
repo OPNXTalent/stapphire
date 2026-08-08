@@ -65,6 +65,50 @@ Terminology Relevance. Score every subcriterion the model actually
 contains — do not invent subcriteria that aren't in it, and do not
 silently drop ones that are.
 
+CORE PRINCIPLE: the job description and Hiring Decision Model are
+source documents, not an automatic scoring rubric. Don't count how
+many phrases from them appear on the resume — determine, from the best
+available evidence, how likely this candidate is to succeed in the
+role. Before treating any specialized requirement as a real deficiency
+when absent, apply the EXTERNAL CANDIDATE ACCESS TEST: could a
+reasonably qualified external candidate be expected to already possess
+this exact knowledge before ever working for this employer? If no —
+it's likely employer-specific or insider knowledge, and its absence
+should not materially penalize an external candidate. Internal
+company-specific systems, route/report/tool names, proprietary
+workflows, and internal terminology usually fail this test.
+
+Classify each meaningful requirement (internally, to guide your
+scoring and your gaps_structured output — don't necessarily narrate
+this classification process) as one of:
+- pre-hire/portable: candidate should reasonably already have it —
+  missing evidence may reduce fit
+- transferable/adjacent: not the exact task or term, but a
+  substantially similar underlying capability is demonstrated — award
+  meaningful credit, don't require exact wording
+- industry/domain knowledge: acquirable elsewhere in the industry,
+  useful as a differentiator when present, not a major deficiency when
+  absent if the org can reasonably teach it
+- employer-specific/insider knowledge: generally only learned by
+  already working there — no meaningful pre-hire penalty for lacking it
+- post-hire/training outcome: if the JD or Hiring Decision Model
+  indicates the employer trains this after hire, score the candidate's
+  demonstrated capacity to learn it, not whether they already have it
+- needs verification: things that normally wouldn't appear on a resume
+  at all (shift availability, willingness to work weekends, physical
+  requirements, sponsorship, onsite ability) — absence of resume
+  evidence is not evidence the candidate fails the condition
+- superseded: recruiter/hiring-manager discovery has established this
+  requirement no longer applies — don't score it against anyone
+
+NO DOUBLE-PENALTY: group closely related requirements into one
+competency family before scoring. If several subcriteria really
+represent the same underlying employer-specific operational knowledge
+(e.g. three different internal system names that are all facets of one
+"knows our internal tools" competency), evaluate that family once —
+don't deduct multiple times for what is essentially one missing thing
+stated several ways.
+
 Produce TWO overall scores, since they can genuinely diverge as
 discovery refines the model beyond the original JD, and as context
 diverges from what the resume alone shows:
@@ -99,23 +143,37 @@ Do not infer experience the resume doesn't support. Do not award credit
 for vague, unevidenced claims. Prioritize demonstrated accomplishments
 over years of experience alone.
 
-Before listing something as a gap, ask: is this capability actually
-required by the model, or is it terminology/tooling that isn't itself
-the qualification? Do not list the mere absence of a specific term as a
-gap when the resume shows comparable underlying experience through
-different language. Reserve gaps for genuinely missing, required
-capabilities — not vocabulary mismatches.
+Do not treat every unknown or missing item the same way. When
+reporting gaps_structured, categorize each one:
+- critical: a confirmed missing Day-1 requirement that would materially
+  prevent successful performance
+- moderate: a relevant qualification that would improve fit but can
+  reasonably be developed
+- trainable: something the employer's own training/onboarding covers
+  (per the JD or Hiring Decision Model) — not a real pre-hire penalty
+- resume_gap: the experience may genuinely exist but isn't currently
+  communicated on the resume
+- verification: simply unknown — wouldn't normally appear on a resume,
+  so its absence proves nothing either way
+- employer_specific: insider/proprietary knowledge an external
+  candidate wouldn't be expected to already have
+- superseded: no longer relevant per discovery — recorded for
+  transparency, not held against the candidate
+Only "critical" and genuinely unaddressed "moderate" items should
+meaningfully pull down overall_match — trainable, employer_specific,
+verification, and superseded items should not.
 
 A resume is incomplete evidence of a person's actual capability —
 silence on a topic is not proof the candidate lacks it. Distinguish two
 situations and treat them differently:
   - The resume actively shows the candidate lacks something or
-    contradicts a requirement — that is a genuine gap.
+    contradicts a requirement — that is a genuine (critical or
+    moderate) gap.
   - The resume simply doesn't address something the model asks about —
-    that is an open question, not a deficiency. Do not score it as a
-    penalty or state it with the confidence of a real gap. Say plainly
-    that it isn't addressed in the resume, and route it to
-    interview_recommendations.probe_areas instead of gaps or risk_flags.
+    that is a verification item, not a deficiency. Do not score it as
+    a penalty or state it with the confidence of a real gap. Say
+    plainly that it isn't addressed in the resume, and also route it
+    to interview_recommendations.probe_areas.
 You are assessing what the paper shows, not rendering a verdict on the
 whole person — the recruiter and hiring team make that call after
 actually meeting the candidate. When evidence is genuinely inconclusive,
@@ -137,6 +195,17 @@ If the uploaded document is not a resume (e.g. a bank statement, a
 cover letter with no work history, an unrelated file), set
 document_type to "non_resume" and leave scoring fields at 0 — do not
 attempt to evaluate it as a candidate.
+
+FINAL REASONABLENESS CHECK before you finalize scores: would an
+experienced recruiter looking at the totality of this evidence
+reasonably call this candidate poorly matched, moderately matched, or
+strongly matched? If your numeric score seems inconsistent with the
+evidence you've actually written down, look for the usual causes —
+double-penalizing one competency family stated multiple ways,
+employer-specific knowledge scored as if it were a Day-1 requirement,
+trainable skills over-weighted as deficiencies, unknowns treated as
+failures, or keyword dependence — and correct the score before
+submitting. The number and the narrative must tell the same story.
 
 Keep every text field to plain prose with no line breaks inside a
 single field — use separate array entries instead of embedding newlines
@@ -191,11 +260,20 @@ export const EVALUATION_TOOL = {
         }
       },
       strengths: { type: 'array', items: { type: 'string' } },
-      gaps: {
+      gaps_structured: {
         type: 'array',
-        items: { type: 'string' },
-        description:
-          'Only genuine gaps the resume actively shows or contradicts — never something the resume simply does not mention. Unaddressed-but-unknown items belong in interview_recommendations.probe_areas instead.'
+        description: 'Every gap, categorized by what kind it actually is — never lump them under one generic heading.',
+        items: {
+          type: 'object',
+          properties: {
+            description: { type: 'string' },
+            category: {
+              type: 'string',
+              enum: ['critical', 'moderate', 'trainable', 'resume_gap', 'verification', 'employer_specific', 'superseded']
+            }
+          },
+          required: ['description', 'category']
+        }
       },
       ats_compatibility: {
         type: 'object',
@@ -264,7 +342,7 @@ export const EVALUATION_TOOL = {
       'status',
       'signals',
       'strengths',
-      'gaps',
+      'gaps_structured',
       'risk_flags'
     ]
   }

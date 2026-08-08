@@ -167,7 +167,11 @@ create table evaluations (
   scores jsonb not null,              -- job_responsibilities, hard_skills, soft_skills, keyword_relevance
   signals jsonb not null,             -- resume_confidence, evidence_quality, location_fit, employment_status, timeline_review, certifications
   strengths text[] not null default '{}',
-  gaps text[] not null default '{}',
+  gaps text[] not null default '{}',   -- flat descriptions, derived from gaps_structured for backward compat
+  -- categorized: critical / moderate / trainable / resume_gap /
+  -- verification / employer_specific / superseded — replaces the flat
+  -- "GAPS" bucket that treated every kind of unknown the same way
+  gaps_structured jsonb,
   ats_compatibility jsonb,
   employment_history jsonb,           -- watchlist_match, gaps, short_tenure_roles
   risk_flags text[] not null default '{}',
