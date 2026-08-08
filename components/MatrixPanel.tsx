@@ -734,21 +734,28 @@ export function MatrixPanel({
                     </div>
 
                     <div className="facet-cell matrix-row-match">
-                      <span className="score-num">{evalu.overall_match}%</span>
                       {evalu.job_description_match !== null && evalu.job_description_match !== undefined ? (
-                        <div
-                          className="dual-bar-mini"
-                          title={`Job Description Match: ${evalu.job_description_match}% · Hiring Profile Match: ${evalu.overall_match}%`}
-                        >
-                          <div className="dual-bar-track">
-                            <div className="dual-bar-fill dual-bar-jd" style={{ width: `${evalu.job_description_match}%` }} />
+                        <div className="dual-bar-mini">
+                          <div className="dual-bar-row">
+                            <span className="dual-bar-label dual-bar-label-jd">JD</span>
+                            <div className="dual-bar-track">
+                              <div className="dual-bar-fill dual-bar-jd" style={{ width: `${evalu.job_description_match}%` }} />
+                            </div>
+                            <span className="dual-bar-num dual-bar-num-jd">{evalu.job_description_match}%</span>
                           </div>
-                          <div className="dual-bar-track">
-                            <div className="dual-bar-fill dual-bar-profile" style={{ width: `${evalu.overall_match}%` }} />
+                          <div className="dual-bar-row">
+                            <span className="dual-bar-label dual-bar-label-profile">HP</span>
+                            <div className="dual-bar-track">
+                              <div className="dual-bar-fill dual-bar-profile" style={{ width: `${evalu.overall_match}%` }} />
+                            </div>
+                            <span className="dual-bar-num dual-bar-num-profile">{evalu.overall_match}%</span>
                           </div>
                         </div>
                       ) : (
-                        <div className={`facet-mini ${facetTier(evalu.overall_match)}`} />
+                        <>
+                          <span className="score-num">{evalu.overall_match}%</span>
+                          <div className={`facet-mini ${facetTier(evalu.overall_match)}`} />
+                        </>
                       )}
                     </div>
 
