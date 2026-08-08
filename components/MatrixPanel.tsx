@@ -90,6 +90,8 @@ export function MatrixPanel({
   const [downloading, setDownloading] = useState<string | null>(null);
   const [contextDrafts, setContextDrafts] = useState<Record<string, string>>({});
   const [savingContext, setSavingContext] = useState<string | null>(null);
+  const [contextSaved, setContextSaved] = useState<string | null>(null);
+  const [contextError, setContextError] = useState<string | null>(null);
   const [localDisposition, setLocalDisposition] = useState<Record<string, string>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDisposition, setBulkDisposition] = useState('');
@@ -172,14 +174,35 @@ export function MatrixPanel({
 
   async function handleSaveContext(candidateId: string) {
     setSavingContext(candidateId);
+    setContextSaved(null);
+    setContextError(null);
     try {
-      await fetch(`/api/candidates/${candidateId}/context`, {
+      const res = await fetch(`/api/candidates/${candidateId}/context`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ additional_context: contextDrafts[candidateId] ?? '' })
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? 'Failed to save');
+      }
+      setContextSaved(candidateId);
+      setTimeout(() => setContextSaved((id) => (id === candidateId ? null : id)), 2000);
+    } catch (err: any) {
+      setContextError(err?.message ?? 'Something went wrong saving this.');
     } finally {
       setSavingContext(null);
+    }
+  }
+
+  function handleReevaluateSingle(candidateId: string, name: string) {
+    if (!onBulkReevaluate) return;
+    if (
+      window.confirm(
+        `Re-evaluate ${name} with this additional context? This uses 1 credit, same as a fresh evaluation.`
+      )
+    ) {
+      onBulkReevaluate([candidateId]);
     }
   }
 
@@ -594,18 +617,40 @@ export function MatrixPanel({
                           placeholder="Tell me..."
                           value={contextValue(c)}
                           onChange={(e) => setContextDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                          disabled={savingContext === c.id}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleSaveContext(c.id);
+                            }
+                          }}
                         />
                         <div className="prompt-footer">
                           <span className="upload-hint" style={{ margin: 0 }}>
-                            Re-evaluate to see this reflected in the assessment.
+                            {contextError ? (
+                              <span style={{ color: 'var(--red)' }}>{contextError}</span>
+                            ) : (
+                              'Saving does not re-score by itself — re-evaluate to see it reflected.'
+                            )}
                           </span>
-                          <button
-                            className="qa-btn-text"
-                            disabled={savingContext === c.id}
-                            onClick={() => handleSaveContext(c.id)}
-                          >
-                            {savingContext === c.id ? 'Saving…' : 'Save'}
-                          </button>
+                          <span style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
+                            <button
+                              className="qa-btn-text"
+                              disabled={savingContext === c.id}
+                              onClick={() => handleSaveContext(c.id)}
+                            >
+                              {savingContext === c.id ? 'Saving…' : contextSaved === c.id ? 'Saved ✓' : 'Save'}
+                            </button>
+                            {onBulkReevaluate && (
+                              <button
+                                className="qa-btn-text"
+                                style={{ color: 'var(--deep)', borderBottomColor: 'var(--deep)' }}
+                                onClick={() => handleReevaluateSingle(c.id, c.full_name)}
+                              >
+                                Re-evaluate (1 credit)
+                              </button>
+                            )}
+                          </span>
                         </div>
                       </div>
 
