@@ -60,15 +60,19 @@ export async function POST(req: NextRequest) {
         // resume that was trashed (or later permanently deleted) must
         // never silently block or hijack a legitimate re-upload of the
         // same file — the user can no longer even see that old row.
-        const { data: existing } = await supabaseAdmin
+        console.log('[dedup-check] requisitionId:', requisitionId, 'contentHash:', contentHash);
+        const { data: existing, error: dedupError } = await supabaseAdmin
           .from('candidates')
-          .select('id, full_name, evaluations(*)')
+          .select('id, full_name, deleted_at, evaluations(*)')
           .eq('requisition_id', requisitionId)
           .eq('content_hash', contentHash)
           .is('deleted_at', null)
           .maybeSingle();
 
+        console.log('[dedup-check] result:', JSON.stringify(existing), 'error:', JSON.stringify(dedupError));
+
         if (existing) {
+          console.log('[dedup-check] FLAGGING AS DUPLICATE - matched candidate id:', existing.id, 'deleted_at on matched row:', (existing as any).deleted_at);
           send({ type: 'done', candidate: existing, deduped: true });
           controller.close();
           return;
