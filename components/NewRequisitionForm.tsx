@@ -122,7 +122,15 @@ export function NewRequisitionForm({
         </div>
 
         <div className="section-label">Job Specific Fit Prompt</div>
-        <div className="prompt-box" onClick={(e) => e.stopPropagation()}>
+        <div className="discovery-chat" onClick={(e) => e.stopPropagation()}>
+          <div className="discovery-messages">
+            <div className="trash-empty-hint">
+              Tell me about the role — paste, type, upload, or dictate the job description below and I'll build the
+              Hiring Decision Model.
+            </div>
+          </div>
+
+          <div className="prompt-box" style={{ marginTop: 8 }}>
           <textarea
             className="prompt-input"
             placeholder="+ Paste, type, upload or simply tell me about your requisition..."
@@ -181,6 +189,7 @@ export function NewRequisitionForm({
             >
               {submitting ? '…' : '↑'}
             </button>
+          </div>
           </div>
         </div>
 

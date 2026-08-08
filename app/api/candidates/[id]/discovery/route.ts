@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { anthropic, EVALUATION_MODEL } from '@/lib/anthropic';
+import { extractTextFromBuffer } from '@/lib/extractText';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -71,8 +72,22 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { message } = await req.json();
-    if (!message?.trim()) return NextResponse.json({ error: 'A message is required' }, { status: 400 });
+    const formData = await req.formData();
+    const message = (formData.get('message') as string | null) ?? '';
+    const file = formData.get('file') as File | null;
+
+    if (!message.trim() && !file) {
+      return NextResponse.json({ error: 'A message or attachment is required' }, { status: 400 });
+    }
+
+    let effectiveMessage = message.trim();
+    if (file) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const fileText = await extractTextFromBuffer(buffer, file.name, file.type);
+      effectiveMessage = effectiveMessage
+        ? `${effectiveMessage}\n\n[Attached document: ${file.name}]\n${fileText}`
+        : `[Attached document: ${file.name}]\n${fileText}`;
+    }
 
     const { data: candidate, error: candError } = await supabaseAdmin
       .from('candidates')
@@ -101,14 +116,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     await supabaseAdmin
       .from('candidate_discovery_messages')
-      .insert({ candidate_id: params.id, role: 'user', content: message.trim() });
+      .insert({ candidate_id: params.id, role: 'user', content: message.trim() || `Attached: ${file?.name}` });
 
     const userMessage = JSON.stringify({
       job_description: requisition?.job_description ?? '',
       candidate_name: candidate.full_name,
       previously_established_context: candidate.additional_context ?? null,
       recent_conversation: recentHistory,
-      new_message: message.trim()
+      new_message: effectiveMessage
     });
 
     const response = await anthropic.messages.create({

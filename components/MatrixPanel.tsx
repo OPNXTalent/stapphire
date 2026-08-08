@@ -124,6 +124,26 @@ export function MatrixPanel({
   const [candidateChatDrafts, setCandidateChatDrafts] = useState<Record<string, string>>({});
   const [candidateChatSending, setCandidateChatSending] = useState<string | null>(null);
   const [candidateChatError, setCandidateChatError] = useState<string | null>(null);
+
+  const [jdAttachedFile, setJdAttachedFile] = useState<File | null>(null);
+  const [jdListening, setJdListening] = useState(false);
+  const [jdVoiceSupported, setJdVoiceSupported] = useState(false);
+  const jdFileInputRef = useRef<HTMLInputElement>(null);
+  const jdRecognitionRef = useRef<any>(null);
+
+  const [candidateAttachedFile, setCandidateAttachedFile] = useState<File | null>(null);
+  const [candidateListening, setCandidateListening] = useState(false);
+  const [candidateVoiceSupported, setCandidateVoiceSupported] = useState(false);
+  const candidateFileInputRef = useRef<HTMLInputElement>(null);
+  const candidateRecognitionRef = useRef<any>(null);
+  const candidateListeningFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const supported = !!SpeechRecognition;
+    setJdVoiceSupported(supported);
+    setCandidateVoiceSupported(supported);
+  }, []);
   const [localDisposition, setLocalDisposition] = useState<Record<string, string>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDisposition, setBulkDisposition] = useState('');
@@ -163,19 +183,25 @@ export function MatrixPanel({
   }, [messages]);
 
   async function handleSendChat() {
-    if (!chatText.trim() || sending) return;
+    if ((!chatText.trim() && !jdAttachedFile) || sending) return;
     const text = chatText.trim();
+    const file = jdAttachedFile;
     setChatText('');
+    setJdAttachedFile(null);
     setSending(true);
     setChatError(null);
-    setMessages((prev) => [...prev, { id: `local-${Date.now()}`, role: 'user', content: text, created_at: new Date().toISOString() }]);
+    setMessages((prev) => [
+      ...prev,
+      { id: `local-${Date.now()}`, role: 'user', content: text || `Attached: ${file?.name}`, created_at: new Date().toISOString() }
+    ]);
 
     try {
-      const res = await fetch(`/api/requisitions/${requisitionId}/discovery`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, source: discoverySource })
-      });
+      const formData = new FormData();
+      formData.append('message', text);
+      formData.append('source', discoverySource);
+      if (file) formData.append('file', file);
+
+      const res = await fetch(`/api/requisitions/${requisitionId}/discovery`, { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Discovery failed');
 
@@ -196,6 +222,29 @@ export function MatrixPanel({
     }
   }
 
+  function toggleJdListening() {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    if (jdListening) {
+      jdRecognitionRef.current?.stop();
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+    recognition.onresult = (event: any) => {
+      let transcript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) transcript += event.results[i][0].transcript;
+      setChatText((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    };
+    recognition.onend = () => setJdListening(false);
+    recognition.onerror = () => setJdListening(false);
+    jdRecognitionRef.current = recognition;
+    recognition.start();
+    setJdListening(true);
+  }
+
   function handlePrint() {
     window.print();
   }
@@ -207,26 +256,56 @@ export function MatrixPanel({
     setCandidateMessagesLoaded((prev) => ({ ...prev, [candidateId]: true }));
   }
 
+  function toggleCandidateListening(candidateId: string) {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    if (candidateListening) {
+      candidateRecognitionRef.current?.stop();
+      return;
+    }
+    candidateListeningFor.current = candidateId;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+    recognition.onresult = (event: any) => {
+      let transcript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) transcript += event.results[i][0].transcript;
+      setCandidateChatDrafts((prev) => {
+        const id = candidateListeningFor.current;
+        if (!id) return prev;
+        return { ...prev, [id]: (prev[id] ? `${prev[id]} ` : '') + transcript };
+      });
+    };
+    recognition.onend = () => setCandidateListening(false);
+    recognition.onerror = () => setCandidateListening(false);
+    candidateRecognitionRef.current = recognition;
+    recognition.start();
+    setCandidateListening(true);
+  }
+
   async function handleSendCandidateChat(candidateId: string) {
     const text = (candidateChatDrafts[candidateId] ?? '').trim();
-    if (!text || candidateChatSending === candidateId) return;
+    const file = candidateAttachedFile;
+    if ((!text && !file) || candidateChatSending === candidateId) return;
     setCandidateChatDrafts((prev) => ({ ...prev, [candidateId]: '' }));
+    setCandidateAttachedFile(null);
     setCandidateChatSending(candidateId);
     setCandidateChatError(null);
     setCandidateMessages((prev) => ({
       ...prev,
       [candidateId]: [
         ...(prev[candidateId] ?? []),
-        { id: `local-${Date.now()}`, role: 'user', content: text, created_at: new Date().toISOString() }
+        { id: `local-${Date.now()}`, role: 'user', content: text || `Attached: ${file?.name}`, created_at: new Date().toISOString() }
       ]
     }));
 
     try {
-      const res = await fetch(`/api/candidates/${candidateId}/discovery`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text })
-      });
+      const formData = new FormData();
+      formData.append('message', text);
+      if (file) formData.append('file', file);
+
+      const res = await fetch(`/api/candidates/${candidateId}/discovery`, { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Discovery failed');
 
@@ -475,16 +554,53 @@ export function MatrixPanel({
                       }
                     }}
                   />
-                  <div className="prompt-footer">
-                    <span className="upload-hint" style={{ margin: 0 }}>
-                      {chatError ? (
-                        <span style={{ color: 'var(--red)' }}>{chatError}</span>
-                      ) : (
-                        'Updates the model when it materially changes understanding of the role. Existing candidates only reflect it once re-evaluated.'
-                      )}
-                    </span>
-                    <button className="qa-btn-text" disabled={sending || !chatText.trim()} onClick={handleSendChat}>
-                      {sending ? 'Thinking…' : 'Send'}
+                  {jdAttachedFile && (
+                    <div className="attach-pending" style={{ marginBottom: 8 }}>
+                      {jdAttachedFile.name}
+                      <button type="button" className="attach-remove" onClick={() => setJdAttachedFile(null)}>
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                  {chatError && (
+                    <div className="upload-hint" style={{ color: 'var(--red)', marginBottom: 4 }}>
+                      {chatError}
+                    </div>
+                  )}
+                  <div className="composer-footer">
+                    <input
+                      ref={jdFileInputRef}
+                      type="file"
+                      accept=".pdf,.docx,.txt"
+                      style={{ display: 'none' }}
+                      onChange={(e) => setJdAttachedFile(e.target.files?.[0] ?? null)}
+                    />
+                    <button
+                      type="button"
+                      className="composer-btn"
+                      title="Attach a document"
+                      onClick={() => jdFileInputRef.current?.click()}
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      className={`composer-btn ${jdListening ? 'composer-btn-active' : ''}`}
+                      title={jdVoiceSupported ? 'Dictate' : 'Voice dictation not supported in this browser'}
+                      disabled={!jdVoiceSupported}
+                      onClick={toggleJdListening}
+                    >
+                      🎤
+                    </button>
+                    <div style={{ flex: 1 }} />
+                    <button
+                      type="button"
+                      className="composer-send"
+                      disabled={sending || (!chatText.trim() && !jdAttachedFile)}
+                      onClick={handleSendChat}
+                      title="Send"
+                    >
+                      {sending ? '…' : '↑'}
                     </button>
                   </div>
                 </div>
@@ -726,33 +842,71 @@ export function MatrixPanel({
                               }
                             }}
                           />
-                          <div className="prompt-footer">
-                            <span className="upload-hint" style={{ margin: 0 }}>
-                              {candidateChatError ? (
-                                <span style={{ color: 'var(--red)' }}>{candidateChatError}</span>
-                              ) : (
-                                'Free to discuss — re-evaluate separately to see it reflected in scoring.'
-                              )}
-                            </span>
-                            <span style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
+                          {candidateAttachedFile && (
+                            <div className="attach-pending" style={{ marginBottom: 8 }}>
+                              {candidateAttachedFile.name}
+                              <button type="button" className="attach-remove" onClick={() => setCandidateAttachedFile(null)}>
+                                ✕
+                              </button>
+                            </div>
+                          )}
+                          {candidateChatError && (
+                            <div className="upload-hint" style={{ color: 'var(--red)', marginBottom: 4 }}>
+                              {candidateChatError}
+                            </div>
+                          )}
+                          <div className="composer-footer">
+                            <input
+                              ref={candidateFileInputRef}
+                              type="file"
+                              accept=".pdf,.docx,.txt"
+                              style={{ display: 'none' }}
+                              onChange={(e) => setCandidateAttachedFile(e.target.files?.[0] ?? null)}
+                            />
+                            <button
+                              type="button"
+                              className="composer-btn"
+                              title="Attach a document"
+                              onClick={() => candidateFileInputRef.current?.click()}
+                            >
+                              +
+                            </button>
+                            <button
+                              type="button"
+                              className={`composer-btn ${candidateListening ? 'composer-btn-active' : ''}`}
+                              title={candidateVoiceSupported ? 'Dictate' : 'Voice dictation not supported in this browser'}
+                              disabled={!candidateVoiceSupported}
+                              onClick={() => toggleCandidateListening(c.id)}
+                            >
+                              🎤
+                            </button>
+                            <div style={{ flex: 1 }} />
+                            <button
+                              type="button"
+                              className="composer-send"
+                              disabled={
+                                candidateChatSending === c.id || (!(candidateChatDrafts[c.id] ?? '').trim() && !candidateAttachedFile)
+                              }
+                              onClick={() => handleSendCandidateChat(c.id)}
+                              title="Send"
+                            >
+                              {candidateChatSending === c.id ? '…' : '↑'}
+                            </button>
+                          </div>
+                          {onBulkReevaluate && (
+                            <div className="prompt-footer" style={{ marginTop: 6 }}>
+                              <span className="upload-hint" style={{ margin: 0 }}>
+                                Free to discuss — re-evaluate separately to see it reflected in scoring.
+                              </span>
                               <button
                                 className="qa-btn-text"
-                                disabled={candidateChatSending === c.id || !(candidateChatDrafts[c.id] ?? '').trim()}
-                                onClick={() => handleSendCandidateChat(c.id)}
+                                style={{ color: 'var(--deep)', borderBottomColor: 'var(--deep)' }}
+                                onClick={() => handleReevaluateSingle(c.id, c.full_name)}
                               >
-                                {candidateChatSending === c.id ? 'Thinking…' : 'Send'}
+                                Re-evaluate (1 credit)
                               </button>
-                              {onBulkReevaluate && (
-                                <button
-                                  className="qa-btn-text"
-                                  style={{ color: 'var(--deep)', borderBottomColor: 'var(--deep)' }}
-                                  onClick={() => handleReevaluateSingle(c.id, c.full_name)}
-                                >
-                                  Re-evaluate (1 credit)
-                                </button>
-                              )}
-                            </span>
-                          </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
