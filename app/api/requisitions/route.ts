@@ -136,6 +136,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Free-tier orgs (never purchased) are capped at one active
+    // requisition — archiving the existing one (still free) opens room
+    // for a new one; running two at once is what upgrading is for.
+    const { data: org } = await supabaseAdmin
+      .from('organizations')
+      .select('credits_total')
+      .eq('id', org_id)
+      .single();
+
+    if (org && org.credits_total === 0) {
+      const { count: activeCount } = await supabaseAdmin
+        .from('requisitions')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', org_id)
+        .is('archived_at', null);
+
+      if ((activeCount ?? 0) >= 1) {
+        return NextResponse.json(
+          {
+            error:
+              'Free plan is limited to one active requisition at a time. Archive your current one to open a new one, or upgrade for more.'
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const job_description = file
       ? await extractTextFromBuffer(Buffer.from(await file.arrayBuffer()), file.name, file.type)
       : (pastedText as string);
