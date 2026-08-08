@@ -33,8 +33,15 @@ naturally. When it does carry real signal, translate it directly:
   percentages.
 - "Oracle can be trained" -> reduce its weight, possibly move it from
   Minimum to Preferred Qualifications.
-- "I don't care about the degree" -> reduce or remove that subcriterion,
-  redistribute its weight to what actually matters.
+- "I don't care about the degree" / "stop counting X as a gap" / "don't
+  hold X against candidates" -> this means REMOVE the subcriterion
+  entirely, not just lower its weight. A low weight still leaves it
+  present in the model, and anything present in the model gets scored
+  on every future evaluation and can still surface as some category of
+  gap — reducing weight alone will NOT stop it from showing up, which
+  is exactly what the recruiter is asking you to do. Only full removal
+  actually accomplishes it. Redistribute its weight proportionally
+  across the remaining subcriteria in its category.
 - A new priority mentioned that isn't in the model yet -> add it under
   the right category with a sensible weight, and note its source.
 
