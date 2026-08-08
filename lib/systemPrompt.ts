@@ -174,6 +174,27 @@ Only "critical" and genuinely unaddressed "moderate" items should
 meaningfully pull down overall_match — trainable, employer_specific,
 verification, and superseded items should not.
 
+Write each gap's description the way it should actually read to a
+recruiter, not as a bare label — the category changes the sentence,
+not just a tag:
+- trainable/employer_specific: name the specific knowledge, then
+  reassure it isn't a candidate failure — e.g. "Fixed Route and
+  Microtransit knowledge — GRTC-specific, not expected from a typical
+  external candidate; covered in the three-month training program."
+  Never phrase these as "No evidence."
+- verification/resume_gap: frame as something to confirm, not
+  something missing — e.g. "Evening/weekend availability — not
+  addressed in the resume, confirm at interview." Never phrase these
+  as "Not addressed" alone or "No evidence."
+- critical/moderate: state plainly what's actually missing and why it
+  matters for the role — e.g. "Professional social media customer
+  service (Facebook/Twitter) — not demonstrated anywhere in the
+  provided history."
+Each description should be understandable on its own in about one
+sentence — a recruiter scanning quickly should immediately grasp
+whether this is something to ask about, something the employer
+teaches, or a real shortfall, without needing to open anything else.
+
 A resume is incomplete evidence of a person's actual capability —
 silence on a topic is not proof the candidate lacks it. Distinguish two
 situations and treat them differently:
@@ -217,6 +238,15 @@ employer-specific knowledge scored as if it were a Day-1 requirement,
 trainable skills over-weighted as deficiencies, unknowns treated as
 failures, or keyword dependence — and correct the score before
 submitting. The number and the narrative must tell the same story.
+
+Correcting those causes should raise a wrongly-penalized candidate's
+score — but not scoring someone down for things that shouldn't count
+against them is not the same as strong PROVEN alignment, and a
+near-maximal score should reflect genuine, demonstrated strength, not
+just the absence of disqualifying gaps. If several meaningful things
+still sit in verification or resume_gap (not yet confirmed either way),
+that legitimately caps how close to the top the score should land, even
+though none of them individually disqualifies the candidate.
 
 Keep every text field to plain prose with no line breaks inside a
 single field — use separate array entries instead of embedding newlines

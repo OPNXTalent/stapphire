@@ -63,6 +63,12 @@ const GAP_CATEGORY_ORDER: GapItem['category'][] = [
   'superseded'
 ];
 
+const STATUS_BADGE: Record<string, { icon: string; label: string; tier: string }> = {
+  greenlight: { icon: '🟢', label: 'Recommend Interview', tier: 'Strong Match' },
+  consider: { icon: '🟡', label: 'Consider', tier: 'Possible Match' },
+  decline: { icon: '🔴', label: 'Decline', tier: 'Limited Match' }
+};
+
 function facetTier(score: number): 'strong' | 'moderate' | 'limited' {
   if (score >= 85) return 'strong';
   if (score >= 69) return 'moderate';
@@ -112,6 +118,7 @@ export function MatrixPanel({
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [dispositionFilter, setDispositionFilter] = useState<string[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [fullEvidenceOpen, setFullEvidenceOpen] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (expandedId && !candidateMessagesLoaded[expandedId]) {
@@ -245,7 +252,12 @@ export function MatrixPanel({
     setJdListening(true);
   }
 
-  function handlePrint() {
+  function handlePrint(candidateId?: string) {
+    if (candidateId && !fullEvidenceOpen[candidateId]) {
+      setFullEvidenceOpen((prev) => ({ ...prev, [candidateId]: true }));
+      setTimeout(() => window.print(), 50);
+      return;
+    }
     window.print();
   }
 
@@ -785,36 +797,97 @@ export function MatrixPanel({
 
                   {isOpen && (
                     <div className="matrix-row-body">
-                      {evalu.job_description_match !== null && evalu.job_description_match !== undefined && (
-                        <div className="dual-match-row">
-                          <div className="dual-match-item">
-                            <span className="signal-label">Job Description Match</span>
-                            <span className="dual-match-num">{evalu.job_description_match}%</span>
-                          </div>
-                          <div className="dual-match-item">
-                            <span className="signal-label">Hiring Profile Match</span>
-                            <span className="dual-match-num dual-match-primary">
-                              {evalu.overall_match}%
-                              {c.evaluations.length > 1 &&
-                                (() => {
-                                  const delta = evalu.overall_match - c.evaluations[1].overall_match;
-                                  if (delta === 0) return null;
-                                  return (
-                                    <span className={`match-delta ${delta > 0 ? 'match-delta-up' : 'match-delta-down'}`}>
-                                      {delta > 0 ? '↑' : '↓'} {Math.abs(delta)}
-                                    </span>
-                                  );
-                                })()}
-                            </span>
-                          </div>
+                      <div className="candidate-decision-header">
+                        <div className="candidate-decision-score">
+                          <span className="candidate-decision-num">{evalu.overall_match}%</span>
+                          <span className="candidate-decision-tier">{STATUS_BADGE[evalu.status]?.tier ?? ''}</span>
                         </div>
-                      )}
+                        <div className={`candidate-decision-badge candidate-decision-badge-${evalu.status}`}>
+                          <span>{STATUS_BADGE[evalu.status]?.icon}</span>
+                          {STATUS_BADGE[evalu.status]?.label ?? evalu.status}
+                        </div>
+                      </div>
 
                       {evalu.resume_gap_flag && (
                         <div className="risk-note flagged" style={{ marginBottom: 16 }}>
                           Résumé Gap: {evalu.resume_gap_flag}
                         </div>
                       )}
+
+                      {evalu.strengths?.length > 0 && (
+                        <>
+                          <div className="section-label">Why</div>
+                          <ul className="plain evidence" style={{ marginBottom: 16 }}>
+                            {evalu.strengths.map((s, idx) => (
+                              <li key={idx}>{s}</li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+
+                      {(() => {
+                        const verify = (evalu.gaps_structured ?? []).filter(
+                          (g) => g.category === 'verification' || g.category === 'resume_gap'
+                        );
+                        if (verify.length === 0) return null;
+                        return (
+                          <>
+                            <div className="section-label">What to Verify</div>
+                            <ul className="plain verify-list" style={{ marginBottom: 16 }}>
+                              {verify.map((g, idx) => (
+                                <li key={idx}>{g.description}</li>
+                              ))}
+                            </ul>
+                          </>
+                        );
+                      })()}
+
+                      {(() => {
+                        const trainable = (evalu.gaps_structured ?? []).filter(
+                          (g) => g.category === 'trainable' || g.category === 'employer_specific'
+                        );
+                        if (trainable.length === 0) return null;
+                        return (
+                          <>
+                            <div className="section-label">Trainable After Hire</div>
+                            <ul className="plain trainable-list" style={{ marginBottom: 16 }}>
+                              {trainable.map((g, idx) => (
+                                <li key={idx}>{g.description}</li>
+                              ))}
+                            </ul>
+                          </>
+                        );
+                      })()}
+
+                      {(() => {
+                        const realGaps = (evalu.gaps_structured ?? []).filter(
+                          (g) => g.category === 'critical' || g.category === 'moderate'
+                        );
+                        if (realGaps.length === 0 && !evalu.gaps_structured) {
+                          // fall back to legacy flat gaps for old evaluations
+                          return evalu.gaps?.length > 0 ? (
+                            <>
+                              <div className="section-label">Gap</div>
+                              <ul className="plain gaps" style={{ marginBottom: 16 }}>
+                                {evalu.gaps.map((g, idx) => (
+                                  <li key={idx}>{g}</li>
+                                ))}
+                              </ul>
+                            </>
+                          ) : null;
+                        }
+                        if (realGaps.length === 0) return null;
+                        return (
+                          <>
+                            <div className="section-label">Gap</div>
+                            <ul className="plain gaps" style={{ marginBottom: 16 }}>
+                              {realGaps.map((g, idx) => (
+                                <li key={idx}>{g.description}</li>
+                              ))}
+                            </ul>
+                          </>
+                        );
+                      })()}
 
                       <div className="section-label">Additional Candidate Context</div>
                       <div className="discovery-chat" onClick={(e) => e.stopPropagation()}>
@@ -917,127 +990,151 @@ export function MatrixPanel({
                         </div>
                       </div>
 
-                      {evalu.context_assessment && (
-                        <>
-                          {(evalu.context_assessment.newly_established?.length ?? 0) > 0 && (
-                            <>
-                              <div className="section-label">Newly Established</div>
-                              <ul className="plain evidence">
-                                {evalu.context_assessment!.newly_established!.map((s, idx) => (
-                                  <li key={idx}>{s}</li>
-                                ))}
-                              </ul>
-                            </>
-                          )}
-                          {(evalu.context_assessment.strengthened?.length ?? 0) > 0 && (
-                            <>
-                              <div className="section-label">Strengthened</div>
-                              <ul className="plain evidence">
-                                {evalu.context_assessment!.strengthened!.map((s, idx) => (
-                                  <li key={idx}>{s}</li>
-                                ))}
-                              </ul>
-                            </>
-                          )}
-                          {(evalu.context_assessment.still_unverified?.length ?? 0) > 0 && (
-                            <>
-                              <div className="section-label">Still Unverified</div>
-                              <ul className="plain gaps">
-                                {evalu.context_assessment!.still_unverified!.map((s, idx) => (
-                                  <li key={idx}>{s}</li>
-                                ))}
-                              </ul>
-                            </>
-                          )}
-                          {(evalu.context_assessment.new_concerns?.length ?? 0) > 0 && (
-                            <>
-                              <div className="section-label">New Concerns</div>
-                              <ul className="plain gaps">
-                                {evalu.context_assessment!.new_concerns!.map((s, idx) => (
-                                  <li key={idx}>{s}</li>
-                                ))}
-                              </ul>
-                            </>
-                          )}
-                        </>
-                      )}
+                      <button
+                        type="button"
+                        className="full-evidence-toggle"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFullEvidenceOpen((prev) => ({ ...prev, [c.id]: !prev[c.id] }));
+                        }}
+                      >
+                        {fullEvidenceOpen[c.id] ? 'Hide Full Evidence ▴' : 'View Full Evidence ▾'}
+                      </button>
 
-                      {Object.keys(evalu.matrix_dimensions ?? {}).length > 0 && (
-                        <>
-                          <div className="section-label">Job-Specific Fit</div>
-                          <div className="signal-row">
-                            {Object.entries(evalu.matrix_dimensions).map(([k, v]) => (
-                              <div className="signal-chip" key={k}>
-                                <span className="signal-label">{k}</span>
-                                <span className="signal-value">{v}</span>
+                      {fullEvidenceOpen[c.id] && (
+                        <div className="full-evidence-panel" onClick={(e) => e.stopPropagation()}>
+                          {evalu.job_description_match !== null && evalu.job_description_match !== undefined && (
+                            <div className="dual-match-row">
+                              <div className="dual-match-item">
+                                <span className="signal-label">Job Description Match</span>
+                                <span className="dual-match-num">{evalu.job_description_match}%</span>
                               </div>
-                            ))}
-                          </div>
-                        </>
-                      )}
+                              <div className="dual-match-item">
+                                <span className="signal-label">Hiring Profile Match</span>
+                                <span className="dual-match-num dual-match-primary">
+                                  {evalu.overall_match}%
+                                  {c.evaluations.length > 1 &&
+                                    (() => {
+                                      const delta = evalu.overall_match - c.evaluations[1].overall_match;
+                                      if (delta === 0) return null;
+                                      return (
+                                        <span className={`match-delta ${delta > 0 ? 'match-delta-up' : 'match-delta-down'}`}>
+                                          {delta > 0 ? '↑' : '↓'} {Math.abs(delta)}
+                                        </span>
+                                      );
+                                    })()}
+                                </span>
+                              </div>
+                            </div>
+                          )}
 
-                      {Object.keys(evalu.signals ?? {}).length > 0 && (
-                        <>
-                          <div className="section-label">Evaluation Signals</div>
-                          <div className="signal-row">
-                            {Object.entries(evalu.signals).map(
-                              ([k, v]) =>
-                                v && (
-                                  <div className="signal-chip" key={k}>
-                                    <span className="signal-label">{k.replace(/_/g, ' ')}</span>
-                                    <span className="signal-value">{v}</span>
-                                  </div>
-                                )
-                            )}
-                          </div>
-                        </>
-                      )}
-
-                      <div className="two-col">
-                        <div>
-                          <div className="section-label">Evidence</div>
-                          <ul className="plain evidence">
-                            {evalu.strengths?.map((s, idx) => (
-                              <li key={idx}>{s}</li>
-                            ))}
-                          </ul>
-                        </div>
-                        <div>
-                          <div className="section-label">Gaps</div>
-                          {evalu.gaps_structured && evalu.gaps_structured.length > 0 ? (
-                            GAP_CATEGORY_ORDER.map((cat) => {
-                              const items = evalu.gaps_structured!.filter((g) => g.category === cat);
-                              if (items.length === 0) return null;
-                              return (
-                                <div key={cat} className="gap-category-group">
-                                  <div className="gap-category-label">{GAP_CATEGORY_LABELS[cat]}</div>
-                                  <ul className="plain gaps">
-                                    {items.map((g, idx) => (
-                                      <li key={idx}>{g.description}</li>
+                          {evalu.context_assessment && (
+                            <>
+                              {(evalu.context_assessment.newly_established?.length ?? 0) > 0 && (
+                                <>
+                                  <div className="section-label">Newly Established</div>
+                                  <ul className="plain evidence">
+                                    {evalu.context_assessment!.newly_established!.map((s, idx) => (
+                                      <li key={idx}>{s}</li>
                                     ))}
                                   </ul>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <ul className="plain gaps">
-                              {evalu.gaps?.map((g, idx) => (
-                                <li key={idx}>{g}</li>
-                              ))}
-                            </ul>
+                                </>
+                              )}
+                              {(evalu.context_assessment.strengthened?.length ?? 0) > 0 && (
+                                <>
+                                  <div className="section-label">Strengthened</div>
+                                  <ul className="plain evidence">
+                                    {evalu.context_assessment!.strengthened!.map((s, idx) => (
+                                      <li key={idx}>{s}</li>
+                                    ))}
+                                  </ul>
+                                </>
+                              )}
+                              {(evalu.context_assessment.still_unverified?.length ?? 0) > 0 && (
+                                <>
+                                  <div className="section-label">Still Unverified</div>
+                                  <ul className="plain gaps">
+                                    {evalu.context_assessment!.still_unverified!.map((s, idx) => (
+                                      <li key={idx}>{s}</li>
+                                    ))}
+                                  </ul>
+                                </>
+                              )}
+                              {(evalu.context_assessment.new_concerns?.length ?? 0) > 0 && (
+                                <>
+                                  <div className="section-label">New Concerns</div>
+                                  <ul className="plain gaps">
+                                    {evalu.context_assessment!.new_concerns!.map((s, idx) => (
+                                      <li key={idx}>{s}</li>
+                                    ))}
+                                  </ul>
+                                </>
+                              )}
+                            </>
+                          )}
+
+                          {Object.keys(evalu.matrix_dimensions ?? {}).length > 0 && (
+                            <>
+                              <div className="section-label">Job-Specific Fit</div>
+                              <div className="signal-row">
+                                {Object.entries(evalu.matrix_dimensions).map(([k, v]) => (
+                                  <div className="signal-chip" key={k}>
+                                    <span className="signal-label">{k}</span>
+                                    <span className="signal-value">{v}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          )}
+
+                          {Object.keys(evalu.signals ?? {}).length > 0 && (
+                            <>
+                              <div className="section-label">Evaluation Signals</div>
+                              <div className="signal-row">
+                                {Object.entries(evalu.signals).map(
+                                  ([k, v]) =>
+                                    v && (
+                                      <div className="signal-chip" key={k}>
+                                        <span className="signal-label">{k.replace(/_/g, ' ')}</span>
+                                        <span className="signal-value">{v}</span>
+                                      </div>
+                                    )
+                                )}
+                              </div>
+                            </>
+                          )}
+
+                          {evalu.gaps_structured && evalu.gaps_structured.length > 0 && (
+                            <>
+                              <div className="section-label">All Gaps, Categorized</div>
+                              {GAP_CATEGORY_ORDER.map((cat) => {
+                                const items = evalu.gaps_structured!.filter((g) => g.category === cat);
+                                if (items.length === 0) return null;
+                                return (
+                                  <div key={cat} className="gap-category-group">
+                                    <div className="gap-category-label">{GAP_CATEGORY_LABELS[cat]}</div>
+                                    <ul className="plain gaps">
+                                      {items.map((g, idx) => (
+                                        <li key={idx}>{g.description}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                );
+                              })}
+                            </>
+                          )}
+
+                          {evalu.risk_flags?.length > 0 && (
+                            <>
+                              <div className="section-label">Risk Flags</div>
+                              <ul className="plain gaps">
+                                {evalu.risk_flags.map((r, idx) => (
+                                  <li key={idx}>{r}</li>
+                                ))}
+                              </ul>
+                            </>
                           )}
                         </div>
-                      </div>
-
-                      {evalu.risk_flags?.length > 0 && (
-                        <>
-                          <div className="section-label">Risk Flags</div>
-                          <ul className="plain gaps">
-                            {evalu.risk_flags.map((r, idx) => (
-                              <li key={idx}>{r}</li>
-                            ))}
-                          </ul>
-                        </>
                       )}
 
                       <div className="matrix-row-actions">
@@ -1058,7 +1155,7 @@ export function MatrixPanel({
                           className="qa-btn-text qa-btn-icon"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handlePrint();
+                            handlePrint(c.id);
                           }}
                         >
                           <span className="qa-btn-icon-glyph">🖨</span>

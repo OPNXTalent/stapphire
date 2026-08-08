@@ -472,6 +472,34 @@
   }
   .dual-match-num{ font-family: var(--font-mono); font-weight:700; font-size:18px; color: var(--ink-soft); }
   .dual-match-primary{ color: var(--sapphire); }
+
+  /* Decision header — the 15-second-scan summary */
+  .candidate-decision-header{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding-bottom:16px; margin-bottom:16px; border-bottom:2px solid var(--line-strong);
+  }
+  .candidate-decision-score{ display:flex; align-items:baseline; gap:9px; }
+  .candidate-decision-num{ font-family: var(--font-mono); font-weight:800; font-size:30px; color: var(--deep); }
+  .candidate-decision-tier{ font-size:13px; font-weight:600; color: var(--ink-soft); }
+  .candidate-decision-badge{
+    display:flex; align-items:center; gap:7px; flex-shrink:0;
+    font-family: var(--font-mono); font-size:12px; font-weight:700; letter-spacing:0.02em;
+    padding:7px 14px; border-radius:16px;
+  }
+  .candidate-decision-badge-greenlight{ background:#E3F5E9; color:#1B7A3D; }
+  .candidate-decision-badge-consider{ background:#FDF3DC; color:#92660A; }
+  .candidate-decision-badge-decline{ background:#FBE7E7; color:#B02A2A; }
+
+  ul.plain.verify-list li::before{ background:#C08A1E; }
+  ul.plain.trainable-list li::before{ background: var(--sapphire); }
+
+  .full-evidence-toggle{
+    display:block; width:100%; text-align:left; background:none; border:none; cursor:pointer;
+    font-family: var(--font-mono); font-size:11px; font-weight:600; letter-spacing:0.03em;
+    color: var(--sapphire); padding:8px 0; margin-bottom:4px; border-top:1px solid var(--line);
+  }
+  .full-evidence-toggle:hover{ color: var(--deep); }
+  .full-evidence-panel{ padding-top:8px; animation: cardEnter 0.15s ease; }
   .match-delta{ font-family: var(--font-mono); font-size:12px; font-weight:600; margin-left:8px; }
   .match-delta-up{ color: var(--green); }
   .match-delta-down{ color: var(--red); }
@@ -833,7 +861,7 @@
     @page{ margin: 0.6in; }
 
     .brand, .req-panel, .side-panel, .pull-tab,
-    .matrix-toggle, .matrix-role-pane, .filter-row, .bulk-bar, .matrix-row-actions{
+    .matrix-toggle, .matrix-role-pane, .filter-row, .bulk-bar, .matrix-row-actions, .full-evidence-toggle{
       display:none !important;
     }
     .print-header{ display:flex !important; padding-bottom:14px; margin-bottom:20px; border-bottom:2px solid var(--sapphire); }
