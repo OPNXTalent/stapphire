@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { anthropic, EVALUATION_MODEL } from '@/lib/anthropic';
 import { extractTextFromBuffer } from '@/lib/extractText';
+import { reevaluateCandidate } from '@/lib/reevaluateCandidate';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -179,9 +180,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .from('candidate_discovery_messages')
       .insert({ candidate_id: params.id, role: 'assistant', content: reply });
 
+    const contextChanged = updatedContext.trim() !== (candidate.additional_context ?? '').trim();
     await supabaseAdmin.from('candidates').update({ additional_context: updatedContext }).eq('id', params.id);
 
-    return NextResponse.json({ reply, updated_context: updatedContext });
+    // Course-correction, not a separate paid action — if this exchange
+    // actually changed what's known about the candidate, keep the
+    // evaluation current automatically rather than waiting for a
+    // deliberate Re-evaluate click.
+    let freshEvaluation = null;
+    if (contextChanged) {
+      const reevalResult = await reevaluateCandidate(params.id);
+      if (reevalResult.success) freshEvaluation = reevalResult.evaluation;
+    }
+
+    return NextResponse.json({ reply, updated_context: updatedContext, reevaluated: !!freshEvaluation, evaluation: freshEvaluation });
   } catch (err: any) {
     console.error('Candidate discovery failed:', err);
     return NextResponse.json({ error: err.message ?? 'Discovery failed' }, { status: 500 });

@@ -457,6 +457,11 @@
     align-self:flex-start; background: var(--paper-cool); color: var(--ink);
   }
 
+  .rescored-banner{
+    font-family: var(--font-mono); font-size:11px; font-weight:600; color: var(--green);
+    margin-top:6px; animation: cardEnter 0.2s ease;
+  }
+
   .hdm-category{ margin-bottom:14px; }
   .hdm-category:last-child{ margin-bottom:0; }
   .hdm-category-head{

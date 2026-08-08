@@ -133,6 +133,7 @@ export function MatrixPanel({
   const [candidateChatDrafts, setCandidateChatDrafts] = useState<Record<string, string>>({});
   const [candidateChatSending, setCandidateChatSending] = useState<string | null>(null);
   const [candidateChatError, setCandidateChatError] = useState<string | null>(null);
+  const [justRescored, setJustRescored] = useState<string | null>(null);
 
   const [jdAttachedFile, setJdAttachedFile] = useState<File | null>(null);
   const [jdListening, setJdListening] = useState(false);
@@ -330,6 +331,12 @@ export function MatrixPanel({
           { id: `local-reply-${Date.now()}`, role: 'assistant', content: data.reply ?? '', created_at: new Date().toISOString() }
         ]
       }));
+
+      if (data.reevaluated) {
+        setJustRescored(candidateId);
+        setTimeout(() => setJustRescored((id) => (id === candidateId ? null : id)), 3000);
+        onProfileUpdated?.();
+      }
     } catch (err: any) {
       setCandidateChatError(err?.message ?? 'Something went wrong.');
     } finally {
@@ -339,13 +346,7 @@ export function MatrixPanel({
 
   function handleReevaluateSingle(candidateId: string, name: string) {
     if (!onBulkReevaluate) return;
-    if (
-      window.confirm(
-        `Re-evaluate ${name} with this additional context? This uses 1 credit, same as a fresh evaluation.`
-      )
-    ) {
-      onBulkReevaluate([candidateId]);
-    }
+    onBulkReevaluate([candidateId]);
   }
 
   async function handleDownload(id: string) {
@@ -441,7 +442,7 @@ export function MatrixPanel({
     const ids = Array.from(selectedIds);
     if (
       window.confirm(
-        `Re-evaluate ${ids.length} candidate${ids.length !== 1 ? 's' : ''} against the current Hiring Decision Model? This uses ${ids.length} credit${ids.length !== 1 ? 's' : ''} — one per candidate, same as a fresh evaluation.`
+        `Re-evaluate ${ids.length} candidate${ids.length !== 1 ? 's' : ''} against the current Hiring Decision Model?`
       )
     ) {
       onBulkReevaluate(ids);
@@ -710,7 +711,7 @@ export function MatrixPanel({
                   onClick={handleReevaluateClick}
                   style={{ color: 'var(--deep)', borderBottomColor: 'var(--deep)' }}
                 >
-                  Re-evaluate ({selectedIds.size} credit{selectedIds.size !== 1 ? 's' : ''})
+                  Re-evaluate ({selectedIds.size})
                 </button>
               )}
               <button
@@ -910,6 +911,8 @@ export function MatrixPanel({
                           )}
                         </div>
 
+                        {justRescored === c.id && <div className="rescored-banner">↻ Re-scored based on this conversation</div>}
+
                         <div className="prompt-box" style={{ marginTop: 8 }}>
                           <textarea
                             className="prompt-input"
@@ -978,14 +981,15 @@ export function MatrixPanel({
                           {onBulkReevaluate && (
                             <div className="prompt-footer" style={{ marginTop: 6 }}>
                               <span className="upload-hint" style={{ margin: 0 }}>
-                                Free to discuss — re-evaluate separately to see it reflected in scoring.
+                                The evaluation updates automatically when this conversation changes something.
                               </span>
                               <button
                                 className="qa-btn-text"
                                 style={{ color: 'var(--deep)', borderBottomColor: 'var(--deep)' }}
                                 onClick={() => handleReevaluateSingle(c.id, c.full_name)}
+                                title="Re-run manually, e.g. after the Hiring Decision Model changed without chatting about this candidate specifically"
                               >
-                                Re-evaluate (1 credit)
+                                Re-evaluate Now
                               </button>
                             </div>
                           )}
