@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const LIMIT = 5;
+const LIMIT = 3;
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export async function GET(req: NextRequest, { params }: { params: { orgId: string } }) {

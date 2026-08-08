@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
         }
 
         // No paid credits doesn't automatically mean "blocked" — orgs
-        // trying the product get 5 free evaluations per rolling 24
+        // trying the product get 3 free evaluations per rolling 24
         // hours, checked against real timestamps rather than a
         // calendar-day reset.
         let usingFreeTrial = false;
@@ -105,10 +105,10 @@ export async function POST(req: NextRequest) {
             return;
           }
 
-          if ((count ?? 0) >= 5) {
+          if ((count ?? 0) >= 3) {
             send({
               type: 'error',
-              message: 'Free trial limit reached — 5 evaluations per 24 hours. Upgrade for more.'
+              message: 'Free trial limit reached — 3 evaluations per 24 hours. Upgrade for more.'
             });
             controller.close();
             return;
