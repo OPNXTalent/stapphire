@@ -22,6 +22,7 @@ type Evaluation = {
   job_description_match: number | null;
   status: 'greenlight' | 'consider' | 'decline';
   profile_revision?: number | null;
+  prompt_version?: string | null;
   signals: Record<string, string>;
   matrix_dimensions: Record<string, string>;
   strengths: string[];
@@ -95,6 +96,7 @@ export function MatrixPanel({
   shareToken,
   hiringProfile,
   profileRevision,
+  currentPromptVersion,
   discoverySource = 'recruiter_discovery',
   onProfileUpdated,
   onSelectCandidate,
@@ -109,6 +111,7 @@ export function MatrixPanel({
   shareToken?: string;
   hiringProfile?: unknown;
   profileRevision?: number;
+  currentPromptVersion?: string | null;
   discoverySource?: 'recruiter_discovery' | 'hiring_leader_discovery';
   onProfileUpdated?: () => void;
   onSelectCandidate: (candidateId: string | null) => void;
@@ -120,6 +123,7 @@ export function MatrixPanel({
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [dispositionFilter, setDispositionFilter] = useState<string[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [autoReevaluating, setAutoReevaluating] = useState<string | null>(null);
   const [fullEvidenceOpen, setFullEvidenceOpen] = useState<Record<string, boolean>>({});
   const [resumeTextOpen, setResumeTextOpen] = useState<Record<string, boolean>>({});
 
@@ -176,9 +180,14 @@ export function MatrixPanel({
   const currentRevision = liveRevision ?? profileRevision;
 
   function isEvalStale(evalu: Evaluation): boolean {
-    if (currentRevision === undefined) return false;
-    if (evalu.profile_revision === null || evalu.profile_revision === undefined) return currentRevision > 1;
-    return evalu.profile_revision !== currentRevision;
+    const profileStale =
+      currentRevision !== undefined &&
+      (evalu.profile_revision === null || evalu.profile_revision === undefined
+        ? currentRevision > 1
+        : evalu.profile_revision !== currentRevision);
+    const promptStale =
+      !!currentPromptVersion && evalu.prompt_version !== currentPromptVersion;
+    return profileStale || promptStale;
   }
 
   useEffect(() => {
@@ -385,13 +394,29 @@ export function MatrixPanel({
     }
   }
 
-  function handleToggleRow(id: string) {
+  async function handleToggleRow(id: string) {
     if (expandedId === id) {
       setExpandedId(null);
       onSelectCandidate(null);
     } else {
       setExpandedId(id);
       onSelectCandidate(id);
+
+      const candidate = candidates.find((c) => c.id === id);
+      const latestEval = candidate?.evaluations?.[0];
+      if (latestEval && isEvalStale(latestEval) && onBulkReevaluate) {
+        setAutoReevaluating(id);
+        try {
+          await fetch(`/api/candidates/${id}/reevaluate`, { method: 'POST' });
+          onProfileUpdated?.();
+        } catch {
+          // Silent — the stale badge just stays visible and they can
+          // still trigger it manually via bulk re-evaluate if this
+          // one-off attempt failed for any reason.
+        } finally {
+          setAutoReevaluating(null);
+        }
+      }
     }
   }
 
@@ -848,6 +873,9 @@ export function MatrixPanel({
 
                   {isOpen && (
                     <div className="matrix-row-body">
+                      {autoReevaluating === c.id && (
+                        <div className="auto-reevaluating-banner">↻ Updating with the latest scoring…</div>
+                      )}
                       <div className="candidate-decision-header">
                         <div className="candidate-decision-score">
                           <span className="candidate-decision-num">{evalu.overall_match}%</span>

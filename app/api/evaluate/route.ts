@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { createHash } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { anthropic, EVALUATION_MODEL } from '@/lib/anthropic';
-import { EVALUATION_SYSTEM_PROMPT, EVALUATION_TOOL, buildEvaluationUserMessage } from '@/lib/systemPrompt';
+import { EVALUATION_SYSTEM_PROMPT, EVALUATION_TOOL, buildEvaluationUserMessage, EVALUATION_PROMPT_VERSION } from '@/lib/systemPrompt';
 import { extractTextFromBuffer } from '@/lib/extractText';
 
 // Vercel kills serverless functions at 10s by default on the Hobby plan.
@@ -226,6 +226,7 @@ export async function POST(req: NextRequest) {
             overall_match: evaluation.overall_match,
             job_description_match: evaluation.job_description_match ?? null,
             profile_revision: requisition.profile_revision ?? null,
+            prompt_version: EVALUATION_PROMPT_VERSION,
             status: evaluation.status,
             scores: evaluation.category_scores ?? evaluation.scores ?? null,
             signals: evaluation.signals,

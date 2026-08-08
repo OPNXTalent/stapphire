@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { EVALUATION_PROMPT_VERSION } from '@/lib/systemPrompt';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return scoreB - scoreA;
   });
 
-  return NextResponse.json({ requisition, candidates: sorted });
+  return NextResponse.json({ requisition, candidates: sorted, promptVersion: EVALUATION_PROMPT_VERSION });
 }
 
 // Permanent deletion — deliberately requires the requisition to already

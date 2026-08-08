@@ -2,6 +2,8 @@
 // for Stapphire and must never be composed with, or fall back to, any
 // other product's system prompt (e.g. Prism's).
 
+import { createHash } from 'crypto';
+
 export const EVALUATION_SYSTEM_PROMPT = `
 You are a hiring evaluation engine inside a Quality Control workspace for
 talent acquisition teams. You do not make hiring decisions. You surface
@@ -303,6 +305,15 @@ are signals for the matrix, not a hiring recommendation — never use
 language like "Recommend Interview" anywhere in the output; that
 decision belongs to the human reviewer.
 `.trim();
+
+// Automatically derived from the prompt text itself — any change to
+// EVALUATION_SYSTEM_PROMPT (a scoring-logic fix, a new instruction,
+// anything) produces a new version with zero risk of forgetting to
+// bump a manual counter. Every evaluation stores the version that
+// produced it, so the app can tell exactly which candidates were
+// scored under an older version of the reasoning and needs no human
+// to remember when a fix shipped.
+export const EVALUATION_PROMPT_VERSION = createHash('sha256').update(EVALUATION_SYSTEM_PROMPT).digest('hex').slice(0, 12);
 
 // Forcing output through a tool call (rather than asking the model to
 // write JSON as free text) guarantees well-formed, schema-conforming

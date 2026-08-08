@@ -34,6 +34,7 @@ function DashboardContent() {
 
   const [requisition, setRequisition] = useState<any>(null);
   const [org, setOrg] = useState<any>(null);
+  const [promptVersion, setPromptVersion] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [trashedCandidates, setTrashedCandidates] = useState<any[]>([]);
   const [activeCandidateId, setActiveCandidateId] = useState<string | null>(null);
@@ -62,6 +63,7 @@ function DashboardContent() {
     setRequisition(data.requisition);
     setCandidates(data.candidates ?? []);
     setOrg(data.requisition?.organizations ?? null);
+    setPromptVersion(data.promptVersion ?? null);
   }, [requisitionId]);
 
   const loadTrash = useCallback(async () => {
@@ -330,6 +332,7 @@ function DashboardContent() {
               shareToken={requisition.share_token}
               hiringProfile={requisition.evaluation_pillars}
               profileRevision={requisition.profile_revision}
+              currentPromptVersion={promptVersion}
               discoverySource="recruiter_discovery"
               onProfileUpdated={loadRequisition}
               onSelectCandidate={setActiveCandidateId}

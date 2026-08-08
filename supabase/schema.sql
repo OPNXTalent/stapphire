@@ -172,6 +172,11 @@ create table evaluations (
   -- set when the résumé alone materially underrepresents the
   -- candidate's actual fit once additional context is factored in
   resume_gap_flag text,
+  -- hash of the exact EVALUATION_SYSTEM_PROMPT that produced this
+  -- score — lets the app detect when a scoring-logic fix has shipped
+  -- since this evaluation ran, independent of the Hiring Decision
+  -- Model's own revision tracking
+  prompt_version text,
   status text not null check (status in ('greenlight','consider','decline')),
 
   scores jsonb not null,              -- job_responsibilities, hard_skills, soft_skills, keyword_relevance

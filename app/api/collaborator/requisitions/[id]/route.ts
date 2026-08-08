@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabaseServerClient';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { EVALUATION_PROMPT_VERSION } from '@/lib/systemPrompt';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -57,5 +58,5 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return scoreB - scoreA;
   });
 
-  return NextResponse.json({ requisition, candidates: sorted, accessLevel: grant.access_level });
+  return NextResponse.json({ requisition, candidates: sorted, accessLevel: grant.access_level, promptVersion: EVALUATION_PROMPT_VERSION });
 }

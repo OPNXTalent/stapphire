@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { anthropic, EVALUATION_MODEL } from '@/lib/anthropic';
-import { EVALUATION_SYSTEM_PROMPT, EVALUATION_TOOL, buildEvaluationUserMessage } from '@/lib/systemPrompt';
+import { EVALUATION_SYSTEM_PROMPT, EVALUATION_TOOL, buildEvaluationUserMessage, EVALUATION_PROMPT_VERSION } from '@/lib/systemPrompt';
 import { extractTextFromBuffer } from '@/lib/extractText';
 
 // Re-running an evaluation against a candidate you've already paid to
@@ -85,6 +85,7 @@ export async function reevaluateCandidate(
       additional_context_snapshot: candidate.additional_context ?? null,
       context_assessment: evaluation.context_assessment ?? null,
       resume_gap_flag: evaluation.resume_gap_flag ?? null,
+      prompt_version: EVALUATION_PROMPT_VERSION,
       status: evaluation.status,
       scores: evaluation.category_scores ?? evaluation.scores ?? null,
       signals: evaluation.signals,

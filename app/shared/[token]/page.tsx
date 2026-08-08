@@ -26,6 +26,7 @@ function storageKey(token: string) {
 
 export default function SharedRequisitionPage({ params }: { params: { token: string } }) {
   const [requisition, setRequisition] = useState<any>(null);
+  const [promptVersion, setPromptVersion] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [trashedCandidates, setTrashedCandidates] = useState<any[]>([]);
   const [activeCandidateId, setActiveCandidateId] = useState<string | null>(null);
@@ -83,6 +84,7 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
     const data = await res.json();
     setRequisition(data.requisition);
     setCandidates(data.candidates ?? []);
+    setPromptVersion(data.promptVersion ?? null);
   }, [params.token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadTrash = useCallback(async () => {
@@ -214,6 +216,7 @@ export default function SharedRequisitionPage({ params }: { params: { token: str
             requisitionTitle={requisition.title}
             hiringProfile={requisition.evaluation_pillars}
             profileRevision={requisition.profile_revision}
+            currentPromptVersion={promptVersion}
             discoverySource="hiring_leader_discovery"
             onProfileUpdated={load}
             onSelectCandidate={setActiveCandidateId}

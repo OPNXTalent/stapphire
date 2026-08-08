@@ -646,6 +646,11 @@
     background:#FDF3DC; border:1px solid #E8C871; border-radius: var(--radius);
     padding:10px 14px; margin-bottom:12px; font-size:12px; color:#6B4A0A;
   }
+  .auto-reevaluating-banner{
+    font-family: var(--font-mono); font-size:11px; font-weight:600; color: var(--sapphire);
+    background: var(--sapphire-pale); border-radius: var(--radius); padding:8px 12px; margin-bottom:14px;
+    animation: cardEnter 0.15s ease;
+  }
   .rec-pill.greenlight{ background: var(--green-tint); color: var(--green); }
   .rec-pill.consider{ background: var(--amber-tint); color: var(--amber); }
   .rec-pill.decline{ background: var(--red-tint); color: var(--red); }

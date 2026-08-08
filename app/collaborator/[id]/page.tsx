@@ -13,6 +13,7 @@ export default function CollaboratorRequisitionPage({ params }: { params: { id: 
   const router = useRouter();
   const [requisition, setRequisition] = useState<any>(null);
   const [candidates, setCandidates] = useState<any[]>([]);
+  const [promptVersion, setPromptVersion] = useState<string | null>(null);
   const [collaboratorName, setCollaboratorName] = useState('');
   const [activeCandidateId, setActiveCandidateId] = useState<string | null>(null);
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -44,6 +45,7 @@ export default function CollaboratorRequisitionPage({ params }: { params: { id: 
 
     setRequisition(reqData.requisition);
     setCandidates(reqData.candidates ?? []);
+    setPromptVersion(reqData.promptVersion ?? null);
     setCollaboratorName(profileData.full_name ?? profileData.email ?? 'You');
   }, [params.id, router]);
 
@@ -112,6 +114,7 @@ export default function CollaboratorRequisitionPage({ params }: { params: { id: 
             requisitionTitle={requisition.title}
             hiringProfile={requisition.evaluation_pillars}
             profileRevision={requisition.profile_revision}
+            currentPromptVersion={promptVersion}
             discoverySource="hiring_leader_discovery"
             onProfileUpdated={load}
             onSelectCandidate={setActiveCandidateId}
