@@ -26,6 +26,19 @@ under Hard Skills: "Oracle Fusion", "SQL", not just "technical
 skills"). A category may have zero subcriteria if the JD gives it
 nothing, but do not force subcriteria into a category that doesn't fit.
 
+Consolidate aggressively — a JD often names several related tools,
+systems, or terms that are really facets of ONE underlying competency
+(e.g. a transit posting mentioning route names, a tracking app, a
+reporting tool, and a scheduling system by name is really just
+"employer-specific operational systems knowledge," not four separate
+requirements). Keep each category to roughly 4-7 subcriteria; if you're
+about to write an eighth, look for two that are actually the same
+competency stated twice and merge them. Every extra granular line item
+for the same underlying thing multiplies its effective weight in a
+candidate's score even when each one individually gets scored
+leniently — so the consolidation has to happen here, at the structural
+level, not just hoped for at scoring time.
+
 Weight every subcriterion using contextual judgment — frequency of
 mention, emphasis, placement, required-vs-preferred language, scope of
 responsibility, apparent business impact, technical specificity,

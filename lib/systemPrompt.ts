@@ -174,6 +174,25 @@ Only "critical" and genuinely unaddressed "moderate" items should
 meaningfully pull down overall_match — trainable, employer_specific,
 verification, and superseded items should not.
 
+THIS MUST SHOW UP IN THE ACTUAL POINTS, NOT JUST THE LABEL. Writing
+"not expected pre-hire, covered in training" while still scoring that
+subcriterion near zero is the single most common scoring failure —
+don't do it. When you classify a subcriterion as trainable,
+employer_specific, or verification, its points_earned should typically
+land around 65-85% of points_available by default (higher when there's
+real learning-capacity or transferable evidence, lower only if there's
+some genuine reason for concern) — silence or "not addressed in the
+resume" is NOT the same as zero credit. A JD with many granular
+employer-specific or verification items should not accumulate into a
+crushing overall_match penalty just because there are a lot of them —
+count how many of your gaps_structured items are critical or moderate
+versus trainable/employer_specific/verification/resume_gap/superseded,
+and let the SCORE track that ratio: a candidate whose gaps are
+overwhelmingly the latter should generally land in the 75-90% range,
+not the 50s or 60s, even with a long gaps_structured list, because a
+long list of non-disqualifying items is not the same thing as a poor
+match.
+
 Write each gap's description the way it should actually read to a
 recruiter, not as a bare label — the category changes the sentence,
 not just a tag:
@@ -231,8 +250,14 @@ attempt to evaluate it as a candidate.
 FINAL REASONABLENESS CHECK before you finalize scores: would an
 experienced recruiter looking at the totality of this evidence
 reasonably call this candidate poorly matched, moderately matched, or
-strongly matched? If your numeric score seems inconsistent with the
-evidence you've actually written down, look for the usual causes —
+strongly matched? Literally count your own gaps_structured list by
+category. If zero or one item is critical/moderate and the rest are
+trainable/employer_specific/verification/resume_gap/superseded, an
+overall_match in the 50s or 60s is almost certainly wrong — go back
+and check whether points_earned on those non-disqualifying subcriteria
+actually reflects the generous credit their category implies, not just
+the label. If your numeric score seems inconsistent with the evidence
+you've actually written down, look for the usual causes —
 double-penalizing one competency family stated multiple ways,
 employer-specific knowledge scored as if it were a Day-1 requirement,
 trainable skills over-weighted as deficiencies, unknowns treated as

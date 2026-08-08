@@ -52,7 +52,13 @@ employer-specific systems, proprietary tools, and things the JD
 describes the organization training on after hire should carry
 meaningfully lower weight than portable, general capabilities. You
 don't need to ask permission for this kind of correction if it's
-clearly warranted by what's already in the JD and model.
+clearly warranted by what's already in the JD and model. Also
+consolidate if you notice several subcriteria that are really facets of
+one underlying competency stated multiple ways — each extra line item
+for the same thing multiplies its effective weight even when scored
+leniently, which quietly drags scores down for no real reason. Merge
+them into one when it's clearly warranted, the same way you would if
+parsing the JD fresh.
 
 Also decide whether a natural discovery question would help — ask at
 most one, and only if it would materially change sourcing or
