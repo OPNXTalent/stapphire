@@ -87,11 +87,18 @@ export function MatrixPanel({
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [dispositionFilter, setDispositionFilter] = useState<string[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (expandedId && !candidateMessagesLoaded[expandedId]) {
+      loadCandidateMessages(expandedId);
+    }
+  }, [expandedId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [downloading, setDownloading] = useState<string | null>(null);
-  const [contextDrafts, setContextDrafts] = useState<Record<string, string>>({});
-  const [savingContext, setSavingContext] = useState<string | null>(null);
-  const [contextSaved, setContextSaved] = useState<string | null>(null);
-  const [contextError, setContextError] = useState<string | null>(null);
+  const [candidateMessages, setCandidateMessages] = useState<Record<string, DiscoveryMessage[]>>({});
+  const [candidateMessagesLoaded, setCandidateMessagesLoaded] = useState<Record<string, boolean>>({});
+  const [candidateChatDrafts, setCandidateChatDrafts] = useState<Record<string, string>>({});
+  const [candidateChatSending, setCandidateChatSending] = useState<string | null>(null);
+  const [candidateChatError, setCandidateChatError] = useState<string | null>(null);
   const [localDisposition, setLocalDisposition] = useState<Record<string, string>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDisposition, setBulkDisposition] = useState('');
@@ -168,30 +175,47 @@ export function MatrixPanel({
     window.print();
   }
 
-  function contextValue(c: Candidate): string {
-    return contextDrafts[c.id] ?? c.additional_context ?? '';
+  async function loadCandidateMessages(candidateId: string) {
+    const res = await fetch(`/api/candidates/${candidateId}/discovery`, { cache: 'no-store' });
+    const data = await res.json();
+    setCandidateMessages((prev) => ({ ...prev, [candidateId]: data.messages ?? [] }));
+    setCandidateMessagesLoaded((prev) => ({ ...prev, [candidateId]: true }));
   }
 
-  async function handleSaveContext(candidateId: string) {
-    setSavingContext(candidateId);
-    setContextSaved(null);
-    setContextError(null);
+  async function handleSendCandidateChat(candidateId: string) {
+    const text = (candidateChatDrafts[candidateId] ?? '').trim();
+    if (!text || candidateChatSending === candidateId) return;
+    setCandidateChatDrafts((prev) => ({ ...prev, [candidateId]: '' }));
+    setCandidateChatSending(candidateId);
+    setCandidateChatError(null);
+    setCandidateMessages((prev) => ({
+      ...prev,
+      [candidateId]: [
+        ...(prev[candidateId] ?? []),
+        { id: `local-${Date.now()}`, role: 'user', content: text, created_at: new Date().toISOString() }
+      ]
+    }));
+
     try {
-      const res = await fetch(`/api/candidates/${candidateId}/context`, {
-        method: 'PATCH',
+      const res = await fetch(`/api/candidates/${candidateId}/discovery`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ additional_context: contextDrafts[candidateId] ?? '' })
+        body: JSON.stringify({ message: text })
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Failed to save');
-      }
-      setContextSaved(candidateId);
-      setTimeout(() => setContextSaved((id) => (id === candidateId ? null : id)), 2000);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Discovery failed');
+
+      setCandidateMessages((prev) => ({
+        ...prev,
+        [candidateId]: [
+          ...(prev[candidateId] ?? []),
+          { id: `local-reply-${Date.now()}`, role: 'assistant', content: data.reply ?? '', created_at: new Date().toISOString() }
+        ]
+      }));
     } catch (err: any) {
-      setContextError(err?.message ?? 'Something went wrong saving this.');
+      setCandidateChatError(err?.message ?? 'Something went wrong.');
     } finally {
-      setSavingContext(null);
+      setCandidateChatSending(null);
     }
   }
 
@@ -611,46 +635,65 @@ export function MatrixPanel({
                       )}
 
                       <div className="section-label">Additional Candidate Context</div>
-                      <div className="prompt-box" style={{ marginBottom: 16 }} onClick={(e) => e.stopPropagation()}>
-                        <textarea
-                          className="prompt-input"
-                          placeholder="Tell me..."
-                          value={contextValue(c)}
-                          onChange={(e) => setContextDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))}
-                          disabled={savingContext === c.id}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              handleSaveContext(c.id);
-                            }
-                          }}
-                        />
-                        <div className="prompt-footer">
-                          <span className="upload-hint" style={{ margin: 0 }}>
-                            {contextError ? (
-                              <span style={{ color: 'var(--red)' }}>{contextError}</span>
-                            ) : (
-                              'Saving does not re-score by itself — re-evaluate to see it reflected.'
-                            )}
-                          </span>
-                          <span style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
-                            <button
-                              className="qa-btn-text"
-                              disabled={savingContext === c.id}
-                              onClick={() => handleSaveContext(c.id)}
-                            >
-                              {savingContext === c.id ? 'Saving…' : contextSaved === c.id ? 'Saved ✓' : 'Save'}
-                            </button>
-                            {onBulkReevaluate && (
+                      <div className="discovery-chat" onClick={(e) => e.stopPropagation()}>
+                        <div className="discovery-messages">
+                          {!candidateMessagesLoaded[c.id] ? (
+                            <div className="trash-empty-hint">Loading…</div>
+                          ) : (candidateMessages[c.id] ?? []).length === 0 ? (
+                            <div className="trash-empty-hint">
+                              Tell me anything about this candidate that isn't on their résumé — current role, internal
+                              feedback, confirmed skills.
+                            </div>
+                          ) : (
+                            (candidateMessages[c.id] ?? []).map((m) => (
+                              <div key={m.id} className={`discovery-msg discovery-msg-${m.role}`}>
+                                {m.content}
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        <div className="prompt-box" style={{ marginTop: 8 }}>
+                          <textarea
+                            className="prompt-input"
+                            placeholder="Tell me..."
+                            value={candidateChatDrafts[c.id] ?? ''}
+                            onChange={(e) => setCandidateChatDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                            disabled={candidateChatSending === c.id}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendCandidateChat(c.id);
+                              }
+                            }}
+                          />
+                          <div className="prompt-footer">
+                            <span className="upload-hint" style={{ margin: 0 }}>
+                              {candidateChatError ? (
+                                <span style={{ color: 'var(--red)' }}>{candidateChatError}</span>
+                              ) : (
+                                'Free to discuss — re-evaluate separately to see it reflected in scoring.'
+                              )}
+                            </span>
+                            <span style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
                               <button
                                 className="qa-btn-text"
-                                style={{ color: 'var(--deep)', borderBottomColor: 'var(--deep)' }}
-                                onClick={() => handleReevaluateSingle(c.id, c.full_name)}
+                                disabled={candidateChatSending === c.id || !(candidateChatDrafts[c.id] ?? '').trim()}
+                                onClick={() => handleSendCandidateChat(c.id)}
                               >
-                                Re-evaluate (1 credit)
+                                {candidateChatSending === c.id ? 'Thinking…' : 'Send'}
                               </button>
-                            )}
-                          </span>
+                              {onBulkReevaluate && (
+                                <button
+                                  className="qa-btn-text"
+                                  style={{ color: 'var(--deep)', borderBottomColor: 'var(--deep)' }}
+                                  onClick={() => handleReevaluateSingle(c.id, c.full_name)}
+                                >
+                                  Re-evaluate (1 credit)
+                                </button>
+                              )}
+                            </span>
+                          </div>
                         </div>
                       </div>
 

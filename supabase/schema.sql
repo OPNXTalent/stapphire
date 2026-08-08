@@ -91,6 +91,22 @@ create table discovery_messages (
 );
 create index idx_discovery_requisition on discovery_messages(requisition_id, created_at);
 
+-- ── Per-candidate discovery conversation ─────────────────────────
+-- Mirrors discovery_messages but scoped to one candidate — a free,
+-- conversational way to build up Additional Candidate Context, with
+-- the same acknowledge-and-suggest pattern as the Hiring Discovery
+-- chat. This chat itself never costs a credit; actually re-scoring the
+-- candidate against what's discussed here stays a separate, explicit
+-- Re-evaluate action.
+create table candidate_discovery_messages (
+  id uuid primary key default uuid_generate_v4(),
+  candidate_id uuid not null references candidates(id) on delete cascade,
+  role text not null check (role in ('user','assistant')),
+  content text not null,
+  created_at timestamptz not null default now()
+);
+create index idx_cand_discovery_candidate on candidate_discovery_messages(candidate_id, created_at);
+
 -- ── Core object 2: Candidate (normalized profile, not the raw PDF) ─
 create table candidates (
   id uuid primary key default uuid_generate_v4(),
