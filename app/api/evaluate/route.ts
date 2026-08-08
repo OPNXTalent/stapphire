@@ -55,12 +55,17 @@ export async function POST(req: NextRequest) {
         const resumeText = await extractTextFromBuffer(buffer, file.name, file.type);
         const contentHash = createHash('sha256').update(resumeText.trim().toLowerCase()).digest('hex');
 
-        // Duplicate check — never re-evaluate, never charge twice, never mention it.
+        // Duplicate check — never re-evaluate, never charge twice, never
+        // mention it. Deliberately scoped to active candidates only: a
+        // resume that was trashed (or later permanently deleted) must
+        // never silently block or hijack a legitimate re-upload of the
+        // same file — the user can no longer even see that old row.
         const { data: existing } = await supabaseAdmin
           .from('candidates')
           .select('id, full_name, evaluations(*)')
           .eq('requisition_id', requisitionId)
           .eq('content_hash', contentHash)
+          .is('deleted_at', null)
           .maybeSingle();
 
         if (existing) {

@@ -132,9 +132,16 @@ create table candidates (
   -- editable; the value USED for any given evaluation is preserved on
   -- that evaluation row (additional_context_snapshot) for provenance,
   -- since this field itself is mutable going forward.
-  additional_context text,
-  unique (requisition_id, content_hash)
+  additional_context text
 );
+-- Duplicate detection only applies among active candidates — a trashed
+-- (or later permanently deleted) resume must never block re-uploading
+-- the same file again. A blanket table-level unique constraint here
+-- would still collide with a soft-deleted row's hash even after it's
+-- invisible everywhere in the app; this partial index scopes the
+-- uniqueness to rows that are actually still active.
+create unique index candidates_active_content_hash_idx
+  on candidates (requisition_id, content_hash) where deleted_at is null;
 
 -- ── Core object 3: Evaluation (immutable — evidence, not verdict) ──
 create table evaluations (
