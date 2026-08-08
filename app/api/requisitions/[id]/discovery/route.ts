@@ -5,7 +5,7 @@ import { HIRING_CATEGORIES, normalizeHiringProfile, normalizeProfileWeights } fr
 import { extractTextFromBuffer } from '@/lib/extractText';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const DISCOVERY_SYSTEM_PROMPT = `
 You are conducting hiring discovery with a recruiter or hiring leader —

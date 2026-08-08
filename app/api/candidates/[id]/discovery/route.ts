@@ -6,7 +6,7 @@ import { reevaluateCandidate } from '@/lib/reevaluateCandidate';
 import { HIRING_CATEGORIES, normalizeHiringProfile, normalizeProfileWeights } from '@/lib/hiringProfile';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const CANDIDATE_DISCOVERY_PROMPT = `
 You are having a discovery conversation with a recruiter or hiring

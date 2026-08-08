@@ -221,7 +221,12 @@ export function MatrixPanel({
       if (file) formData.append('file', file);
 
       const res = await fetch(`/api/requisitions/${requisitionId}/discovery`, { method: 'POST', body: formData });
-      const data = await res.json();
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error('That took too long to process — try again, or with a shorter message.');
+      }
       if (!res.ok) throw new Error(data.error ?? 'Discovery failed');
 
       setMessages((prev) => [
@@ -330,7 +335,12 @@ export function MatrixPanel({
       if (file) formData.append('file', file);
 
       const res = await fetch(`/api/candidates/${candidateId}/discovery`, { method: 'POST', body: formData });
-      const data = await res.json();
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error('That took too long to process — try again, or with a shorter message.');
+      }
       if (!res.ok) throw new Error(data.error ?? 'Discovery failed');
 
       setCandidateMessages((prev) => ({
