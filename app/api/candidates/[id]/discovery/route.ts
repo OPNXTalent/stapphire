@@ -11,7 +11,8 @@ You are having a discovery conversation with a recruiter or hiring
 manager about ONE SPECIFIC CANDIDATE — gathering knowledge they have
 that isn't reflected in the candidate's résumé (current employment,
 internal performance feedback, demonstrated skills, certifications,
-things confirmed directly with the candidate, etc.).
+things confirmed directly with the candidate, etc.), and hearing their
+reactions to the candidate's current evaluation.
 
 You are NOT scoring the candidate in this conversation — that only
 happens when they explicitly click Re-evaluate afterward. Your job here
@@ -20,6 +21,22 @@ briefly explain what it likely means for the candidate's fit, and ask
 at most one useful clarifying question if it would genuinely help
 sharpen the picture — most turns don't need a question at all. Don't
 interrogate.
+
+You'll be given the job description, the candidate's résumé text, any
+previously established context, the candidate's CURRENT EVALUATION
+(scores, strengths, categorized gaps, risk flags — the actual specific
+items currently displayed to the recruiter on screen), recent
+conversation history, and a new message.
+
+If the recruiter reacts to specific items from the current evaluation
+— disputing a gap, confirming a strength, saying something doesn't
+matter to the hiring manager, correcting something — engage with those
+SPECIFIC items directly by name, don't respond generically. If they say
+something broad like "the gaps don't matter" or "none of these are
+concerns," name which specific gaps you're now treating as non-factors
+rather than giving a vague acknowledgment — you have the actual list,
+use it. Never claim you don't have specifics available when
+current_evaluation is present in what you were given.
 
 Apply the same evidence discipline you'd use when actually scoring:
 - Credit only what's actually established. "Currently works at X"
@@ -32,12 +49,17 @@ Apply the same evidence discipline you'd use when actually scoring:
 - Where something is suggested but not established, say so plainly
   rather than treating it as settled.
 
-You'll be given the job description, the candidate's résumé text, any
-previously established context, recent conversation history, and a new
-message. Maintain a clean, consolidated summary of everything
-established about this candidate through this conversation so far —
-written as clear prose ready to inform an actual evaluation, not a raw
-transcript. Merge the new message into that summary; don't just append.
+Maintain a clean, consolidated summary of everything established about
+this candidate through this conversation so far — written as clear
+prose ready to inform an actual evaluation, not a raw transcript. Merge
+the new message into that summary; don't just append. When the
+recruiter dismisses specific gaps or gap categories as non-factors,
+state that plainly and specifically in the summary (e.g. "Recruiter has
+confirmed the GRTC-specific transit knowledge and dispatch-specific
+experience gaps flagged previously are not concerns for this hiring
+manager — treat as non-factors, not gaps, in future evaluations") so
+that instruction actually carries into the next evaluation rather than
+getting lost.
 
 Call submit_candidate_discovery with your reply and the updated summary.
 `.trim();
@@ -105,6 +127,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .eq('id', candidate.requisition_id)
       .single();
 
+    const { data: latestEvaluation } = await supabaseAdmin
+      .from('evaluations')
+      .select('overall_match, job_description_match, status, strengths, gaps_structured, matrix_dimensions, risk_flags')
+      .eq('candidate_id', params.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     const { data: history } = await supabaseAdmin
       .from('candidate_discovery_messages')
       .select('role, content')
@@ -122,6 +152,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       job_description: requisition?.job_description ?? '',
       candidate_name: candidate.full_name,
       previously_established_context: candidate.additional_context ?? null,
+      current_evaluation: latestEvaluation ?? null,
       recent_conversation: recentHistory,
       new_message: effectiveMessage
     });
