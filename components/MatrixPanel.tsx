@@ -5,6 +5,13 @@ import { DISPOSITIONS } from '@/lib/dispositions';
 import { normalizeHiringProfile, type HiringProfile } from '@/lib/hiringProfile';
 import { MultiSelectFilter } from '@/components/MultiSelectFilter';
 
+type ContextAssessment = {
+  newly_established?: string[];
+  strengthened?: string[];
+  still_unverified?: string[];
+  new_concerns?: string[];
+};
+
 type Evaluation = {
   overall_match: number;
   job_description_match: number | null;
@@ -14,6 +21,8 @@ type Evaluation = {
   strengths: string[];
   gaps: string[];
   risk_flags: string[];
+  resume_gap_flag?: string | null;
+  context_assessment?: ContextAssessment | null;
 };
 
 type Candidate = {
@@ -23,6 +32,7 @@ type Candidate = {
   source_filename: string | null;
   original_file_url: string | null;
   disposition: string | null;
+  additional_context: string | null;
   evaluations: Evaluation[];
 };
 
@@ -78,6 +88,8 @@ export function MatrixPanel({
   const [dispositionFilter, setDispositionFilter] = useState<string[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [contextDrafts, setContextDrafts] = useState<Record<string, string>>({});
+  const [savingContext, setSavingContext] = useState<string | null>(null);
   const [localDisposition, setLocalDisposition] = useState<Record<string, string>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDisposition, setBulkDisposition] = useState('');
@@ -152,6 +164,23 @@ export function MatrixPanel({
 
   function handlePrint() {
     window.print();
+  }
+
+  function contextValue(c: Candidate): string {
+    return contextDrafts[c.id] ?? c.additional_context ?? '';
+  }
+
+  async function handleSaveContext(candidateId: string) {
+    setSavingContext(candidateId);
+    try {
+      await fetch(`/api/candidates/${candidateId}/context`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ additional_context: contextDrafts[candidateId] ?? '' })
+      });
+    } finally {
+      setSavingContext(null);
+    }
   }
 
   async function handleDownload(id: string) {
@@ -535,9 +564,94 @@ export function MatrixPanel({
                           </div>
                           <div className="dual-match-item">
                             <span className="signal-label">Hiring Profile Match</span>
-                            <span className="dual-match-num dual-match-primary">{evalu.overall_match}%</span>
+                            <span className="dual-match-num dual-match-primary">
+                              {evalu.overall_match}%
+                              {c.evaluations.length > 1 &&
+                                (() => {
+                                  const delta = evalu.overall_match - c.evaluations[1].overall_match;
+                                  if (delta === 0) return null;
+                                  return (
+                                    <span className={`match-delta ${delta > 0 ? 'match-delta-up' : 'match-delta-down'}`}>
+                                      {delta > 0 ? '↑' : '↓'} {Math.abs(delta)}
+                                    </span>
+                                  );
+                                })()}
+                            </span>
                           </div>
                         </div>
+                      )}
+
+                      {evalu.resume_gap_flag && (
+                        <div className="risk-note flagged" style={{ marginBottom: 16 }}>
+                          Résumé Gap: {evalu.resume_gap_flag}
+                        </div>
+                      )}
+
+                      <div className="section-label">Additional Candidate Context</div>
+                      <div className="prompt-box" style={{ marginBottom: 16 }} onClick={(e) => e.stopPropagation()}>
+                        <textarea
+                          className="prompt-input"
+                          placeholder="Add relevant information not reflected in the candidate's résumé — current responsibilities, recent experience, hiring manager feedback, demonstrated skills, certifications, internal experience, performance observations, or other job-relevant context. Example: Barbara currently works for GRTC, but her résumé has not been updated to include her current position."
+                          value={contextValue(c)}
+                          onChange={(e) => setContextDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                        />
+                        <div className="prompt-footer">
+                          <span className="upload-hint" style={{ margin: 0 }}>
+                            Re-evaluate to see this reflected in the assessment.
+                          </span>
+                          <button
+                            className="qa-btn-text"
+                            disabled={savingContext === c.id}
+                            onClick={() => handleSaveContext(c.id)}
+                          >
+                            {savingContext === c.id ? 'Saving…' : 'Save'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {evalu.context_assessment && (
+                        <>
+                          {(evalu.context_assessment.newly_established?.length ?? 0) > 0 && (
+                            <>
+                              <div className="section-label">Newly Established</div>
+                              <ul className="plain evidence">
+                                {evalu.context_assessment!.newly_established!.map((s, idx) => (
+                                  <li key={idx}>{s}</li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
+                          {(evalu.context_assessment.strengthened?.length ?? 0) > 0 && (
+                            <>
+                              <div className="section-label">Strengthened</div>
+                              <ul className="plain evidence">
+                                {evalu.context_assessment!.strengthened!.map((s, idx) => (
+                                  <li key={idx}>{s}</li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
+                          {(evalu.context_assessment.still_unverified?.length ?? 0) > 0 && (
+                            <>
+                              <div className="section-label">Still Unverified</div>
+                              <ul className="plain gaps">
+                                {evalu.context_assessment!.still_unverified!.map((s, idx) => (
+                                  <li key={idx}>{s}</li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
+                          {(evalu.context_assessment.new_concerns?.length ?? 0) > 0 && (
+                            <>
+                              <div className="section-label">New Concerns</div>
+                              <ul className="plain gaps">
+                                {evalu.context_assessment!.new_concerns!.map((s, idx) => (
+                                  <li key={idx}>{s}</li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
+                        </>
                       )}
 
                       {Object.keys(evalu.matrix_dimensions ?? {}).length > 0 && (

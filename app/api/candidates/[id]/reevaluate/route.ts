@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   try {
     const { data: candidate, error: candError } = await supabaseAdmin
       .from('candidates')
-      .select('id, full_name, source_filename, original_file_url, requisition_id')
+      .select('id, full_name, source_filename, original_file_url, requisition_id, additional_context')
       .eq('id', params.id)
       .single();
 
@@ -81,6 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       jobDescription: requisition.job_description,
       hiringProfile: requisition.evaluation_pillars,
       employerWatchlist: requisition.employer_watchlist ?? [],
+      additionalContext: candidate.additional_context,
       resumeText
     });
 
@@ -108,6 +109,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         overall_match: evaluation.overall_match,
         job_description_match: evaluation.job_description_match ?? null,
         profile_revision: requisition.profile_revision ?? null,
+        additional_context_snapshot: candidate.additional_context ?? null,
+        context_assessment: evaluation.context_assessment ?? null,
+        resume_gap_flag: evaluation.resume_gap_flag ?? null,
         status: evaluation.status,
         scores: evaluation.category_scores ?? evaluation.scores ?? null,
         signals: evaluation.signals,

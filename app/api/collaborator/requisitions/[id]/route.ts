@@ -41,7 +41,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const { data: candidates, error: candError } = await supabaseAdmin
     .from('candidates')
-    .select('id, full_name, source_filename, original_file_url, document_type, disposition, evaluations(*)')
+    .select('id, full_name, source_filename, original_file_url, document_type, disposition, additional_context, evaluations(*)')
     .eq('requisition_id', params.id)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })

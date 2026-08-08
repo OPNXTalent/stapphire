@@ -111,6 +111,12 @@ create table candidates (
     'phone_screen','interview','second_interview','third_interview','final_interview',
     'make_offer','onboarding','hired','withdrew','did_not_select'
   )),
+  -- recruiter/hiring-manager knowledge not reflected in the résumé —
+  -- becomes active evaluation evidence, not a passive note. Freely
+  -- editable; the value USED for any given evaluation is preserved on
+  -- that evaluation row (additional_context_snapshot) for provenance,
+  -- since this field itself is mutable going forward.
+  additional_context text,
   unique (requisition_id, content_hash)
 );
 
@@ -129,6 +135,17 @@ create table evaluations (
   -- which Hiring Profile revision this evaluation was measured
   -- against — evaluations from before this existed have no revision.
   profile_revision integer,
+  -- Additional Candidate Context is mutable on the candidate, so each
+  -- evaluation preserves exactly what was in effect when it ran —
+  -- provenance, not a live pointer to whatever the field says now.
+  additional_context_snapshot text,
+  -- newly_established / strengthened / still_unverified / new_concerns
+  -- — only populated when additional context materially affected this
+  -- evaluation; otherwise null, not an empty shell.
+  context_assessment jsonb,
+  -- set when the résumé alone materially underrepresents the
+  -- candidate's actual fit once additional context is factored in
+  resume_gap_flag text,
   status text not null check (status in ('greenlight','consider','decline')),
 
   scores jsonb not null,              -- job_responsibilities, hard_skills, soft_skills, keyword_relevance
