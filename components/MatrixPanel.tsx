@@ -21,6 +21,7 @@ type Evaluation = {
   overall_match: number;
   job_description_match: number | null;
   status: 'greenlight' | 'consider' | 'decline';
+  profile_revision?: number | null;
   signals: Record<string, string>;
   matrix_dimensions: Record<string, string>;
   strengths: string[];
@@ -172,6 +173,13 @@ export function MatrixPanel({
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const profile = liveProfile ?? normalizeHiringProfile(hiringProfile);
+  const currentRevision = liveRevision ?? profileRevision;
+
+  function isEvalStale(evalu: Evaluation): boolean {
+    if (currentRevision === undefined) return false;
+    if (evalu.profile_revision === null || evalu.profile_revision === undefined) return currentRevision > 1;
+    return evalu.profile_revision !== currentRevision;
+  }
 
   useEffect(() => {
     setLiveProfile(null);
@@ -484,6 +492,11 @@ export function MatrixPanel({
     });
   }, [scored, statusFilter, dispositionFilter]);
 
+  const staleCandidateIds = useMemo(
+    () => scored.filter((c) => isEvalStale(c.evaluations[0])).map((c) => c.id),
+    [scored, currentRevision]
+  ); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (expandedId && !filtered.some((c) => c.id === expandedId)) {
       setExpandedId(null);
@@ -660,6 +673,22 @@ export function MatrixPanel({
 
         {/* ── Bottom: everything candidate-related — the compact list, and the focused candidate's full evaluation. ── */}
         <div className={`matrix-list-pane ${discoveryOpen ? 'matrix-list-pane-hidden' : ''}`}>
+          {staleCandidateIds.length > 0 && onBulkReevaluate && (
+            <div className="stale-consistency-banner">
+              <span>
+                ⚠ {staleCandidateIds.length} candidate{staleCandidateIds.length !== 1 ? 's' : ''} still scored against an
+                outdated version of the Hiring Decision Model — not the same standard as the rest of the pool.
+              </span>
+              <button
+                className="qa-btn-text"
+                style={{ flexShrink: 0 }}
+                onClick={() => onBulkReevaluate(staleCandidateIds)}
+              >
+                Re-evaluate All Outdated
+              </button>
+            </div>
+          )}
+
           <div className="filter-row">
             <MultiSelectFilter
               label="Status"
@@ -785,6 +814,12 @@ export function MatrixPanel({
                     <span className={`rec-pill ${evalu.status}`}>
                       {evalu.status.charAt(0).toUpperCase() + evalu.status.slice(1)}
                     </span>
+
+                    {isEvalStale(evalu) && (
+                      <span className="stale-badge" title="Scored against an earlier version of the Hiring Decision Model">
+                        Outdated Standard
+                      </span>
+                    )}
 
                     <select
                       className={`disposition-select ${
