@@ -130,6 +130,17 @@ diverges from what the resume alone shows:
   CURRENT Hiring Decision Model (the weighted subcriteria you were
   given) — this is the standard the recruiter and hiring team actually
   use.
+EVERYTHING above about the External Candidate Access Test, the
+requirement classification, no-double-penalty, and generous credit for
+trainable/employer-specific/verification items applies EQUALLY to
+job_description_match, not just to overall_match and category_scores —
+it is not a raw keyword-overlap score against the JD text. Reading the
+JD plainly still means applying the same judgment about what's actually
+a pre-hire requirement versus what the job itself will teach; it does
+not mean reverting to penalizing a candidate for lacking things the JD
+happens to mention that no external candidate would reasonably already
+have. Both numbers should move together for the same underlying
+reasons, and both are subject to the same final reasonableness check.
 A meaningful gap between the two is expected and fine, not an error —
 it usually means discovery has moved the target since the JD was
 written.
@@ -250,15 +261,24 @@ attempt to evaluate it as a candidate.
 FINAL REASONABLENESS CHECK before you finalize scores: would an
 experienced recruiter looking at the totality of this evidence
 reasonably call this candidate poorly matched, moderately matched, or
-strongly matched? Literally count your own gaps_structured list by
-category. If zero or one item is critical/moderate and the rest are
-trainable/employer_specific/verification/resume_gap/superseded, an
-overall_match in the 50s or 60s is almost certainly wrong — go back
-and check whether points_earned on those non-disqualifying subcriteria
-actually reflects the generous credit their category implies, not just
-the label. If your numeric score seems inconsistent with the evidence
-you've actually written down, look for the usual causes —
-double-penalizing one competency family stated multiple ways,
+strongly matched? Apply this to BOTH overall_match and
+job_description_match — they're computed from the same underlying
+judgment about the candidate and should rarely diverge by a large
+margin unless discovery has genuinely moved the Hiring Decision Model
+away from the original JD. If job_description_match alone looks harsh
+relative to your own strengths/gaps write-up, that's the same bug as
+overall_match looking harsh, and it needs the same fix: verify you're
+not reverting to counting missing JD phrases as deficiencies when they
+represent employer-specific or trainable knowledge. Literally count
+your own gaps_structured list by category. If zero or one item is
+critical/moderate and the rest are
+trainable/employer_specific/verification/resume_gap/superseded, a
+score in the 50s or 60s — on either number — is almost certainly wrong
+— go back and check whether points_earned on those non-disqualifying
+subcriteria actually reflects the generous credit their category
+implies, not just the label. If your numeric score seems inconsistent
+with the evidence you've actually written down, look for the usual
+causes — double-penalizing one competency family stated multiple ways,
 employer-specific knowledge scored as if it were a Day-1 requirement,
 trainable skills over-weighted as deficiencies, unknowns treated as
 failures, or keyword dependence — and correct the score before
