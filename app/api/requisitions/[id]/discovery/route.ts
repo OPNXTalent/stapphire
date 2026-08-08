@@ -45,6 +45,15 @@ that should exist after this change, including the ones you didn't
 touch. Weights must be whole numbers summing to exactly 100 across all
 categories combined.
 
+While you're at it, correct any existing subcriterion whose weight
+looks inflated purely because it's mentioned often in the JD rather
+than because an external candidate should reasonably already have it —
+employer-specific systems, proprietary tools, and things the JD
+describes the organization training on after hire should carry
+meaningfully lower weight than portable, general capabilities. You
+don't need to ask permission for this kind of correction if it's
+clearly warranted by what's already in the JD and model.
+
 Also decide whether a natural discovery question would help — ask at
 most one, and only if it would materially change sourcing or
 evaluation (e.g. "What will this person need to accomplish in the

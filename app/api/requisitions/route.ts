@@ -35,6 +35,24 @@ because they're easy to identify — a degree should not automatically
 outweigh the actual work performed unless the JD clearly establishes
 that importance.
 
+Frequency of mention is NOT the same as pre-hire importance — a JD
+often repeats employer-specific operational terms (internal system
+names, proprietary tools, company-specific processes) many times simply
+because that's the actual daily work, not because an external candidate
+should already know them. Before weighting a specialized subcriterion
+heavily, ask: could a reasonably qualified external candidate be
+expected to already possess this exact knowledge before ever working
+here? If the JD itself describes formal training, onboarding, or a
+qualification period covering a competency, that is a strong signal it
+is a post-hire outcome, not a pre-hire requirement — weight it
+meaningfully lower than the portable, general capabilities (customer
+service, communication, relevant systems experience, problem-solving)
+the candidate needs to walk in the door with. This matters because
+these weights are what an actual candidate gets scored against — an
+inflated weight on unlearnable-in-advance, employer-specific knowledge
+will unfairly tank otherwise strong candidates regardless of how
+leniently any individual gap gets categorized later.
+
 All subcriteria weights across all five categories must be whole
 numbers summing to exactly 100.
 

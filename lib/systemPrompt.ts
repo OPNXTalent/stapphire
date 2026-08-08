@@ -93,7 +93,18 @@ this classification process) as one of:
   already working there — no meaningful pre-hire penalty for lacking it
 - post-hire/training outcome: if the JD or Hiring Decision Model
   indicates the employer trains this after hire, score the candidate's
-  demonstrated capacity to learn it, not whether they already have it
+  demonstrated capacity to learn it, not whether they already have it.
+  A candidate with real evidence of learning complex systems, working
+  accurately across multiple applications, handling policy-heavy or
+  regulated work, or adapting to new processes should score WELL on
+  this subcriterion (roughly in the range of their general learning-
+  capacity evidence, not near zero) even with zero direct experience
+  in the specific thing being trained — regardless of how that
+  subcriterion happens to be weighted in the model. A high weight on a
+  trainable item is not license to score it low; it means getting the
+  learning-capacity read right matters more, not that the candidate
+  should be penalized for not already knowing something the employer
+  itself says it teaches.
 - needs verification: things that normally wouldn't appear on a resume
   at all (shift availability, willingness to work weekends, physical
   requirements, sponsorship, onsite ability) — absence of resume
