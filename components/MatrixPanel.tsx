@@ -283,9 +283,28 @@ export function MatrixPanel({
 
   async function handleApplyBulk() {
     if (!bulkDisposition || selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+
+    if (bulkDisposition === '__trash__') {
+      if (
+        !window.confirm(
+          `Move ${ids.length} candidate${ids.length !== 1 ? 's' : ''} to trash? They stay recoverable until trash is emptied.`
+        )
+      )
+        return;
+      setApplyingBulk(true);
+      try {
+        ids.forEach((id) => onDelete(id));
+        setSelectedIds(new Set());
+        setBulkDisposition('');
+      } finally {
+        setApplyingBulk(false);
+      }
+      return;
+    }
+
     setApplyingBulk(true);
     try {
-      const ids = Array.from(selectedIds);
       setLocalDisposition((prev) => {
         const next = { ...prev };
         ids.forEach((id) => (next[id] = bulkDisposition));
@@ -520,6 +539,7 @@ export function MatrixPanel({
                     {d.label}
                   </option>
                 ))}
+                <option value="__trash__">Move to Trash</option>
               </select>
               <button
                 className="qa-btn-text"
