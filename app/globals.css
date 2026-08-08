@@ -636,16 +636,6 @@
 
   .rec-pill{ font-family: var(--font-mono); font-size:10px; padding:2.5px 8px; border-radius:2px; white-space:nowrap; display:inline-block; cursor:pointer; }
 
-  .stale-badge{
-    font-family: var(--font-mono); font-size:9.5px; font-weight:700; letter-spacing:0.02em;
-    color:#92660A; background:#FDF3DC; border-radius:10px; padding:2.5px 8px; white-space:nowrap; flex-shrink:0;
-  }
-
-  .stale-consistency-banner{
-    display:flex; align-items:center; justify-content:space-between; gap:14px;
-    background:#FDF3DC; border:1px solid #E8C871; border-radius: var(--radius);
-    padding:10px 14px; margin-bottom:12px; font-size:12px; color:#6B4A0A;
-  }
   .auto-reevaluating-banner{
     font-family: var(--font-mono); font-size:11px; font-weight:600; color: var(--sapphire);
     background: var(--sapphire-pale); border-radius: var(--radius); padding:8px 12px; margin-bottom:14px;

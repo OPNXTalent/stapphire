@@ -404,15 +404,14 @@ export function MatrixPanel({
 
       const candidate = candidates.find((c) => c.id === id);
       const latestEval = candidate?.evaluations?.[0];
-      if (latestEval && isEvalStale(latestEval) && onBulkReevaluate) {
+      if (latestEval && isEvalStale(latestEval) && onBulkReevaluate && !autoReevaluatedRef.current.has(id)) {
+        autoReevaluatedRef.current.add(id);
         setAutoReevaluating(id);
         try {
           await fetch(`/api/candidates/${id}/reevaluate`, { method: 'POST' });
           onProfileUpdated?.();
         } catch {
-          // Silent — the stale badge just stays visible and they can
-          // still trigger it manually via bulk re-evaluate if this
-          // one-off attempt failed for any reason.
+          // Silent — nothing to announce. A page reload will retry it.
         } finally {
           setAutoReevaluating(null);
         }
@@ -524,8 +523,38 @@ export function MatrixPanel({
 
   const staleCandidateIds = useMemo(
     () => scored.filter((c) => isEvalStale(c.evaluations[0])).map((c) => c.id),
-    [scored, currentRevision]
+    [scored, currentRevision, currentPromptVersion]
   ); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const autoReevaluatedRef = useRef<Set<string>>(new Set());
+  const backgroundReevaluatingRef = useRef(false);
+
+  useEffect(() => {
+    const toProcess = staleCandidateIds.filter((id) => !autoReevaluatedRef.current.has(id));
+    if (toProcess.length === 0 || backgroundReevaluatingRef.current) return;
+
+    backgroundReevaluatingRef.current = true;
+    toProcess.forEach((id) => autoReevaluatedRef.current.add(id));
+
+    (async () => {
+      const CONCURRENCY = 3;
+      let nextIndex = 0;
+      async function worker() {
+        while (nextIndex < toProcess.length) {
+          const id = toProcess[nextIndex++];
+          try {
+            await fetch(`/api/candidates/${id}/reevaluate`, { method: 'POST' });
+          } catch {
+            // Silent — nothing to announce either way. It'll simply
+            // stay stale and get picked up again next time this runs.
+          }
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, toProcess.length) }, worker));
+      backgroundReevaluatingRef.current = false;
+      onProfileUpdated?.();
+    })();
+  }, [staleCandidateIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (expandedId && !filtered.some((c) => c.id === expandedId)) {
@@ -703,22 +732,6 @@ export function MatrixPanel({
 
         {/* ── Bottom: everything candidate-related — the compact list, and the focused candidate's full evaluation. ── */}
         <div className={`matrix-list-pane ${discoveryOpen ? 'matrix-list-pane-hidden' : ''}`}>
-          {staleCandidateIds.length > 0 && onBulkReevaluate && (
-            <div className="stale-consistency-banner">
-              <span>
-                ⚠ {staleCandidateIds.length} candidate{staleCandidateIds.length !== 1 ? 's' : ''} still scored against an
-                outdated version of the Hiring Decision Model — not the same standard as the rest of the pool.
-              </span>
-              <button
-                className="qa-btn-text"
-                style={{ flexShrink: 0 }}
-                onClick={() => onBulkReevaluate(staleCandidateIds)}
-              >
-                Re-evaluate All Outdated
-              </button>
-            </div>
-          )}
-
           <div className="filter-row">
             <MultiSelectFilter
               label="Status"
@@ -845,11 +858,6 @@ export function MatrixPanel({
                       {evalu.status.charAt(0).toUpperCase() + evalu.status.slice(1)}
                     </span>
 
-                    {isEvalStale(evalu) && (
-                      <span className="stale-badge" title="Scored against an earlier version of the Hiring Decision Model">
-                        Outdated Standard
-                      </span>
-                    )}
 
                     <select
                       className={`disposition-select ${
