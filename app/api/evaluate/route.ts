@@ -242,7 +242,17 @@ export async function POST(req: NextRequest) {
           .select()
           .single();
 
-        if (evalError) throw evalError;
+        if (evalError) {
+          // The candidate row already committed before this failed —
+          // without cleanup it becomes an orphan: active (deleted_at
+          // null) but with zero evaluations, which is invisible in the
+          // UI (the candidate list only shows evaluated candidates) yet
+          // still holds the content_hash, silently blocking every future
+          // upload of this exact resume with no way for anyone to find
+          // or remove it. Remove it here so a retry can actually work.
+          await supabaseAdmin.from('candidates').delete().eq('id', candidate.id);
+          throw evalError;
+        }
 
         if (usingFreeTrial) {
           await supabaseAdmin.from('free_trial_usage').insert({ org_id: org.id });
