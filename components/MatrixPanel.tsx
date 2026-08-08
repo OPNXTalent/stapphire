@@ -619,7 +619,21 @@ export function MatrixPanel({
 
                     <div className="facet-cell matrix-row-match">
                       <span className="score-num">{evalu.overall_match}%</span>
-                      <div className={`facet-mini ${facetTier(evalu.overall_match)}`} />
+                      {evalu.job_description_match !== null && evalu.job_description_match !== undefined ? (
+                        <div
+                          className="dual-bar-mini"
+                          title={`Job Description Match: ${evalu.job_description_match}% · Hiring Profile Match: ${evalu.overall_match}%`}
+                        >
+                          <div className="dual-bar-track">
+                            <div className="dual-bar-fill dual-bar-jd" style={{ width: `${evalu.job_description_match}%` }} />
+                          </div>
+                          <div className="dual-bar-track">
+                            <div className="dual-bar-fill dual-bar-profile" style={{ width: `${evalu.overall_match}%` }} />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={`facet-mini ${facetTier(evalu.overall_match)}`} />
+                      )}
                     </div>
 
                     <span className={`rec-pill ${evalu.status}`}>
