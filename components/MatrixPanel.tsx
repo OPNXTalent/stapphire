@@ -134,6 +134,7 @@ export function MatrixPanel({
   const [candidateChatSending, setCandidateChatSending] = useState<string | null>(null);
   const [candidateChatError, setCandidateChatError] = useState<string | null>(null);
   const [justRescored, setJustRescored] = useState<string | null>(null);
+  const [justAppliedGlobally, setJustAppliedGlobally] = useState<string | null>(null);
 
   const [jdAttachedFile, setJdAttachedFile] = useState<File | null>(null);
   const [jdListening, setJdListening] = useState(false);
@@ -336,6 +337,13 @@ export function MatrixPanel({
         setJustRescored(candidateId);
         setTimeout(() => setJustRescored((id) => (id === candidateId ? null : id)), 3000);
         onProfileUpdated?.();
+      }
+
+      if (data.profile_changed) {
+        setLiveProfile(data.profile);
+        setLiveRevision(data.revision);
+        setJustAppliedGlobally(candidateId);
+        setTimeout(() => setJustAppliedGlobally((id) => (id === candidateId ? null : id)), 4000);
       }
     } catch (err: any) {
       setCandidateChatError(err?.message ?? 'Something went wrong.');
@@ -911,6 +919,11 @@ export function MatrixPanel({
                           )}
                         </div>
 
+                        {justAppliedGlobally === c.id && (
+                          <div className="rescored-banner rescored-banner-global">
+                            🌐 Applied to the Hiring Decision Model — this now applies to every candidate in this requisition
+                          </div>
+                        )}
                         {justRescored === c.id && <div className="rescored-banner">↻ Re-scored based on this conversation</div>}
 
                         <div className="prompt-box" style={{ marginTop: 8 }}>
