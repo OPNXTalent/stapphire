@@ -21,7 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
 
   const { data: candidates, error: candError } = await supabaseAdmin
     .from('candidates')
-    .select('id, full_name, source_filename, original_file_url, document_type, disposition, additional_context, evaluations(*)')
+    .select('id, full_name, source_filename, original_file_url, document_type, disposition, additional_context, resume_text, evaluations(*)')
     .eq('requisition_id', requisition.id)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })

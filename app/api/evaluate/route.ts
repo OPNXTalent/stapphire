@@ -196,6 +196,7 @@ export async function POST(req: NextRequest) {
             source_filename: file.name,
             original_file_url: storagePath,
             content_hash: contentHash,
+            resume_text: resumeText,
             document_type: evaluation.document_type
           })
           .select()

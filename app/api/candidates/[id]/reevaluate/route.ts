@@ -101,6 +101,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const evaluation = toolUseBlock.input as any;
 
+    await supabaseAdmin.from('candidates').update({ resume_text: resumeText }).eq('id', candidate.id);
+
     const { data: evalRow, error: evalError } = await supabaseAdmin
       .from('evaluations')
       .insert({

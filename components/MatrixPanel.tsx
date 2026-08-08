@@ -39,6 +39,7 @@ type Candidate = {
   original_file_url: string | null;
   disposition: string | null;
   additional_context: string | null;
+  resume_text: string | null;
   evaluations: Evaluation[];
 };
 
@@ -119,6 +120,7 @@ export function MatrixPanel({
   const [dispositionFilter, setDispositionFilter] = useState<string[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [fullEvidenceOpen, setFullEvidenceOpen] = useState<Record<string, boolean>>({});
+  const [resumeTextOpen, setResumeTextOpen] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (expandedId && !candidateMessagesLoaded[expandedId]) {
@@ -1153,6 +1155,18 @@ export function MatrixPanel({
                         )}
                         <button
                           className="qa-btn-text qa-btn-icon"
+                          disabled={!c.resume_text}
+                          title={c.resume_text ? undefined : 'Not available for this candidate yet — re-evaluate to extract it'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setResumeTextOpen((prev) => ({ ...prev, [c.id]: !prev[c.id] }));
+                          }}
+                        >
+                          <span className="qa-btn-icon-glyph">📝</span>
+                          {resumeTextOpen[c.id] ? 'Hide Résumé Text' : 'View Résumé Text'}
+                        </button>
+                        <button
+                          className="qa-btn-text qa-btn-icon"
                           onClick={(e) => {
                             e.stopPropagation();
                             handlePrint(c.id);
@@ -1162,6 +1176,13 @@ export function MatrixPanel({
                           Print this evaluation
                         </button>
                       </div>
+
+                      {resumeTextOpen[c.id] && c.resume_text && (
+                        <div className="resume-text-panel" onClick={(e) => e.stopPropagation()}>
+                          <div className="section-label">Résumé Text</div>
+                          <pre className="resume-text-content">{c.resume_text}</pre>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

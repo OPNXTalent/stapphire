@@ -500,6 +500,14 @@
   }
   .full-evidence-toggle:hover{ color: var(--deep); }
   .full-evidence-panel{ padding-top:8px; animation: cardEnter 0.15s ease; }
+
+  .resume-text-panel{ margin-top:14px; animation: cardEnter 0.15s ease; }
+  .resume-text-content{
+    max-height:420px; overflow-y:auto;
+    background: var(--paper-cool); border:1px solid var(--line); border-radius: var(--radius);
+    padding:16px 18px; font-family: var(--font-body); font-size:12.5px; line-height:1.6; color: var(--ink);
+    white-space:pre-wrap; word-break:break-word;
+  }
   .match-delta{ font-family: var(--font-mono); font-size:12px; font-weight:600; margin-left:8px; }
   .match-delta-up{ color: var(--green); }
   .match-delta-down{ color: var(--red); }
@@ -861,7 +869,7 @@
     @page{ margin: 0.6in; }
 
     .brand, .req-panel, .side-panel, .pull-tab,
-    .matrix-toggle, .matrix-role-pane, .filter-row, .bulk-bar, .matrix-row-actions, .full-evidence-toggle{
+    .matrix-toggle, .matrix-role-pane, .filter-row, .bulk-bar, .matrix-row-actions, .full-evidence-toggle, .resume-text-panel{
       display:none !important;
     }
     .print-header{ display:flex !important; padding-bottom:14px; margin-bottom:20px; border-bottom:2px solid var(--sapphire); }

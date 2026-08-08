@@ -116,6 +116,9 @@ create table candidates (
   original_file_url text, -- Supabase Storage path; "Download Original Resume"
   -- content fingerprint for duplicate detection — never re-evaluate a match
   content_hash text not null,
+  -- plain extracted text, no formatting — lets a recruiter read the
+  -- actual resume content without opening the original file
+  resume_text text,
   document_type text not null default 'resume' check (document_type in ('resume','non_resume')),
   created_at timestamptz not null default now(),
   -- soft delete — deleted candidates go to trash and stay recoverable
