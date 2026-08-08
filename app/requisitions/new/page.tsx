@@ -14,7 +14,7 @@ export default function NewRequisitionPage() {
     <>
       <TopBar />
       <div style={{ marginTop: 48, minHeight: 'calc(100vh - 48px)', background: 'var(--paper)' }}>
-        <NewRequisitionForm onCreated={(id) => router.push(`/?requisition=${id}`)} />
+        <NewRequisitionForm onCreated={(id) => router.push(`/app?requisition=${id}`)} />
       </div>
     </>
   );

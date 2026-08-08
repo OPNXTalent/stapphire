@@ -1,375 +1,307 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { TopBar } from '@/components/TopBar';
-import { RequisitionPanel } from '@/components/RequisitionPanel';
-import { MatrixPanel } from '@/components/MatrixPanel';
-import { CollaborationPanel } from '@/components/CollaborationPanel';
-import { NewRequisitionForm } from '@/components/NewRequisitionForm';
-import { TrashModal } from '@/components/TrashModal';
-import { ArchiveModal } from '@/components/ArchiveModal';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import './landing.css';
 
-const DEMO_ORG_ID = process.env.NEXT_PUBLIC_DEMO_ORG_ID ?? '';
-const DEMO_REQUISITION_ID = process.env.NEXT_PUBLIC_DEMO_REQUISITION_ID ?? '';
-
-export const dynamic = 'force-dynamic';
-
-export default function DashboardPage() {
+function Gem() {
   return (
-    <Suspense fallback={<div style={{ padding: 40 }}>Loading…</div>}>
-      <DashboardContent />
-    </Suspense>
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+      <polygon points="12,1 21,7 24,14 17,23 7,23 0,14 3,7" fill="url(#lpGem)" />
+      <polygon points="12,1 21,7 12,9" fill="#fff" opacity="0.22" />
+      <polygon points="3,7 12,1 12,9" fill="#fff" opacity="0.1" />
+      <polygon points="0,14 3,7 12,9 7,23" fill="#0A2452" opacity="0.35" />
+      <polygon points="24,14 21,7 12,9 17,23" fill="#0A2452" opacity="0.2" />
+      <defs>
+        <linearGradient id="lpGem" x1="0" y1="0" x2="24" y2="23">
+          <stop offset="0%" stopColor="#5C87F5" />
+          <stop offset="100%" stopColor="#123A8F" />
+        </linearGradient>
+      </defs>
+    </svg>
   );
 }
 
-function DashboardContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const requisitionId = searchParams.get('requisition') ?? DEMO_REQUISITION_ID;
-  const requisitionIdRef = useRef(requisitionId);
-  useEffect(() => {
-    requisitionIdRef.current = requisitionId;
-  }, [requisitionId]);
+function SignupForm() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [company, setCompany] = useState('');
+  const [teamSize, setTeamSize] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
-  const [requisition, setRequisition] = useState<any>(null);
-  const [org, setOrg] = useState<any>(null);
-  const [promptVersion, setPromptVersion] = useState<string | null>(null);
-  const [candidates, setCandidates] = useState<any[]>([]);
-  const [trashedCandidates, setTrashedCandidates] = useState<any[]>([]);
-  const [activeCandidateId, setActiveCandidateId] = useState<string | null>(null);
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [creatingRequisition, setCreatingRequisition] = useState(false);
-  const [trashModalOpen, setTrashModalOpen] = useState(false);
-  const [archiveModalOpen, setArchiveModalOpen] = useState(false);
-  const [batchQueue, setBatchQueue] = useState<
-    { name: string; status: 'pending' | 'processing' | 'done' | 'duplicate' | 'non_resume' | 'error'; message: string }[]
-  >([]);
-  const [batchActive, setBatchActive] = useState(false);
-  const [batchRequisitionId, setBatchRequisitionId] = useState<string | null>(null);
-  const [allRequisitions, setAllRequisitions] = useState<any[]>([]);
-
-  const loadAllRequisitions = useCallback(async () => {
-    const res = await fetch(`/api/requisitions?org_id=${DEMO_ORG_ID}`, { cache: 'no-store' });
-    const data = await res.json();
-    setAllRequisitions(data.requisitions ?? []);
-  }, []);
-
-  const loadRequisition = useCallback(async () => {
-    const res = await fetch(`/api/requisitions/${requisitionId}`, { cache: 'no-store' });
-    const data = await res.json();
-    setRequisition(data.requisition);
-    setCandidates(data.candidates ?? []);
-    setOrg(data.requisition?.organizations ?? null);
-    setPromptVersion(data.promptVersion ?? null);
-  }, [requisitionId]);
-
-  const loadTrash = useCallback(async () => {
-    const res = await fetch(`/api/requisitions/${requisitionId}/trash`, { cache: 'no-store' });
-    const data = await res.json();
-    setTrashedCandidates(data.candidates ?? []);
-  }, [requisitionId]);
-
-  useEffect(() => {
-    Promise.all([loadRequisition(), loadTrash(), loadAllRequisitions()]).finally(() => setLoading(false));
-  }, [requisitionId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Evaluates one file, reading its progress stream, and reports back
-  // the final outcome without touching any batch-wide state itself —
-  // that's handled by the caller so this stays reusable for both a
-  // single upload and one slot in a concurrent batch.
-  async function evaluateOneFile(
-    file: File,
-    targetRequisitionId: string,
-    onProgress: (message: string) => void
-  ): Promise<{ status: 'done' | 'duplicate' | 'non_resume' | 'error'; message: string }> {
-    const formData = new FormData();
-    formData.append('requisition_id', targetRequisitionId);
-    formData.append('file', file);
-
-    const res = await fetch('/api/evaluate', { method: 'POST', body: formData });
-    if (!res.body) return { status: 'error', message: 'No response from server' };
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let outcome: { status: 'done' | 'duplicate' | 'non_resume' | 'error'; message: string } = {
-      status: 'error',
-      message: 'Did not complete'
-    };
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        const event = JSON.parse(line);
-
-        if (event.type === 'status' || event.type === 'progress') {
-          onProgress(event.message);
-        } else if (event.type === 'error') {
-          outcome = { status: 'error', message: event.message };
-        } else if (event.type === 'done') {
-          if (event.deduped) outcome = { status: 'duplicate', message: 'Already evaluated' };
-          else if (event.skipped === 'non_resume') outcome = { status: 'non_resume', message: 'Not a resume' };
-          else outcome = { status: 'done', message: '' };
-        }
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim() || !email.trim()) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/signups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, company, team_size: teamSize })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? 'Something went wrong');
       }
+      setSubmitted(true);
+    } catch (err: any) {
+      setError(err.message ?? 'Something went wrong');
+    } finally {
+      setSubmitting(false);
     }
-
-    return outcome;
   }
 
-  // Runs a fixed number of files at once instead of strictly one after
-  // another — real wall-clock speedup for a large batch, since each
-  // evaluation's 10-15s isn't spent waiting in a single-file line.
-  async function handleBatchUpload(files: File[]) {
-    const targetRequisitionId = requisitionId;
-
-    setBatchQueue(files.map((f) => ({ name: f.name, status: 'pending', message: '' })));
-    setBatchActive(true);
-    setBatchRequisitionId(targetRequisitionId);
-
-    const CONCURRENCY = 3;
-    let nextIndex = 0;
-
-    async function worker() {
-      while (nextIndex < files.length) {
-        const myIndex = nextIndex++;
-        const file = files[myIndex];
-
-        setBatchQueue((q) => q.map((item, i) => (i === myIndex ? { ...item, status: 'processing' } : item)));
-
-        const result = await evaluateOneFile(file, targetRequisitionId, (msg) => {
-          setBatchQueue((q) => q.map((item, i) => (i === myIndex ? { ...item, message: msg } : item)));
-        });
-
-        setBatchQueue((q) =>
-          q.map((item, i) => (i === myIndex ? { ...item, status: result.status, message: result.message } : item))
-        );
-
-        // Only refresh the visible matrix if the batch's target is still
-        // the requisition currently on screen — checked live via ref,
-        // since a plain closure would only ever see the value from when
-        // the batch started, never a navigation that happens mid-run.
-        if (targetRequisitionId === requisitionIdRef.current) await loadRequisition();
-      }
-    }
-
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, worker));
-
-    setBatchActive(false);
-    if (targetRequisitionId === requisitionIdRef.current) await loadTrash();
-    await loadAllRequisitions();
-  }
-
-  async function handleDeleteCandidate(candidateId: string) {
-    await fetch(`/api/candidates/${candidateId}`, { method: 'DELETE' });
-    if (activeCandidateId === candidateId) setActiveCandidateId(null);
-    await Promise.all([loadRequisition(), loadTrash()]);
-  }
-
-  async function handleSetDisposition(candidateId: string, disposition: string) {
-    await fetch(`/api/candidates/${candidateId}/disposition`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ disposition, actor_name: 'You' })
-    });
-    await loadRequisition();
-  }
-
-  async function handleBulkSetDisposition(candidateIds: string[], disposition: string) {
-    await Promise.all(
-      candidateIds.map((candidateId) =>
-        fetch(`/api/candidates/${candidateId}/disposition`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ disposition, actor_name: 'You' })
-        })
-      )
+  if (submitted) {
+    return (
+      <div className="lp-form-success">
+        <div className="lp-form-success-check">✓</div>
+        <h3>You're on the list.</h3>
+        <p>Someone from our team will reach out shortly to get your workspace set up.</p>
+      </div>
     );
-    await loadRequisition();
   }
-
-  async function handleBulkReevaluate(candidateIds: string[]) {
-    const CONCURRENCY = 3;
-    let nextIndex = 0;
-    const errors: string[] = [];
-
-    async function worker() {
-      while (nextIndex < candidateIds.length) {
-        const id = candidateIds[nextIndex++];
-        const res = await fetch(`/api/candidates/${id}/reevaluate`, { method: 'POST' });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          errors.push(data.error ?? `Failed to re-evaluate candidate ${id}`);
-        }
-      }
-    }
-
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, candidateIds.length) }, worker));
-    await loadRequisition();
-
-    if (errors.length > 0) {
-      alert(`${errors.length} re-evaluation(s) didn't complete:\n\n${errors.join('\n')}`);
-    }
-  }
-
-  async function handleRestoreCandidate(candidateId: string) {
-    await fetch(`/api/candidates/${candidateId}/restore`, { method: 'POST' });
-    await Promise.all([loadRequisition(), loadTrash()]);
-  }
-
-  // Archiving is non-destructive — if the archived requisition is the
-  // one currently on screen, jump to another open one, or start the
-  // creation flow if none are left.
-  async function handleArchiveRequisition(id: string) {
-    await fetch(`/api/requisitions/${id}/archive`, { method: 'POST' });
-
-    if (id === requisitionId) {
-      const res = await fetch(`/api/requisitions?org_id=${DEMO_ORG_ID}`, { cache: 'no-store' });
-      const data = await res.json();
-      const remaining = (data.requisitions ?? []).filter((r: any) => r.id !== id);
-      if (remaining.length > 0) {
-        router.push(`/?requisition=${remaining[0].id}`);
-      } else {
-        setCreatingRequisition(true);
-      }
-    }
-    await loadAllRequisitions();
-  }
-
-  async function handleRestoreRequisition(id: string) {
-    await fetch(`/api/requisitions/${id}/restore`, { method: 'POST' });
-    await loadAllRequisitions();
-  }
-
-  async function handleDeleteRequisitionPermanently(id: string) {
-    const res = await fetch(`/api/requisitions/${id}`, { method: 'DELETE' });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error ?? 'Failed to permanently delete');
-    }
-    await loadAllRequisitions();
-  }
-
-  async function handleEmptyAllTrash() {
-    await fetch(`/api/organizations/${DEMO_ORG_ID}/empty-trash`, { method: 'POST' });
-    await loadTrash();
-  }
-
-  function handleRequisitionCreated(newId: string) {
-    setCreatingRequisition(false);
-    router.push(`/?requisition=${newId}`);
-  }
-
-  function handleSwitchRequisition(id: string) {
-    router.push(`/?requisition=${id}`);
-  }
-
-  if (loading) return <div style={{ padding: 40 }}>Loading requisition…</div>;
-  if (!requisition) return <div style={{ padding: 40 }}>Requisition not found.</div>;
-
-  const appClass = [
-    'app',
-    leftCollapsed ? 'left-collapsed' : '',
-    rightCollapsed ? 'right-collapsed' : ''
-  ]
-    .filter(Boolean)
-    .join(' ');
-
-  const activeCandidateName = candidates.find((c) => c.id === activeCandidateId)?.full_name ?? null;
 
   return (
-    <>
-      <TopBar requisitionTitle={requisition.title} />
-      <div className={appClass}>
-        <RequisitionPanel
-          requisition={requisition}
-          org={org ?? { credits_remaining: 0, credits_total: 0, credits_refill_at: null }}
-          otherRequisitions={allRequisitions
-            .filter((r) => r.id !== requisitionId)
-            .map((r) => ({
-              id: r.id,
-              title: r.title,
-              status: r.status,
-              candidateCount: r.candidates?.[0]?.count ?? 0
-            }))}
-          onSwitchRequisition={handleSwitchRequisition}
-          onArchiveRequisition={handleArchiveRequisition}
-          onOpenTrashModal={() => setTrashModalOpen(true)}
-          onOpenArchiveModal={() => setArchiveModalOpen(true)}
-          collapsed={leftCollapsed}
-          onToggleCollapse={() => setLeftCollapsed((c) => !c)}
-          onBatchUpload={handleBatchUpload}
-          batchQueue={batchQueue}
-          batchActive={batchActive}
-          batchRequisitionId={batchRequisitionId}
-          onClearBatch={() => {
-            setBatchQueue([]);
-            setBatchRequisitionId(null);
-          }}
-          candidateCount={candidates.length}
-          onAddRequisition={() => setCreatingRequisition((c) => !c)}
-          isAddingRequisition={creatingRequisition}
-        />
-
-        <div className="center-panel">
-          {creatingRequisition ? (
-            <NewRequisitionForm onCreated={handleRequisitionCreated} onCancel={() => setCreatingRequisition(false)} />
-          ) : (
-            <MatrixPanel
-              candidates={candidates}
-              requisitionId={requisitionId}
-              requisitionTitle={requisition.title}
-              shareToken={requisition.share_token}
-              hiringProfile={requisition.evaluation_pillars}
-              profileRevision={requisition.profile_revision}
-              currentPromptVersion={promptVersion}
-              discoverySource="recruiter_discovery"
-              onProfileUpdated={loadRequisition}
-              onSelectCandidate={setActiveCandidateId}
-              onDelete={handleDeleteCandidate}
-              onSetDisposition={handleSetDisposition}
-              onBulkSetDisposition={handleBulkSetDisposition}
-              onBulkReevaluate={handleBulkReevaluate}
-            />
-          )}
-        </div>
-
-        <CollaborationPanel
-          collapsed={rightCollapsed}
-          onExpand={() => setRightCollapsed(false)}
-          onCollapse={() => setRightCollapsed(true)}
-          requisitionId={requisitionId}
-          requisitionTitle={requisition.title}
-          activeCandidateId={activeCandidateId}
-          activeCandidateName={activeCandidateName}
-          collaboratorName="You"
+    <form className="lp-form" onSubmit={handleSubmit} id="get-started">
+      <div className="lp-form-row">
+        <input className="lp-input" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} required />
+        <input
+          className="lp-input"
+          type="email"
+          placeholder="Work email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
         />
       </div>
+      <div className="lp-form-row">
+        <input className="lp-input" placeholder="Company" value={company} onChange={(e) => setCompany(e.target.value)} />
+        <select className="lp-select" value={teamSize} onChange={(e) => setTeamSize(e.target.value)}>
+          <option value="">Team size</option>
+          <option value="1-10">1–10</option>
+          <option value="11-50">11–50</option>
+          <option value="51-200">51–200</option>
+          <option value="200+">200+</option>
+        </select>
+      </div>
+      <button className="lp-form-submit" type="submit" disabled={submitting}>
+        {submitting ? 'Submitting…' : 'Get Started'}
+      </button>
+      {error && <div className="lp-form-error">{error}</div>}
+      <div className="lp-form-hint">No credit card required. We'll set up your workspace personally.</div>
+    </form>
+  );
+}
 
-      <TrashModal
-        open={trashModalOpen}
-        onClose={() => setTrashModalOpen(false)}
-        orgId={DEMO_ORG_ID}
-        onRestoreCandidate={handleRestoreCandidate}
-        onEmptyTrash={handleEmptyAllTrash}
-      />
-      <ArchiveModal
-        open={archiveModalOpen}
-        onClose={() => setArchiveModalOpen(false)}
-        orgId={DEMO_ORG_ID}
-        onRestoreRequisition={handleRestoreRequisition}
-        onDeleteRequisition={handleDeleteRequisitionPermanently}
-      />
-    </>
+export default function LandingPage() {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  return (
+    <div className="lp">
+      <nav className={`lp-nav ${scrolled ? 'lp-nav-scrolled' : ''}`}>
+        <div className="lp-nav-brand">
+          <Gem />
+          <span className="lp-nav-word">Stapphire</span>
+          <span className="lp-nav-tag">Hiring Quality Control</span>
+        </div>
+        <div className="lp-nav-actions">
+          <a className="lp-nav-link" href="#how-it-works">
+            How it works
+          </a>
+          <Link className="lp-nav-link" href="/login">
+            Sign In
+          </Link>
+          <a className="lp-nav-cta" href="#get-started">
+            Get Started
+          </a>
+        </div>
+      </nav>
+
+      {/* ── Hero ── */}
+      <header className="lp-hero">
+        <div className="lp-wrap lp-hero-grid">
+          <div>
+            <div className="lp-eyebrow">Hiring Quality Control</div>
+            <h1>
+              Every candidate.
+              <br />
+              Same standard.
+              <br />
+              <em>Full evidence.</em>
+            </h1>
+            <p className="lp-hero-sub">
+              Stapphire builds a living standard for what a role actually needs, then shows exactly why each candidate
+              does or doesn't fit — not a keyword scanner guessing in the dark.
+            </p>
+            <div className="lp-hero-ctas">
+              <a className="lp-btn-primary" href="#get-started">
+                Get Started
+              </a>
+              <a className="lp-link-ghost" href="#how-it-works">
+                See how it works ↓
+              </a>
+            </div>
+          </div>
+
+          <div className="lp-card-wrap">
+            <div className="lp-evidence-card">
+              <div className="lp-ev-head">
+                <div>
+                  <div className="lp-ev-name">Morgan Ellis</div>
+                  <div className="lp-ev-role">Customer Success Manager</div>
+                </div>
+                <div className="lp-ev-score">
+                  <div className="lp-ev-num">88%</div>
+                  <div className="lp-ev-badge">Recommend Interview</div>
+                </div>
+              </div>
+
+              <div className="lp-ev-section">
+                <div className="lp-ev-label">
+                  <span className="lp-ev-dot" style={{ background: '#2E9E52' }} />
+                  Why
+                </div>
+                <div className="lp-ev-item">3+ years leading enterprise renewals with measurable retention gains</div>
+                <div className="lp-ev-item">Fluent in Salesforce and HubSpot from current role</div>
+              </div>
+
+              <div className="lp-ev-section">
+                <div className="lp-ev-label">
+                  <span className="lp-ev-dot" style={{ background: '#C08A1E' }} />
+                  What to Verify
+                </div>
+                <div className="lp-ev-item">Weekend on-call rotation — not addressed in résumé, confirm at interview</div>
+              </div>
+
+              <div className="lp-ev-section">
+                <div className="lp-ev-label">
+                  <span className="lp-ev-dot" style={{ background: '#1E4FD8' }} />
+                  Trainable After Hire
+                </div>
+                <div className="lp-ev-item">Internal ticketing system — proprietary, covered in onboarding</div>
+              </div>
+
+              <div className="lp-ev-section" style={{ marginBottom: 0 }}>
+                <div className="lp-ev-label">
+                  <span className="lp-ev-dot" style={{ background: '#B02A2A' }} />
+                  Gap
+                </div>
+                <div className="lp-ev-item">No direct SaaS industry experience</div>
+              </div>
+            </div>
+            <div className="lp-float-tag lp-float-tag-1">Same standard. Every candidate.</div>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Process ── */}
+      <section className="lp-process" id="how-it-works">
+        <div className="lp-wrap">
+          <div className="lp-section-head">
+            <div className="lp-section-eyebrow">How it works</div>
+            <h2>Not a one-time scan. A standard you actually shape.</h2>
+          </div>
+          <div className="lp-process-grid">
+            <div className="lp-process-step">
+              <div className="lp-process-num">01</div>
+              <h3>Tell us what the role needs</h3>
+              <p>Paste a job description, upload one, or just talk it through — Stapphire parses it into a real, weighted rubric.</p>
+            </div>
+            <div className="lp-process-step">
+              <div className="lp-process-num">02</div>
+              <h3>Refine it in conversation</h3>
+              <p>
+                "That system doesn't matter, we train it." "Communication matters more than the degree." Say it once, and
+                the standard updates for every candidate — not just the one you're looking at.
+              </p>
+            </div>
+            <div className="lp-process-step">
+              <div className="lp-process-num">03</div>
+              <h3>Every candidate, same bar</h3>
+              <p>Full evidence, categorized honestly — what's missing, what's just unconfirmed, and what the job itself will teach.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Contrast ── */}
+      <section className="lp-contrast">
+        <div className="lp-wrap">
+          <div className="lp-section-head">
+            <div className="lp-section-eyebrow">The difference</div>
+            <h2>Keyword scanners guess. Stapphire shows its work.</h2>
+          </div>
+          <div className="lp-contrast-grid">
+            <div className="lp-contrast-col lp-bad">
+              <div className="lp-contrast-title">Typical ATS scoring</div>
+              <div className="lp-contrast-row">
+                <span className="lp-contrast-icon">✕</span>
+                Docks points for missing exact phrases, even when the capability is clearly there
+              </div>
+              <div className="lp-contrast-row">
+                <span className="lp-contrast-icon">✕</span>
+                Treats anything unconfirmed on a résumé as a failure
+              </div>
+              <div className="lp-contrast-row">
+                <span className="lp-contrast-icon">✕</span>
+                One rigid rubric, set once, never revisited
+              </div>
+              <div className="lp-contrast-row">
+                <span className="lp-contrast-icon">✕</span>
+                A black-box percentage with no way to see why
+              </div>
+            </div>
+            <div className="lp-contrast-col lp-good">
+              <div className="lp-contrast-title">Stapphire</div>
+              <div className="lp-contrast-row">
+                <span className="lp-contrast-icon">✓</span>
+                Credits real, demonstrated capability — however it's worded
+              </div>
+              <div className="lp-contrast-row">
+                <span className="lp-contrast-icon">✓</span>
+                Separates what's genuinely missing from what's simply unconfirmed
+              </div>
+              <div className="lp-contrast-row">
+                <span className="lp-contrast-icon">✓</span>
+                A living standard that evolves as you clarify what you actually need
+              </div>
+              <div className="lp-contrast-row">
+                <span className="lp-contrast-icon">✓</span>
+                Every score traces back to evidence you can actually read
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA ── */}
+      <section className="lp-cta-band">
+        <div className="lp-wrap">
+          <h2>See it on your own requisition.</h2>
+          <p>Tell us a bit about your team, and we'll get you set up — no credit card, no long onboarding call required.</p>
+          <SignupForm />
+        </div>
+      </section>
+
+      <footer className="lp-footer">
+        <div className="lp-wrap lp-footer-inner">
+          <div className="lp-footer-brand">
+            <Gem />
+            <span className="lp-footer-word">Stapphire</span>
+            <span>— an OPNX workspace</span>
+          </div>
+          <div className="lp-footer-copy">© {new Date().getFullYear()} OPNX LLC</div>
+        </div>
+      </footer>
+    </div>
   );
 }

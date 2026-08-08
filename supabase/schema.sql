@@ -107,6 +107,21 @@ create table candidate_discovery_messages (
 );
 create index idx_cand_discovery_candidate on candidate_discovery_messages(candidate_id, created_at);
 
+-- ── Landing page signups ──────────────────────────────────────────
+-- Lightweight lead capture for the public landing page's "Get
+-- Started" CTA. No paid onboarding/org-creation flow exists yet, so
+-- this is the honest current gateway — a real lead lands here, a
+-- human follows up, rather than pretending a full self-serve signup
+-- exists when it doesn't.
+create table signups (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,
+  email text not null,
+  company text,
+  team_size text,
+  created_at timestamptz not null default now()
+);
+
 -- ── Core object 2: Candidate (normalized profile, not the raw PDF) ─
 create table candidates (
   id uuid primary key default uuid_generate_v4(),
