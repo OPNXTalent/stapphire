@@ -591,7 +591,7 @@ export function MatrixPanel({
                       <div className="prompt-box" style={{ marginBottom: 16 }} onClick={(e) => e.stopPropagation()}>
                         <textarea
                           className="prompt-input"
-                          placeholder="Add relevant information not reflected in the candidate's résumé — current responsibilities, recent experience, hiring manager feedback, demonstrated skills, certifications, internal experience, performance observations, or other job-relevant context. Example: Barbara currently works for GRTC, but her résumé has not been updated to include her current position."
+                          placeholder="Tell me..."
                           value={contextValue(c)}
                           onChange={(e) => setContextDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))}
                         />
