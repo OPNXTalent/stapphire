@@ -360,11 +360,6 @@ export function MatrixPanel({
     }
   }
 
-  function handleReevaluateSingle(candidateId: string, name: string) {
-    if (!onBulkReevaluate) return;
-    onBulkReevaluate([candidateId]);
-  }
-
   async function handleDownload(id: string) {
     setDownloading(id);
     try {
@@ -1026,21 +1021,6 @@ export function MatrixPanel({
                               {candidateChatSending === c.id ? '…' : '↑'}
                             </button>
                           </div>
-                          {onBulkReevaluate && (
-                            <div className="prompt-footer" style={{ marginTop: 6 }}>
-                              <span className="upload-hint" style={{ margin: 0 }}>
-                                The evaluation updates automatically when this conversation changes something.
-                              </span>
-                              <button
-                                className="qa-btn-text"
-                                style={{ color: 'var(--deep)', borderBottomColor: 'var(--deep)' }}
-                                onClick={() => handleReevaluateSingle(c.id, c.full_name)}
-                                title="Re-run manually, e.g. after the Hiring Decision Model changed without chatting about this candidate specifically"
-                              >
-                                Re-evaluate Now
-                              </button>
-                            </div>
-                          )}
                         </div>
                       </div>
 
