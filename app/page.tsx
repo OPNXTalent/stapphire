@@ -15,6 +15,42 @@ const DEMO_REQUISITION_ID = process.env.NEXT_PUBLIC_DEMO_REQUISITION_ID ?? '';
 
 export const dynamic = 'force-dynamic';
 
+// A stale bookmark, a stale env var, or a race during archive/delete
+// can all land someone on a requisition id that no longer resolves.
+// Rather than dead-ending there, automatically find any other real
+// requisition for the org and move to it — only show a true dead end
+// if the org genuinely has none at all.
+function NotFoundRecovery({ router }: { router: ReturnType<typeof useRouter> }) {
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/requisitions?org_id=${DEMO_ORG_ID}`, { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : { requisitions: [] }))
+      .then((data) => {
+        const list = data.requisitions ?? [];
+        if (list.length > 0) {
+          router.push(`/?requisition=${list[0].id}`);
+        } else {
+          setChecked(true);
+        }
+      })
+      .catch(() => setChecked(true));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!checked) return <div style={{ padding: 40 }}>Looking for an available requisition…</div>;
+
+  return (
+    <div style={{ padding: 40 }}>
+      <p style={{ marginBottom: 14 }}>
+        That requisition isn't available, and this organization doesn't have any others active right now.
+      </p>
+      <a href="/requisitions/new" className="qa-btn-text">
+        Create a new requisition →
+      </a>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   return (
     <Suspense fallback={<div style={{ padding: 40 }}>Loading…</div>}>
@@ -231,12 +267,28 @@ function DashboardContent() {
   // one currently on screen, jump to another open one, or start the
   // creation flow if none are left.
   async function handleArchiveRequisition(id: string) {
-    await fetch(`/api/requisitions/${id}/archive`, { method: 'POST' });
+    const res = await fetch(`/api/requisitions/${id}/archive`, { method: 'POST' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? 'Failed to archive requisition');
+      return;
+    }
 
-    if (id === requisitionId) {
-      const res = await fetch(`/api/requisitions?org_id=${DEMO_ORG_ID}`, { cache: 'no-store' });
-      const data = await res.json();
-      const remaining = (data.requisitions ?? []).filter((r: any) => r.id !== id);
+    // Read the ref, not the closed-over requisitionId — this function
+    // can be invoked from a stale render (e.g. via a memoized child),
+    // and comparing against a stale value here is exactly the kind of
+    // bug that leaves the user stranded on a requisition that just
+    // changed out from under them.
+    if (id === requisitionIdRef.current) {
+      const listRes = await fetch(`/api/requisitions?org_id=${DEMO_ORG_ID}`, { cache: 'no-store' });
+      if (!listRes.ok) {
+        // Archive itself succeeded — don't strand the user on a dead
+        // page just because this follow-up fetch failed.
+        await loadAllRequisitions();
+        return;
+      }
+      const data = await listRes.json();
+      const remaining = data.requisitions ?? [];
       if (remaining.length > 0) {
         router.push(`/?requisition=${remaining[0].id}`);
       } else {
@@ -275,7 +327,7 @@ function DashboardContent() {
   }
 
   if (loading) return <div style={{ padding: 40 }}>Loading requisition…</div>;
-  if (!requisition) return <div style={{ padding: 40 }}>Requisition not found.</div>;
+  if (!requisition) return <NotFoundRecovery router={router} />;
 
   const appClass = [
     'app',
