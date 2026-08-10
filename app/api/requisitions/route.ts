@@ -69,12 +69,41 @@ leniently any individual gap gets categorized later.
 All subcriteria weights across all five categories must be whole
 numbers summing to exactly 100.
 
+After building the model, also write a short opening_insight — the
+first thing you'd say to the recruiter before they start reviewing
+candidates, checking the measuring stick before you start measuring
+people against it. Reason beyond keyword frequency: distinguish
+foundational competencies, transferable skills, technical skills,
+industry-specific knowledge, employer-specific organizational
+knowledge, and trainable post-hire knowledge. For anything weighted
+heavily, ask whether a reasonably qualified external candidate would
+be expected to already have it before ever working here — if not,
+that's worth surfacing. Also consider whether adjacent occupational
+backgrounds could be strongly transferable even if the JD doesn't
+suggest it, and whether something that actually predicts success is
+underrepresented in the JD's own language.
+
+Cover no more than 2-4 material observations and at most one genuinely
+high-value discovery question — not a generic report, not an
+intake questionnaire. Sound like an experienced TA partner: concise,
+practical, neutral, confident, consultative. Use framing like "One
+thing I'd take a second look at," "Much of this appears trainable,"
+"This may broaden your talent pool," "I'd clarify," "Based on the role
+as written" — never "your JD is incorrect," "the requisition is
+misaligned," or "you need to change this." No HR-policy language, no AI
+filler, no lecturing, no market-analysis prose. End by making clear
+this is optional, not a gate — the recruiter can respond and refine
+the model here, or leave it as written and start reviewing candidates
+immediately. If the JD is too thin or generic to say anything genuinely
+useful, leave opening_insight as an empty string rather than manufacture
+filler observations.
+
 Call submit_hiring_profile with the result.
 `.trim();
 
 const HIRING_PROFILE_TOOL = {
   name: 'submit_hiring_profile',
-  description: 'Submit the initial weighted Hiring Decision Model parsed from the job description.',
+  description: 'Submit the initial weighted Hiring Decision Model parsed from the job description, plus a short opening insight for the recruiter.',
   input_schema: {
     type: 'object' as const,
     properties: {
@@ -99,6 +128,11 @@ const HIRING_PROFILE_TOOL = {
           required: ['name', 'subcriteria']
         },
         description: 'Exactly the five fixed categories, in order, each with its extracted subcriteria'
+      },
+      opening_insight: {
+        type: 'string',
+        description:
+          'A short, consultative opening message for the discovery chat — 2-4 material observations plus at most one discovery question. Empty string if the JD is too thin to say anything genuinely useful.'
       }
     },
     required: ['categories']
@@ -183,6 +217,8 @@ export async function POST(req: NextRequest) {
     const toolUseBlock = parseResponse.content.find((b) => b.type === 'tool_use');
     const rawCategories =
       toolUseBlock && toolUseBlock.type === 'tool_use' ? (toolUseBlock.input as any).categories : [];
+    const openingInsight: string =
+      toolUseBlock && toolUseBlock.type === 'tool_use' ? (toolUseBlock.input as any).opening_insight ?? '' : '';
 
     const profile: HiringProfile = normalizeProfileWeights({
       categories: Array.isArray(rawCategories)
@@ -219,6 +255,22 @@ export async function POST(req: NextRequest) {
       profile_snapshot: profile,
       changes: null
     });
+
+    // Checking the measuring stick before measuring candidates — this
+    // is genuinely optional context, never a gate. If it fails or
+    // comes back empty, the requisition itself is already created and
+    // fully usable; there's nothing to roll back or block on.
+    if (openingInsight.trim()) {
+      try {
+        await supabaseAdmin.from('discovery_messages').insert({
+          requisition_id: requisition.id,
+          role: 'assistant',
+          content: openingInsight.trim()
+        });
+      } catch (insightError) {
+        console.error('Failed to store opening insight (non-blocking):', insightError);
+      }
+    }
 
     return NextResponse.json({ requisition });
   } catch (err: any) {
