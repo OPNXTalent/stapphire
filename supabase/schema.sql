@@ -207,6 +207,28 @@ create table evaluations (
   risk_flags text[] not null default '{}',
   interview_recommendations jsonb,
   matrix_dimensions jsonb,            -- JD-specific comparison columns
+  -- normalized tier per matrix_dimensions key (strong/transferable/
+  -- trainable/verify/weak) — powers the cross-candidate comparison
+  -- matrix without needing a separate Claude call to assemble it
+  dimension_tiers jsonb,
+  -- the analytical thesis for this specific candidate, generated fresh
+  -- from their evidence — what kind of candidate is this and why does
+  -- the score make sense
+  thesis text,
+  -- what specifically differentiates this candidate — not a resume
+  -- summary, the most decision-relevant distinctive evidence
+  standout_reasons text,
+  -- compact, curated table: only the most decision-relevant
+  -- requirements, never every subcriterion
+  strongest_job_specific_matches jsonb,
+  -- the single concern most capable of changing the interview
+  -- decision — {summary, what_is_known, what_is_unknown, why_it_matters,
+  -- blocks_advancement}
+  most_important_concern jsonb,
+  -- genuine relative context vs other already-evaluated candidates for
+  -- this requisition — informational only, never affects this
+  -- candidate's own overall_match
+  candidate_comparison text,
 
   raw_model_response jsonb,           -- full response, retained for audit trail
   created_at timestamptz not null default now()

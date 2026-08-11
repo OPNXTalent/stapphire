@@ -48,12 +48,35 @@ export async function reevaluateCandidate(
   const buffer = Buffer.from(await fileData.arrayBuffer());
   const resumeText = await extractTextFromBuffer(buffer, candidate.source_filename ?? 'resume', undefined);
 
+  // Relative context only — informational, never allowed to change this
+  // candidate's own absolute score. Deliberately a compact headline per
+  // candidate, not their full evaluation, to keep the prompt small as
+  // the pool grows.
+  const { data: otherCandidateRows } = await supabaseAdmin
+    .from('candidates')
+    .select('id, full_name, evaluations(overall_match, thesis, strengths, created_at)')
+    .eq('requisition_id', candidate.requisition_id)
+    .is('deleted_at', null)
+    .neq('id', candidate.id);
+
+  const otherCandidates = (otherCandidateRows ?? [])
+    .map((c: any) => {
+      const latest = (c.evaluations ?? []).sort(
+        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+      if (!latest) return null;
+      const headline = latest.thesis || latest.strengths?.[0] || '';
+      return { name: c.full_name, overall_match: latest.overall_match, headline };
+    })
+    .filter((c): c is { name: string; overall_match: number; headline: string } => c !== null);
+
   const userMessage = buildEvaluationUserMessage({
     jobDescription: requisition.job_description,
     hiringProfile: requisition.evaluation_pillars,
     employerWatchlist: requisition.employer_watchlist ?? [],
     additionalContext: candidate.additional_context,
-    resumeText
+    resumeText,
+    otherCandidates
   });
 
   const response = await anthropic.messages.create({
@@ -97,6 +120,12 @@ export async function reevaluateCandidate(
       risk_flags: evaluation.risk_flags,
       interview_recommendations: evaluation.interview_recommendations,
       matrix_dimensions: evaluation.matrix_dimensions,
+      dimension_tiers: evaluation.dimension_tiers ?? null,
+      thesis: evaluation.thesis ?? null,
+      standout_reasons: evaluation.standout_reasons ?? null,
+      strongest_job_specific_matches: evaluation.strongest_job_specific_matches ?? null,
+      most_important_concern: evaluation.most_important_concern ?? null,
+      candidate_comparison: evaluation.candidate_comparison ?? null,
       raw_model_response: evaluation
     })
     .select()
