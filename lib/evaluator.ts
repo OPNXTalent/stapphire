@@ -1,5 +1,8 @@
-import { anthropic, EVALUATION_MODEL } from './anthropic';
+import OpenAI from 'openai';
 import type { ModelEvaluation } from './evaluation';
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const EVALUATION_MODEL = process.env.OPENAI_EVALUATION_MODEL || 'gpt-5.6';
 
 const SYSTEM_PROMPT = `You are a seasoned Hiring Consultant embedded within the Talent Acquisition team of a mission-driven organization. Your role is to rigorously evaluate candidate resumes against specific job descriptions. Your tone is professional and direct—focused on truth over flattery—and your assessments prioritize operational alignment, organizational priorities, and strategic value over surface-level appeal.
 
@@ -182,15 +185,21 @@ const schema = {
 } as const;
 
 export async function evaluateCandidate(jobDescription: string, resumeText: string): Promise<ModelEvaluation> {
-  const response = await anthropic.messages.create({
+  const response = await openai.responses.create({
     model: EVALUATION_MODEL,
-    max_tokens: 5000,
-    system: SYSTEM_PROMPT,
-    tools: [{ name: 'submit_candidate_evaluation', description: 'Submit the evidence-based candidate evaluation.', input_schema: schema }],
-    tool_choice: { type: 'tool', name: 'submit_candidate_evaluation' },
-    messages: [{ role: 'user', content: `JOB DESCRIPTION\n${jobDescription}\n\nCOMPLETE RESUME\n${resumeText}` }]
+    instructions: SYSTEM_PROMPT,
+    input: `JOB DESCRIPTION\n${jobDescription}\n\nCOMPLETE RESUME\n${resumeText}`,
+    max_output_tokens: 5000,
+    store: false,
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'candidate_evaluation',
+        strict: true,
+        schema
+      }
+    }
   });
-  const block = response.content.find(item => item.type === 'tool_use');
-  if (!block || block.type !== 'tool_use') throw new Error('Claude did not return a structured evaluation.');
-  return block.input as ModelEvaluation;
+  if (!response.output_text) throw new Error('OpenAI did not return a structured evaluation.');
+  return JSON.parse(response.output_text) as ModelEvaluation;
 }
