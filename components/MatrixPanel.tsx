@@ -1079,11 +1079,6 @@ export function MatrixPanel({
                                   })()}
                               </span>
                             </div>
-                            {evalu.job_description_match !== null && evalu.job_description_match !== undefined && (
-                              <span className="jd-match-audit-note">
-                                Original JD text alone: {evalu.job_description_match}% (audit reference only)
-                              </span>
-                            )}
                           </div>
 
                           {evalu.context_assessment && (

@@ -171,22 +171,25 @@ language like "Recommend Interview" in the output itself — that
 decision belongs to the human reviewer.
 
 ==================================================
-6. ONE CANONICAL SCORE
+6. ONE SCORE
 ==================================================
-overall_match — alignment with the current Hiring Decision Model — is
-the single recruiter-facing Match score and drives the verdict.
-job_description_match (alignment with the original JD text alone) is
-retained for internal audit/history only — the same reasoning
-discipline applies to it, but it is secondary and must never be
-narrated as though it competes with overall_match.
+There is one job, one current evaluation model for that job, and one
+candidate score: overall_match — "Match" — computed from the job
+description AS INTERPRETED by the current Hiring Decision Model
+(including everything recruiter/Hiring Leader discovery has clarified
+about what the role actually requires) together with the resume
+evidence. This IS the Job Description Match — discovery refines what
+the job description means, it does not create a second, competing
+score. Do not produce or reference a separate "Hiring Profile Match" or
+a literal-JD-text-only score anywhere in your output or reasoning.
 
 ==================================================
 7. ADDITIONAL CANDIDATE CONTEXT
 ==================================================
 When present, this is real evidence, not a passive note — it
-influences overall_match and job_description_match the same way resume
-evidence does, but it is a distinct source: never write about it as
-though it appeared on the resume, and never let it distort
+influences overall_match the same way resume evidence does, but it is a
+distinct source: never write about it as though it appeared on the
+resume, and never let it distort
 ats_compatibility's read on the resume's actual keyword content. Do not
 assume it's positive — it can raise alignment, lower it, confirm what
 the resume showed, resolve an unknown, or introduce a new concern; judge
@@ -295,8 +298,7 @@ export const EVALUATION_TOOL = {
     properties: {
       candidate_name: { type: 'string' },
       document_type: { type: 'string', enum: ['resume', 'non_resume'] },
-      overall_match: { type: 'number', description: 'THE canonical, recruiter-facing Candidate Match score' },
-      job_description_match: { type: 'number', description: 'Secondary/internal audit score only - never shown alongside overall_match as a competing number' },
+      overall_match: { type: 'number', description: 'THE one canonical Match score - job description as interpreted by the current Hiring Decision Model, together with resume evidence' },
       status: { type: 'string', enum: ['greenlight', 'consider', 'decline'] },
 
       thesis: {
@@ -448,7 +450,6 @@ export const EVALUATION_TOOL = {
       'candidate_name',
       'document_type',
       'overall_match',
-      'job_description_match',
       'status',
       'thesis',
       'standout_reasons',
