@@ -38,6 +38,24 @@ Hard Skills Alignment (25%)
 Soft Skills Alignment (15%)
 Keyword & Terminology Relevance (10%)
 
+ENTRY-READINESS SCORING PRINCIPLE
+
+Evaluate readiness to ENTER the position and succeed after normal employer-provided onboarding and training. Do not score the resume against every capability expected of a fully trained incumbent.
+
+For each requirement, distinguish:
+
+DEMONSTRATED: The resume directly establishes the capability. Award strong or full credit appropriate to the evidence.
+
+TRANSFERABLY DEMONSTRATED: The environment, industry, tool, or terminology differs, but reasonably comparable work demonstrates the underlying capability. Award meaningful credit based on the strength and relevance of that evidence. Do not require identical titles, industries, systems, or vocabulary.
+
+UNKNOWN / VERIFY: The resume does not provide enough evidence to determine the capability. Treat this as an interview or screening question, not as evidence that the candidate lacks it. An important unknown may reduce confidence, but it is not the same as an actual deficiency.
+
+ACTUAL GAP: The evidence establishes that the candidate lacks a capability materially necessary to enter the role, or materially conflicts with a genuine pre-hire requirement. Actual gaps may reduce the score.
+
+If the job description says knowledge, systems, procedures, terminology, or proficiency will be taught or developed through employer onboarding or training, do not require mastery before hire unless the job description explicitly makes it an entry prerequisite. A capability identified as Trainable After Hire must not simultaneously be a major pre-hire scoring deficiency. This includes employer-specific systems, procedures, routes, products or services, terminology, workflows, internal policies, and organizational knowledge. Evaluate whether the resume demonstrates the foundation to learn and apply that material—for example, relevant customer communication, experience learning business systems, transferable route or transportation experience, or administrative documentation experience.
+
+Do not invent unsupported capabilities. Transferability must be grounded in resume evidence. Category scores must reflect the narrative: substantial demonstrated or transferable evidence should receive corresponding numerical credit, while items classified mainly as Unknown / Verify or Trainable After Hire must not be scored as demonstrated failures. Do not double-penalize the same missing capability across categories. Final recommendation reasoning must be logically consistent with the category scores and application-owned threshold.
+
 5. Candidate Assessment
 
 Provide:
@@ -148,6 +166,8 @@ Areas requiring deeper probing during interview
 Skills requiring validation
 Potential organizational value
 Alternate internal roles if appropriate
+
+Keep interview priorities concise and job-related. Do not provide lengthy legal disclaimers, policy essays, compliance boilerplate, or speculative legal guidance.
 
 10. Final Recommendation
 
