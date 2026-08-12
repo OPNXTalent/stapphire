@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { verdictLabel, type ModelEvaluation, type Verdict } from '@/lib/evaluation';
 export const dynamic='force-dynamic';
 
-function List({items,empty='None identified.'}:{items:string[];empty?:string}){return items?.length?<ul className="bullets">{items.map((item,i)=><li key={i}>{item}</li>)}</ul>:<p className="muted">{empty}</p>}
+function List({items,empty='None identified.'}:{items?:string[];empty?:string}){return items?.length?<ul className="bullets">{items.map((item,i)=><li key={i}>{item}</li>)}</ul>:<p className="muted">{empty}</p>}
 
 export default async function CandidatePage({params}:{params:{id:string}}){
   const {data:candidate}=await supabaseAdmin.from('phase1_candidates').select('*,phase1_requisitions(title)').eq('id',params.id).single();if(!candidate)notFound();
@@ -18,10 +18,9 @@ export default async function CandidatePage({params}:{params:{id:string}}){
   {a.deal_breakers?.length>0&&<><h3>Transparent deal-breakers</h3><List items={a.deal_breakers}/></>}
   <h2>What to Verify</h2><List items={a.what_to_verify}/>
   <h2>Trainable After Hire</h2><List items={a.trainable_after_hire}/>
-  <h2>ATS Compatibility</h2><p><strong>{a.ats_compatibility.level}</strong> — {a.ats_compatibility.reasoning}</p>
-  <h2>Employment History Review</h2><p><strong>Previous Transit Employer:</strong> {a.employment_history_review.previous_transit_employer||'None Identified'}</p><h3>Gaps</h3><List items={a.employment_history_review.gaps}/><h3>Short tenure</h3><List items={a.employment_history_review.short_tenure}/><h3>Stability</h3><p>{a.employment_history_review.stability}</p>
+  <h2>ATS Compatibility</h2>{a.ats_compatibility?<p><strong>{a.ats_compatibility.level}</strong>{a.ats_compatibility.reasoning&&<> — {a.ats_compatibility.reasoning}</>}</p>:<p className="muted">Not provided.</p>}
+  <h2>Employment History Review</h2><p><strong>Previous Transit Employer:</strong> {a.employment_history_review?.previous_transit_employer||'None Identified'}</p><h3>Gaps</h3><List items={a.employment_history_review?.gaps}/><h3>Short tenure</h3><List items={a.employment_history_review?.short_tenure}/><h3>Stability</h3><p>{a.employment_history_review?.stability||''}</p>
   <h2>Strategic Risk Assessment</h2><p>{a.strategic_risk}</p>
   <h2>Interview Priorities</h2><List items={a.interview_priorities}/>
   <h2>Final Recommendation</h2><p><strong>{verdictLabel[verdict]}.</strong> {a.final_recommendation_reasoning}</p></article>
 }
-
