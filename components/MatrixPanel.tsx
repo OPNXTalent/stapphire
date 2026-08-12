@@ -829,8 +829,29 @@ export function MatrixPanel({
                     </div>
 
                     <div className="facet-cell matrix-row-match">
-                      <span className="score-num">{evalu.overall_match}%</span>
-                      <div className={`facet-mini ${facetTier(evalu.overall_match)}`} />
+                      {evalu.job_description_match !== null && evalu.job_description_match !== undefined ? (
+                        <div className="dual-bar-mini">
+                          <div className="dual-bar-row">
+                            <span className="dual-bar-label dual-bar-label-jd">JD</span>
+                            <div className="dual-bar-track">
+                              <div className="dual-bar-fill dual-bar-jd" style={{ width: `${evalu.job_description_match}%` }} />
+                            </div>
+                            <span className="dual-bar-num dual-bar-num-jd">{evalu.job_description_match}%</span>
+                          </div>
+                          <div className="dual-bar-row">
+                            <span className="dual-bar-label dual-bar-label-profile">HP</span>
+                            <div className="dual-bar-track">
+                              <div className="dual-bar-fill dual-bar-profile" style={{ width: `${evalu.overall_match}%` }} />
+                            </div>
+                            <span className="dual-bar-num dual-bar-num-profile">{evalu.overall_match}%</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="score-num">{evalu.overall_match}%</span>
+                          <div className={`facet-mini ${facetTier(evalu.overall_match)}`} />
+                        </>
+                      )}
                     </div>
 
                     <span className={`rec-pill ${evalu.status}`}>
@@ -1062,29 +1083,30 @@ export function MatrixPanel({
 
                       {fullEvidenceOpen[c.id] && (
                         <div className="full-evidence-panel" onClick={(e) => e.stopPropagation()}>
-                          <div className="canonical-match-row">
-                            <div className="dual-match-item">
-                              <span className="signal-label">Match</span>
-                              <span className="dual-match-num dual-match-primary">
-                                {evalu.overall_match}%
-                                {c.evaluations.length > 1 &&
-                                  (() => {
-                                    const delta = evalu.overall_match - c.evaluations[1].overall_match;
-                                    if (delta === 0) return null;
-                                    return (
-                                      <span className={`match-delta ${delta > 0 ? 'match-delta-up' : 'match-delta-down'}`}>
-                                        {delta > 0 ? '↑' : '↓'} {Math.abs(delta)}
-                                      </span>
-                                    );
-                                  })()}
-                              </span>
+                          {evalu.job_description_match !== null && evalu.job_description_match !== undefined && (
+                            <div className="dual-match-row">
+                              <div className="dual-match-item">
+                                <span className="signal-label">Job Description Match</span>
+                                <span className="dual-match-num">{evalu.job_description_match}%</span>
+                              </div>
+                              <div className="dual-match-item">
+                                <span className="signal-label">Hiring Profile Match</span>
+                                <span className="dual-match-num dual-match-primary">
+                                  {evalu.overall_match}%
+                                  {c.evaluations.length > 1 &&
+                                    (() => {
+                                      const delta = evalu.overall_match - c.evaluations[1].overall_match;
+                                      if (delta === 0) return null;
+                                      return (
+                                        <span className={`match-delta ${delta > 0 ? 'match-delta-up' : 'match-delta-down'}`}>
+                                          {delta > 0 ? '↑' : '↓'} {Math.abs(delta)}
+                                        </span>
+                                      );
+                                    })()}
+                                </span>
+                              </div>
                             </div>
-                            {evalu.job_description_match !== null && evalu.job_description_match !== undefined && (
-                              <span className="jd-match-audit-note">
-                                Original JD text alone: {evalu.job_description_match}% (audit reference only)
-                              </span>
-                            )}
-                          </div>
+                          )}
 
                           {evalu.context_assessment && (
                             <>
