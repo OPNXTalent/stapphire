@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import type { ModelEvaluation } from './evaluation';
 
 const EVALUATION_MODEL = process.env.OPENAI_EVALUATION_MODEL || 'gpt-5.6';
+const MAX_OUTPUT_TOKENS = 12000;
 
 function getOpenAIClient() {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -215,7 +216,7 @@ export async function evaluateCandidate(jobDescription: string, resumeText: stri
     model: EVALUATION_MODEL,
     instructions: SYSTEM_PROMPT,
     input: `JOB DESCRIPTION\n${jobDescription}\n\nCOMPLETE RESUME\n${resumeText}`,
-    max_output_tokens: 5000,
+    max_output_tokens: MAX_OUTPUT_TOKENS,
     store: false,
     text: {
       format: {
@@ -226,6 +227,14 @@ export async function evaluateCandidate(jobDescription: string, resumeText: stri
       }
     }
   });
+  if (response.status !== 'completed' || response.incomplete_details) {
+    const reason = response.incomplete_details?.reason || response.status || 'unknown';
+    throw new Error(`OpenAI evaluation was incomplete (${reason}). Please try again.`);
+  }
   if (!response.output_text) throw new Error('OpenAI did not return a structured evaluation.');
-  return JSON.parse(response.output_text) as ModelEvaluation;
+  try {
+    return JSON.parse(response.output_text) as ModelEvaluation;
+  } catch {
+    throw new Error('OpenAI returned an invalid structured evaluation. Please try again.');
+  }
 }
