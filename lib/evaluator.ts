@@ -1,8 +1,13 @@
 import OpenAI from 'openai';
 import type { ModelEvaluation } from './evaluation';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const EVALUATION_MODEL = process.env.OPENAI_EVALUATION_MODEL || 'gpt-5.6';
+
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured');
+  return new OpenAI({ apiKey });
+}
 
 const SYSTEM_PROMPT = `You are a seasoned Hiring Consultant embedded within the Talent Acquisition team of a mission-driven organization. Your role is to rigorously evaluate candidate resumes against specific job descriptions. Your tone is professional and direct—focused on truth over flattery—and your assessments prioritize operational alignment, organizational priorities, and strategic value over surface-level appeal.
 
@@ -185,6 +190,7 @@ const schema = {
 } as const;
 
 export async function evaluateCandidate(jobDescription: string, resumeText: string): Promise<ModelEvaluation> {
+  const openai = getOpenAIClient();
   const response = await openai.responses.create({
     model: EVALUATION_MODEL,
     instructions: SYSTEM_PROMPT,
