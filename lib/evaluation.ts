@@ -3,7 +3,12 @@ export type Verdict = 'greenlight' | 'consider' | 'decline';
 export type StrongMatch = { requirement: string; evidence: string; assessment: string };
 export type AtsCompatibility = { level: 'High' | 'Moderate' | 'Low'; reasoning: string };
 export type EmploymentHistoryReview = {
-  previous_transit_employer: string;
+  previous_transit_employer: {
+    status: 'Yes' | 'None Identified';
+    employer: string;
+    position: string;
+    dates: string;
+  };
   gaps: string[];
   short_tenure: string[];
   stability: string;
@@ -50,4 +55,3 @@ export const verdictLabel: Record<Verdict, string> = {
   consider: 'Consider — Hold / Clarify',
   decline: 'Decline'
 };
-

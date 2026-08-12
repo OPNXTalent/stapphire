@@ -90,19 +90,7 @@ Greater Richmond Transit Company
 We Drive U
 First Transit
 
-If found, report:
-
-Previous Transit Employer: Yes
-
-List:
-
-Employer
-Position
-Dates of Employment
-
-If none are found, report:
-
-Previous Transit Employer: None Identified
+Return the finding through the structured previous_transit_employer fields only. Do not include labels such as "Previous Transit Employer:", "Employer:", "Position:", or "Dates:" inside field values. If found, set status to Yes and provide employer, position, and dates. If none are found, set status to None Identified and leave employer, position, and dates empty.
 
 Employment Gap Review
 
@@ -190,22 +178,22 @@ const schema = {
   type: 'object', additionalProperties: false,
   required: ['candidate_name','job_responsibilities_score','hard_skills_score','soft_skills_score','keyword_terminology_score','assessment','standout_reasons','strongest_matches','most_important_concern','what_to_verify','trainable_after_hire','ats_compatibility','employment_history_review','strategic_risk','interview_priorities','final_recommendation_reasoning','deal_breakers'],
   properties: {
-    candidate_name: { type: 'string' },
+    candidate_name: { type: 'string', description: 'Candidate name exactly as shown on the resume, with no label or surrounding prose.' },
     job_responsibilities_score: { type: 'integer', minimum: 0, maximum: 100 },
     hard_skills_score: { type: 'integer', minimum: 0, maximum: 100 },
     soft_skills_score: { type: 'integer', minimum: 0, maximum: 100 },
     keyword_terminology_score: { type: 'integer', minimum: 0, maximum: 100 },
-    assessment: { type: 'string' },
-    standout_reasons: { type: 'array', items: { type: 'string' } },
-    strongest_matches: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['requirement','evidence','assessment'], properties: { requirement: {type:'string'}, evidence: {type:'string'}, assessment: {type:'string'} } } },
-    most_important_concern: { type: 'string' },
-    what_to_verify: { type: 'array', items: { type: 'string' } },
-    trainable_after_hire: { type: 'array', items: { type: 'string' } },
-    ats_compatibility: { type: 'object', additionalProperties: false, required: ['level','reasoning'], properties: { level: {type:'string', enum:['High','Moderate','Low']}, reasoning: {type:'string'} } },
-    employment_history_review: { type: 'object', additionalProperties: false, required: ['previous_transit_employer','gaps','short_tenure','stability'], properties: { previous_transit_employer:{type:'string'}, gaps:{type:'array',items:{type:'string'}}, short_tenure:{type:'array',items:{type:'string'}}, stability:{type:'string'} } },
-    strategic_risk: { type: 'string' },
-    interview_priorities: { type: 'array', items: { type: 'string' }, maxItems: 5 },
-    final_recommendation_reasoning: { type: 'string' },
+    assessment: { type: 'string', description: 'Professional, direct, evidence-based assessment in clear prose. Do not include a section heading.' },
+    standout_reasons: { type: 'array', description: 'Concise evidence-supported differentiators, without bullets or labels in the values.', items: { type: 'string', maxLength: 300 } },
+    strongest_matches: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['requirement','evidence','assessment'], properties: { requirement: {type:'string',description:'Concise job requirement without a label.'}, evidence: {type:'string',description:'Specific resume evidence without a label.'}, assessment: {type:'string',description:'Concise professional interpretation without a label.'} } } },
+    most_important_concern: { type: 'string', description: 'One concise evidence-based concern, or an empty string if none. Do not include a heading.' },
+    what_to_verify: { type: 'array', description: 'Concise job-related unknowns to verify; describe undocumented facts as unknown rather than absent.', items: { type: 'string', maxLength: 240 } },
+    trainable_after_hire: { type: 'array', description: 'Concise trainable areas without headings or labels.', items: { type: 'string', maxLength: 240 } },
+    ats_compatibility: { type: 'object', additionalProperties: false, required: ['level','reasoning'], properties: { level: {type:'string', enum:['High','Moderate','Low']}, reasoning: {type:'string',description:'Concise explanation without repeating the compatibility level as a label.'} } },
+    employment_history_review: { type: 'object', additionalProperties: false, required: ['previous_transit_employer','gaps','short_tenure','stability'], properties: { previous_transit_employer:{type:'object',additionalProperties:false,required:['status','employer','position','dates'],properties:{status:{type:'string',enum:['Yes','None Identified']},employer:{type:'string',description:'Employer name only; empty when none.'},position:{type:'string',description:'Position only; empty when none.'},dates:{type:'string',description:'Employment dates only; empty when none.'}}}, gaps:{type:'array',description:'Factual gap findings without section labels.',items:{type:'string',maxLength:300}}, short_tenure:{type:'array',description:'Factual short-tenure findings without section labels.',items:{type:'string',maxLength:300}}, stability:{type:'string',description:'Concise factual stability assessment without a label.'} } },
+    strategic_risk: { type: 'string', description: 'Concise objective risk assessment without a heading or boilerplate.' },
+    interview_priorities: { type: 'array', description: 'Three to five concise, practical, job-related interview objectives. Each item must contain one objective only. No legal disclaimers, policy or compliance commentary, general hiring advice, alternate-role suggestions, or multiple unrelated questions.', items: { type: 'string', maxLength: 180 }, minItems: 0, maxItems: 5 },
+    final_recommendation_reasoning: { type: 'string', description: 'Concise evidence-based explanation consistent with the application-owned verdict. Do not state or override a verdict label.' },
     deal_breakers: { type: 'array', items: { type: 'string' } }
   }
 } as const;
