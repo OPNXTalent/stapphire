@@ -197,7 +197,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const { data: latestEvaluation } = await supabaseAdmin
       .from('evaluations')
-      .select('overall_match, job_description_match, status, strengths, gaps_structured, matrix_dimensions, risk_flags')
+      .select('overall_match, status, strengths, gaps_structured, matrix_dimensions, risk_flags')
       .eq('candidate_id', params.id)
       .order('created_at', { ascending: false })
       .limit(1)

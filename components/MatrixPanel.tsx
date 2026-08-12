@@ -17,12 +17,20 @@ type GapItem = {
   category: 'critical' | 'moderate' | 'trainable' | 'resume_gap' | 'verification' | 'employer_specific' | 'superseded';
 };
 
+type CategoryScores = {
+  job_responsibilities_score: number;
+  hard_skills_score: number;
+  soft_skills_score: number;
+  keyword_terminology_score: number;
+};
+
 type Evaluation = {
   overall_match: number;
-  job_description_match: number | null;
   status: 'greenlight' | 'consider' | 'decline';
   profile_revision?: number | null;
   prompt_version?: string | null;
+  scores?: CategoryScores | null;
+  deal_breakers?: string[] | null;
   signals: Record<string, string>;
   matrix_dimensions: Record<string, string>;
   strengths: string[];
@@ -1080,6 +1088,50 @@ export function MatrixPanel({
                               </span>
                             </div>
                           </div>
+
+                          {evalu.deal_breakers && evalu.deal_breakers.length > 0 && (
+                            <div className="deal-breaker-banner">
+                              <div className="section-label" style={{ color: 'var(--red)' }}>
+                                Deal-Breaker{evalu.deal_breakers.length > 1 ? 's' : ''}
+                              </div>
+                              <ul className="plain gaps">
+                                {evalu.deal_breakers.map((d, idx) => (
+                                  <li key={idx}>{d}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {evalu.scores &&
+                            typeof evalu.scores.job_responsibilities_score === 'number' && (
+                              <>
+                                <div className="section-label">Category Scores</div>
+                                <table className="category-score-table">
+                                  <tbody>
+                                    <tr>
+                                      <td>Job Responsibilities</td>
+                                      <td className="cst-weight">50%</td>
+                                      <td className="cst-score">{evalu.scores.job_responsibilities_score}%</td>
+                                    </tr>
+                                    <tr>
+                                      <td>Hard Skills</td>
+                                      <td className="cst-weight">25%</td>
+                                      <td className="cst-score">{evalu.scores.hard_skills_score}%</td>
+                                    </tr>
+                                    <tr>
+                                      <td>Soft Skills</td>
+                                      <td className="cst-weight">15%</td>
+                                      <td className="cst-score">{evalu.scores.soft_skills_score}%</td>
+                                    </tr>
+                                    <tr>
+                                      <td>Keyword &amp; Terminology</td>
+                                      <td className="cst-weight">10%</td>
+                                      <td className="cst-score">{evalu.scores.keyword_terminology_score}%</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </>
+                            )}
 
                           {evalu.context_assessment && (
                             <>

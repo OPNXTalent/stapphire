@@ -472,6 +472,19 @@
   }
 
   .canonical-match-row{ margin-bottom:16px; }
+
+  .deal-breaker-banner{
+    background: var(--red-tint); border:1px solid var(--red); border-radius: var(--radius);
+    padding:10px 14px; margin-bottom:16px;
+  }
+  .deal-breaker-banner .plain.gaps{ margin:6px 0 0; }
+  .deal-breaker-banner li{ color: var(--red); font-weight:600; }
+
+  .category-score-table{ width:100%; border-collapse:collapse; margin-bottom:18px; font-size:12.5px; }
+  .category-score-table td{ padding:6px 4px; border-bottom:1px solid var(--line); }
+  .category-score-table tr:last-child td{ border-bottom:none; }
+  .category-score-table .cst-weight{ color: var(--ink-faint); font-family: var(--font-mono); width:50px; }
+  .category-score-table .cst-score{ color: var(--sapphire); font-family: var(--font-mono); font-weight:700; width:50px; text-align:right; }
   .dual-match-item{
     display:flex; flex-direction:column; gap:4px; margin-bottom:6px;
     padding:10px 12px; border:1px solid var(--line); border-radius: var(--radius); background: var(--paper-cool);
