@@ -194,7 +194,13 @@ create table evaluations (
   prompt_version text,
   status text not null check (status in ('greenlight','consider','decline')),
 
-  scores jsonb not null,              -- job_responsibilities, hard_skills, soft_skills, keyword_relevance
+  scores jsonb not null,              -- job_responsibilities_score, hard_skills_score, soft_skills_score, keyword_terminology_score (0-100 each, Claude-assigned) - overall_match is calculated deterministically FROM these by application code, never returned by the model
+  -- required, non-negotiable items affirmatively missing or
+  -- contradicted (license, certification, clearance) - forces verdict
+  -- to decline regardless of the calculated Match score, shown
+  -- separately for transparency rather than secretly suppressing the
+  -- score itself
+  deal_breakers jsonb,
   signals jsonb not null,             -- resume_confidence, evidence_quality, location_fit, employment_status, timeline_review, certifications
   strengths text[] not null default '{}',
   gaps text[] not null default '{}',   -- flat descriptions, derived from gaps_structured for backward compat

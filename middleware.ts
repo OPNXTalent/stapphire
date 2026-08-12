@@ -33,13 +33,11 @@ const GATE_EXEMPT_PREFIXES = [
 // here — everything under /api/requisitions/[id]/* (discovery chat,
 // disposition, etc.) is deliberately left alone, since shared-link
 // viewers and collaborators depend on those and don't have the site
-// password. /api/organizations/* and /api/diagnostic/* have no such
-// overlap — every route under either is a recruiter-only or
-// diagnostic-only action.
+// password. /api/organizations/* has no such overlap — every route
+// under it is a recruiter-dashboard-only action.
 function isGatedApi(pathname: string): boolean {
   if (pathname === '/api/requisitions') return true;
   if (pathname === '/api/organizations' || pathname.startsWith('/api/organizations/')) return true;
-  if (pathname === '/api/diagnostic' || pathname.startsWith('/api/diagnostic/')) return true;
   return false;
 }
 

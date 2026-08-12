@@ -1,6 +1,13 @@
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { anthropic, EVALUATION_MODEL } from '@/lib/anthropic';
-import { EVALUATION_SYSTEM_PROMPT, EVALUATION_TOOL, buildEvaluationUserMessage, EVALUATION_PROMPT_VERSION } from '@/lib/systemPrompt';
+import {
+  EVALUATION_SYSTEM_PROMPT,
+  EVALUATION_TOOL,
+  buildEvaluationUserMessage,
+  EVALUATION_PROMPT_VERSION,
+  calculateMatch,
+  calculateStatus
+} from '@/lib/systemPrompt';
 import { extractTextFromBuffer } from '@/lib/extractText';
 
 // Re-running an evaluation against a candidate you've already paid to
@@ -95,6 +102,21 @@ export async function reevaluateCandidate(
 
   const evaluation = toolUseBlock.input as any;
 
+  // The one and only place this candidate's Match and verdict get
+  // computed — deterministically, from Claude's four category scores.
+  // Claude never sees this arithmetic and never returns a final number
+  // itself, so there's no way for a holistic-but-unverified guess to
+  // drift from the category-level reasoning that's supposed to support it.
+  const categoryScores = {
+    job_responsibilities_score: evaluation.job_responsibilities_score,
+    hard_skills_score: evaluation.hard_skills_score,
+    soft_skills_score: evaluation.soft_skills_score,
+    keyword_terminology_score: evaluation.keyword_terminology_score
+  };
+  const dealBreakers: string[] = evaluation.deal_breakers ?? [];
+  const overallMatch = calculateMatch(categoryScores);
+  const status = calculateStatus(overallMatch, dealBreakers);
+
   await supabaseAdmin.from('candidates').update({ resume_text: resumeText }).eq('id', candidate.id);
 
   const { data: evalRow, error: evalError } = await supabaseAdmin
@@ -102,15 +124,15 @@ export async function reevaluateCandidate(
     .insert({
       candidate_id: candidate.id,
       requisition_id: requisition.id,
-      overall_match: evaluation.overall_match,
-      job_description_match: evaluation.job_description_match ?? null,
+      overall_match: overallMatch,
       profile_revision: requisition.profile_revision ?? null,
       additional_context_snapshot: candidate.additional_context ?? null,
       context_assessment: evaluation.context_assessment ?? null,
       resume_gap_flag: evaluation.resume_gap_flag ?? null,
       prompt_version: EVALUATION_PROMPT_VERSION,
-      status: evaluation.status,
-      scores: evaluation.category_scores ?? evaluation.scores ?? null,
+      status,
+      scores: categoryScores,
+      deal_breakers: dealBreakers.length > 0 ? dealBreakers : null,
       signals: evaluation.signals,
       strengths: evaluation.strengths,
       gaps: (evaluation.gaps_structured ?? []).map((g: any) => g.description),
