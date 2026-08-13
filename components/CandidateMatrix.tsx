@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { type Verdict } from '@/lib/evaluation';
 import { CandidateReport } from '@/components/CandidateReport';
@@ -34,11 +34,22 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
   const [dispositionFilter, setDispositionFilter] = useState<DispositionFilter>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [dispositions, setDispositions] = useState<Record<string, Disposition | null>>(() =>
     Object.fromEntries(candidates.map((c) => [c.id, c.disposition]))
   );
   const [savingId, setSavingId] = useState<string | null>(null);
+
+  // candidates is the single source of truth - it's server-fetched and
+  // already excludes anyone soft-deleted. Re-sync whenever it changes
+  // (e.g. after a delete or a restore triggers router.refresh()) rather
+  // than tracking removal/disposition as separate local state that can
+  // silently drift out of sync with what the server actually has. That
+  // drift was exactly why restore appeared broken - a restored
+  // candidate would come back in this prop, but a stale local "removed"
+  // set kept hiding them anyway.
+  useEffect(() => {
+    setDispositions(Object.fromEntries(candidates.map((c) => [c.id, c.disposition])));
+  }, [candidates]);
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -62,10 +73,8 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
       });
       if (!res.ok) throw new Error('Failed to save');
       if (next === 'delete') {
-        // A real action, not just a label - the candidate leaves the
-        // matrix immediately, and a background refresh keeps the
-        // trash bin's count (fed by the server) in sync.
-        setRemovedIds((prev) => new Set(prev).add(id));
+        // Refetch from the server, which now excludes this candidate -
+        // no local "hide it" tracking needed, the prop update handles it.
         router.refresh();
       }
     } catch {
@@ -76,12 +85,8 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
   }
 
   const rows = useMemo(
-    () =>
-      candidates.filter(
-        (candidate) =>
-          !removedIds.has(candidate.id) && (dispositionFilter === 'all' || dispositions[candidate.id] === dispositionFilter)
-      ),
-    [candidates, dispositionFilter, dispositions, removedIds]
+    () => candidates.filter((candidate) => dispositionFilter === 'all' || dispositions[candidate.id] === dispositionFilter),
+    [candidates, dispositionFilter, dispositions]
   );
 
   if (!candidates.length) {
@@ -155,7 +160,7 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
                   <option value="screen">Screen</option>
                   <option value="interview">Interview</option>
                   <option value="hire">Hire</option>
-                  <option value="delete">Delete</option>
+                  <option value="delete">Did Not Select</option>
                 </select>
               </div>
 
