@@ -18,5 +18,5 @@ export default async function RequisitionPage({params}:{params:{id:string}}){
   const requisitionView = <div className="split"><section><h2>Job Description</h2><div className="jd">{req.job_description}</div></section><ResumeUpload requisitionId={req.id}/></div>;
   const candidatesView = <><h2>Candidate Matrix</h2><p className="muted">Compare evaluated candidates and open a name for the full assessment.</p><CandidateMatrix candidates={matrixCandidates}/></>;
 
-  return <><a className="back" href="/">← Requisitions</a><h1>{req.title}</h1><RequisitionViewToggle requisitionView={requisitionView} candidatesView={candidatesView}/></>;
+  return <RequisitionViewToggle title={req.title} requisitionView={requisitionView} candidatesView={candidatesView}/>;
 }

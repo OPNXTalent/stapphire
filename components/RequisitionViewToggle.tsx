@@ -13,9 +13,11 @@ type View = 'requisition' | 'candidates';
 // you, never which view you're already in. The current view has to
 // read from the page heading/content itself, not from this control.
 export function RequisitionViewToggle({
+  title,
   requisitionView,
   candidatesView
 }: {
+  title: string;
   requisitionView: ReactNode;
   candidatesView: ReactNode;
 }) {
@@ -34,6 +36,8 @@ export function RequisitionViewToggle({
           {goingTo === 'candidates' ? 'Candidates →' : '← Requisition'}
         </span>
       </button>
+
+      <h1>{title}</h1>
 
       <div hidden={view !== 'requisition'}>{requisitionView}</div>
       <div hidden={view !== 'candidates'}>{candidatesView}</div>
