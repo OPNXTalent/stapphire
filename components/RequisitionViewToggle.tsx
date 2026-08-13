@@ -21,7 +21,7 @@ export function RequisitionViewToggle({
   requisitionView: ReactNode;
   candidatesView: ReactNode;
 }) {
-  const [view, setView] = useState<View>('requisition');
+  const [view, setView] = useState<View>('candidates');
   const goingTo = view === 'requisition' ? 'candidates' : 'requisition';
 
   return (

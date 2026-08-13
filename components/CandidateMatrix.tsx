@@ -123,7 +123,9 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
     }
   }
 
-  const rows = candidates;
+  const rows = expandedId
+    ? [...candidates].sort((a, b) => (a.id === expandedId ? -1 : b.id === expandedId ? 1 : 0))
+    : candidates;
 
   if (!candidates.length) {
     return (
