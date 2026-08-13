@@ -16,9 +16,20 @@ export async function gateToken(password: string): Promise<string> {
     .join('');
 }
 
+export function isProductionEnv(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
+
 export async function isGateCookieValid(cookieValue: string | undefined): Promise<boolean> {
   const sitePassword = process.env.SITE_PASSWORD;
-  if (!sitePassword) return true; // gate not configured - fail open, same as middleware
+  if (!sitePassword) {
+    // Missing configuration fails OPEN only outside production, purely
+    // for local developer convenience before SITE_PASSWORD is set. In
+    // production, a missing password must never grant access to real
+    // data - that would make the gate worse than having none, since it
+    // would look protected while silently exposing everything.
+    return !isProductionEnv();
+  }
   if (!cookieValue) return false;
   return cookieValue === (await gateToken(sitePassword));
 }

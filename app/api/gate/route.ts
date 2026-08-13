@@ -6,7 +6,7 @@ import { GATE_COOKIE, gateToken } from '@/lib/gate';
 export async function POST(req: NextRequest) {
   const sitePassword = process.env.SITE_PASSWORD;
   if (!sitePassword) {
-    return NextResponse.json({ error: 'Site password is not configured on the server.' }, { status: 500 });
+    return NextResponse.json({ error: 'Site password is not configured on the server.' }, { status: 503 });
   }
 
   const { password } = await req.json().catch(() => ({ password: '' }));
