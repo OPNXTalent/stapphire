@@ -10,6 +10,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
 
   function addFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -28,9 +29,12 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   }
 
   async function upload() {
+    const toProcess = queue.map((q, i) => ({ ...q, i })).filter((q) => q.status === 'staged');
     setBusy(true);
-    for (let i = 0; i < queue.length; i++) {
-      if (queue[i].status !== 'staged') continue;
+    setProgress({ done: 0, total: toProcess.length });
+
+    for (let k = 0; k < toProcess.length; k++) {
+      const i = toProcess[k].i;
       setQueue((prev) => prev.map((item, idx) => (idx === i ? { ...item, status: 'processing' } : item)));
       try {
         const form = new FormData();
@@ -44,13 +48,18 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
           prev.map((item, idx) => (idx === i ? { ...item, status: 'error', message: err instanceof Error ? err.message : 'Evaluation failed.' } : item))
         );
       }
+      // Streamed, not batched - each candidate appears in the matrix
+      // as soon as their own evaluation finishes, not after the whole
+      // upload completes.
+      setProgress((prev) => ({ ...prev, done: prev.done + 1 }));
+      router.refresh();
     }
+
     setBusy(false);
-    router.refresh();
   }
 
   const stagedCount = queue.filter((q) => q.status === 'staged').length;
-  const ICON: Record<FileStatus, string> = { staged: '·', processing: '…', done: '✓', error: '✕' };
+  const remaining = progress.total - progress.done;
 
   return (
     <div className="upload-bar">
@@ -59,7 +68,13 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
         <ul className="upload-queue">
           {queue.map((item, i) => (
             <li key={i} className={`upload-queue-item upload-queue-${item.status}`}>
-              <span className="upload-queue-icon">{ICON[item.status]}</span>
+              <span className="upload-queue-icon">
+                {item.status === 'processing' ? (
+                  <span className="upload-spinner" aria-hidden="true" />
+                ) : (
+                  { staged: '·', done: '✓', error: '✕' }[item.status]
+                )}
+              </span>
               <span className="upload-queue-name">{item.file.name}</span>
               {item.message && <span className="upload-queue-msg">{item.message}</span>}
               {item.status === 'staged' && (
@@ -75,10 +90,16 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
         <button type="button" className="upload-add-btn" onClick={() => inputRef.current?.click()} disabled={busy}>
           + Add résumés
         </button>
-        {stagedCount > 0 && (
-          <button type="button" className="upload-go-btn" onClick={upload} disabled={busy}>
-            {busy ? 'Uploading…' : `Upload ${stagedCount}`}
+        {stagedCount > 0 && !busy && (
+          <button type="button" className="upload-go-btn" onClick={upload}>
+            Upload {stagedCount}
           </button>
+        )}
+        {busy && (
+          <span className="upload-progress">
+            <span className="upload-spinner" aria-hidden="true" />
+            Evaluating {progress.done + 1} of {progress.total} — {remaining} remaining
+          </span>
         )}
       </div>
     </div>
