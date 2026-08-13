@@ -19,11 +19,11 @@
 .facet-mini.strong{background:var(--deep)}
 .facet-mini.moderate{background:var(--sapphire-2)}
 .facet-mini.limited{background:var(--line-strong)}
-.disposition-badge{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.03em;padding:3px 9px;border-radius:3px;white-space:nowrap;flex-shrink:0;text-transform:uppercase}
-.disposition-badge.screen{background:var(--sapphire-pale);color:var(--sapphire)}
-.disposition-badge.interview{background:var(--amber-tint);color:var(--amber)}
-.disposition-badge.hire{background:var(--green-tint);color:var(--green)}
-.disposition-badge.delete{background:var(--red-tint);color:var(--red)}
+.disposition-select{width:auto;flex-shrink:0;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.03em;padding:5px 9px;border:1px solid var(--line-strong);border-radius:4px;background:#fff;color:var(--muted)}
+.disposition-select.screen{color:var(--sapphire);border-color:var(--sapphire)}
+.disposition-select.interview{color:var(--amber);border-color:var(--amber)}
+.disposition-select.hire{color:var(--green);border-color:var(--green)}
+.disposition-select.delete{color:var(--red);border-color:var(--red)}
 
 .matrix-row-body{padding:0 16px 24px}
 .matrix-row-body .evaluation{border:none;box-shadow:none;padding:0;max-width:none;margin:0}

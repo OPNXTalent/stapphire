@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { type Verdict } from '@/lib/evaluation';
 import { CandidateReport } from '@/components/CandidateReport';
@@ -41,7 +41,8 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
   const [dispositions, setDispositions] = useState<Record<string, Disposition | null>>(() =>
     Object.fromEntries(candidates.map((c) => [c.id, c.disposition]))
   );
-  const [busy, setBusy] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   // candidates is the single source of truth (server-fetched, already
   // excludes soft-deleted). Resync whenever it changes rather than
@@ -66,6 +67,29 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
     setSelectedIds(allSelected ? new Set() : new Set(candidates.map((c) => c.id)));
   }
 
+  // Sets disposition for exactly one candidate - the per-row dropdown.
+  async function updateDisposition(id: string, value: string) {
+    const next = (value || null) as Disposition | null;
+    const previous = dispositions[id];
+    setDispositions((prev) => ({ ...prev, [id]: next }));
+    setSavingId(id);
+    try {
+      const res = await fetch(`/api/candidates/${id}/disposition`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disposition: next ?? '' })
+      });
+      if (!res.ok) throw new Error('Failed to save');
+      if (next === 'delete') router.refresh();
+    } catch {
+      setDispositions((prev) => ({ ...prev, [id]: previous }));
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  // Sets the same disposition across every currently-selected candidate
+  // at once - the bulk dropdown, driven by the checkboxes.
   async function applyDispositionToSelected(value: string) {
     if (!value || selectedIds.size === 0) return;
     const next = value as Disposition;
@@ -77,7 +101,7 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
       ids.forEach((id) => (copy[id] = next));
       return copy;
     });
-    setBusy(true);
+    setBulkBusy(true);
     try {
       const results = await Promise.all(
         ids.map((id) =>
@@ -95,7 +119,7 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
       setDispositions(previous);
       alert('Unable to update one or more candidates. Try again.');
     } finally {
-      setBusy(false);
+      setBulkBusy(false);
     }
   }
 
@@ -121,7 +145,7 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
           className="matrix-bulk-disposition"
           value=""
           onChange={(e) => applyDispositionToSelected(e.target.value)}
-          disabled={busy || selectedIds.size === 0}
+          disabled={bulkBusy || selectedIds.size === 0}
         >
           <option value="">
             {selectedIds.size === 0 ? 'Set disposition…' : `Set disposition for ${selectedIds.size} selected…`}
@@ -165,7 +189,19 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
                   <span className="score-num">{candidate.match === null ? '—' : `${candidate.match}%`}</span>
                   <span className={`facet-mini ${facetTier(candidate.match)}`} />
                 </span>
-                {disposition && <span className={`disposition-badge ${disposition}`}>{DISPOSITION_LABEL[disposition]}</span>}
+                <select
+                  className={`disposition-select ${disposition || ''}`}
+                  value={disposition || ''}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => updateDisposition(candidate.id, e.target.value)}
+                  disabled={savingId === candidate.id}
+                >
+                  <option value="">Disposition…</option>
+                  <option value="screen">{DISPOSITION_LABEL.screen}</option>
+                  <option value="interview">{DISPOSITION_LABEL.interview}</option>
+                  <option value="hire">{DISPOSITION_LABEL.hire}</option>
+                  <option value="delete">{DISPOSITION_LABEL.delete}</option>
+                </select>
               </div>
 
               {isOpen && (
