@@ -11,32 +11,49 @@ export type DNSCandidate = { id: string; name: string; deletedAt: string };
 export function DNSBin({ candidates }: { candidates: DNSCandidate[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
 
-  async function restore(id: string) {
-    setBusyId(id);
+  const allSelected = candidates.length > 0 && selectedIds.size === candidates.length;
+
+  function toggleOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelectedIds(allSelected ? new Set() : new Set(candidates.map((c) => c.id)));
+  }
+
+  async function restoreSelected() {
+    setBusy(true);
     try {
-      const res = await fetch(`/api/candidates/${id}/restore`, { method: 'POST' });
-      if (!res.ok) throw new Error();
+      await Promise.all(Array.from(selectedIds).map((id) => fetch(`/api/candidates/${id}/restore`, { method: 'POST' })));
+      setSelectedIds(new Set());
       router.refresh();
     } catch {
-      alert('Unable to restore this candidate. Try again.');
+      alert('Unable to restore one or more candidates. Try again.');
     } finally {
-      setBusyId(null);
+      setBusy(false);
     }
   }
 
-  async function permanentlyDelete(id: string, name: string) {
-    if (!confirm(`Permanently delete ${name}? This cannot be undone.`)) return;
-    setBusyId(id);
+  async function deleteSelected() {
+    const count = selectedIds.size;
+    if (!confirm(`Permanently delete ${count} candidate${count === 1 ? '' : 's'}? This cannot be undone.`)) return;
+    setBusy(true);
     try {
-      const res = await fetch(`/api/candidates/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
+      await Promise.all(Array.from(selectedIds).map((id) => fetch(`/api/candidates/${id}`, { method: 'DELETE' })));
+      setSelectedIds(new Set());
       router.refresh();
     } catch {
-      alert('Unable to permanently delete this candidate. Try again.');
+      alert('Unable to permanently delete one or more candidates. Try again.');
     } finally {
-      setBusyId(null);
+      setBusy(false);
     }
   }
 
@@ -48,19 +65,35 @@ export function DNSBin({ candidates }: { candidates: DNSCandidate[] }) {
         DNS ({candidates.length})
       </button>
       {open && (
-        <ul className="dns-bin-list">
-          {candidates.map((c) => (
-            <li key={c.id} className="dns-bin-item">
-              <span className="dns-bin-name">{c.name}</span>
-              <button type="button" onClick={() => restore(c.id)} disabled={busyId === c.id}>
+        <div className="dns-bin-panel">
+          <div className="dns-bin-actions">
+            <label className="dns-bin-selectall">
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+              Select all
+            </label>
+            <div className="dns-bin-actions-btns">
+              <button type="button" onClick={restoreSelected} disabled={busy || selectedIds.size === 0}>
                 Restore
               </button>
-              <button type="button" className="dns-bin-delete" onClick={() => permanentlyDelete(c.id, c.name)} disabled={busyId === c.id}>
-                Delete forever
+              <button type="button" className="dns-bin-delete" onClick={deleteSelected} disabled={busy || selectedIds.size === 0}>
+                Delete
               </button>
-            </li>
-          ))}
-        </ul>
+            </div>
+          </div>
+          <ul className="dns-bin-list">
+            {candidates.map((c) => (
+              <li key={c.id} className="dns-bin-item">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(c.id)}
+                  onChange={() => toggleOne(c.id)}
+                  aria-label={`Select ${c.name}`}
+                />
+                <span className="dns-bin-name">{c.name}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );
