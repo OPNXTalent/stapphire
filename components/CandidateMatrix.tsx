@@ -20,7 +20,12 @@ export type MatrixCandidate = {
   disposition: Disposition | null;
 };
 
-type DispositionFilter = 'all' | Disposition;
+const DISPOSITION_LABEL: Record<Disposition, string> = {
+  screen: 'Screen',
+  interview: 'Interview',
+  hire: 'Hire',
+  delete: 'Did Not Select'
+};
 
 function facetTier(score: number | null): 'strong' | 'moderate' | 'limited' {
   if (score === null) return 'limited';
@@ -31,27 +36,24 @@ function facetTier(score: number | null): 'strong' | 'moderate' | 'limited' {
 
 export function CandidateMatrix({ candidates, positionTitle }: { candidates: MatrixCandidate[]; positionTitle: string }) {
   const router = useRouter();
-  const [dispositionFilter, setDispositionFilter] = useState<DispositionFilter>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [dispositions, setDispositions] = useState<Record<string, Disposition | null>>(() =>
     Object.fromEntries(candidates.map((c) => [c.id, c.disposition]))
   );
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  // candidates is the single source of truth - it's server-fetched and
-  // already excludes anyone soft-deleted. Re-sync whenever it changes
-  // (e.g. after a delete or a restore triggers router.refresh()) rather
-  // than tracking removal/disposition as separate local state that can
-  // silently drift out of sync with what the server actually has. That
-  // drift was exactly why restore appeared broken - a restored
-  // candidate would come back in this prop, but a stale local "removed"
-  // set kept hiding them anyway.
+  // candidates is the single source of truth (server-fetched, already
+  // excludes soft-deleted). Resync whenever it changes rather than
+  // trusting local state, which can otherwise silently drift after a
+  // refresh.
   useEffect(() => {
     setDispositions(Object.fromEntries(candidates.map((c) => [c.id, c.disposition])));
   }, [candidates]);
 
-  function toggleSelect(id: string) {
+  const allSelected = candidates.length > 0 && selectedIds.size === candidates.length;
+
+  function toggleOne(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -60,34 +62,44 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
     });
   }
 
-  async function updateDisposition(id: string, value: string) {
-    const next = (value || null) as Disposition | null;
-    const previous = dispositions[id];
-    setDispositions((prev) => ({ ...prev, [id]: next }));
-    setSavingId(id);
+  function toggleAll() {
+    setSelectedIds(allSelected ? new Set() : new Set(candidates.map((c) => c.id)));
+  }
+
+  async function applyDispositionToSelected(value: string) {
+    if (!value || selectedIds.size === 0) return;
+    const next = value as Disposition;
+    const ids = Array.from(selectedIds);
+    const previous = { ...dispositions };
+
+    setDispositions((prev) => {
+      const copy = { ...prev };
+      ids.forEach((id) => (copy[id] = next));
+      return copy;
+    });
+    setBusy(true);
     try {
-      const res = await fetch(`/api/candidates/${id}/disposition`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ disposition: next ?? '' })
-      });
-      if (!res.ok) throw new Error('Failed to save');
-      if (next === 'delete') {
-        // Refetch from the server, which now excludes this candidate -
-        // no local "hide it" tracking needed, the prop update handles it.
-        router.refresh();
-      }
+      const results = await Promise.all(
+        ids.map((id) =>
+          fetch(`/api/candidates/${id}/disposition`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ disposition: next })
+          })
+        )
+      );
+      if (results.some((r) => !r.ok)) throw new Error('One or more updates failed');
+      setSelectedIds(new Set());
+      if (next === 'delete') router.refresh();
     } catch {
-      setDispositions((prev) => ({ ...prev, [id]: previous }));
+      setDispositions(previous);
+      alert('Unable to update one or more candidates. Try again.');
     } finally {
-      setSavingId(null);
+      setBusy(false);
     }
   }
 
-  const rows = useMemo(
-    () => candidates.filter((candidate) => dispositionFilter === 'all' || dispositions[candidate.id] === dispositionFilter),
-    [candidates, dispositionFilter, dispositions]
-  );
+  const rows = candidates;
 
   if (!candidates.length) {
     return (
@@ -101,20 +113,24 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
   return (
     <section className="candidate-matrix">
       <div className="matrix-controls">
-        <div className="matrix-filter" aria-label="Filter by disposition">
-          {(
-            [
-              ['all', 'All'],
-              ['screen', 'Screen'],
-              ['interview', 'Interview'],
-              ['hire', 'Hire']
-            ] as const
-          ).map(([value, label]) => (
-            <button key={value} className={dispositionFilter === value ? 'active' : ''} onClick={() => setDispositionFilter(value)}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <label className="matrix-selectall">
+          <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+          Select all
+        </label>
+        <select
+          className="matrix-bulk-disposition"
+          value=""
+          onChange={(e) => applyDispositionToSelected(e.target.value)}
+          disabled={busy || selectedIds.size === 0}
+        >
+          <option value="">
+            {selectedIds.size === 0 ? 'Set disposition…' : `Set disposition for ${selectedIds.size} selected…`}
+          </option>
+          <option value="screen">{DISPOSITION_LABEL.screen}</option>
+          <option value="interview">{DISPOSITION_LABEL.interview}</option>
+          <option value="hire">{DISPOSITION_LABEL.hire}</option>
+          <option value="delete">{DISPOSITION_LABEL.delete}</option>
+        </select>
       </div>
 
       <div className="matrix-list">
@@ -141,7 +157,7 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
                   className="matrix-row-checkbox"
                   checked={selectedIds.has(candidate.id)}
                   onClick={(e) => e.stopPropagation()}
-                  onChange={() => toggleSelect(candidate.id)}
+                  onChange={() => toggleOne(candidate.id)}
                   aria-label={`Select ${candidate.name}`}
                 />
                 <span className="matrix-row-name">{candidate.name}</span>
@@ -149,19 +165,7 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
                   <span className="score-num">{candidate.match === null ? '—' : `${candidate.match}%`}</span>
                   <span className={`facet-mini ${facetTier(candidate.match)}`} />
                 </span>
-                <select
-                  className={`disposition-select ${disposition || ''}`}
-                  value={disposition || ''}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => updateDisposition(candidate.id, e.target.value)}
-                  disabled={savingId === candidate.id}
-                >
-                  <option value="">Disposition…</option>
-                  <option value="screen">Screen</option>
-                  <option value="interview">Interview</option>
-                  <option value="hire">Hire</option>
-                  <option value="delete">Did Not Select</option>
-                </select>
+                {disposition && <span className={`disposition-badge ${disposition}`}>{DISPOSITION_LABEL[disposition]}</span>}
               </div>
 
               {isOpen && (
@@ -187,7 +191,6 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
           );
         })}
       </div>
-      {!rows.length && <p className="matrix-no-results">No candidates match this filter.</p>}
     </section>
   );
 }
