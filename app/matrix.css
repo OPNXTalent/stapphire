@@ -7,10 +7,11 @@
 .matrix-list{border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#fff;box-shadow:0 2px 8px rgba(12,18,32,.035)}
 .matrix-row{border-bottom:1px solid var(--line)}
 .matrix-row:last-child{border-bottom:none}
-.matrix-row-head{display:flex;align-items:center;gap:14px;width:100%;padding:13px 16px;cursor:pointer}
-.matrix-row-head:hover{background:var(--sapphire-pale)}
+.matrix-row-head{display:flex;align-items:center;gap:14px;width:100%;padding:13px 16px;cursor:pointer;background:var(--sapphire-pale);transition:background .12s ease}
+.matrix-row-head:hover{background:rgba(3,13,38,.14)}
 .matrix-row-head:focus-visible{outline:2px solid var(--sapphire);outline-offset:-2px}
-.matrix-row.expanded .matrix-row-head{background:var(--wash)}
+.matrix-row.expanded .matrix-row-head,.matrix-row.expanded .matrix-row-head:hover{background:var(--navy)}
+.matrix-row.expanded .matrix-row-head .matrix-row-name,.matrix-row.expanded .matrix-row-head .score-num{color:#fff}
 .matrix-row-checkbox{flex-shrink:0;width:auto;margin:0;cursor:pointer}
 .matrix-row-name{flex:1;min-width:0;font-weight:700;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .matrix-row-match{flex-shrink:0}
