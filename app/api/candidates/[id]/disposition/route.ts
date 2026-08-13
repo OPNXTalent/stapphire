@@ -12,7 +12,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
     const { error } = await supabaseAdmin
       .from('phase1_candidates')
-      .update({ disposition: disposition || null })
+      .update({
+        disposition: disposition || null,
+        // Selecting Delete is a real action, not just a label - it
+        // soft-deletes the candidate into the trash bin. Any other
+        // disposition value clears deleted_at in case this candidate
+        // was somehow re-triaged from a restored state.
+        deleted_at: disposition === 'delete' ? new Date().toISOString() : null
+      })
       .eq('id', params.id);
     if (error) throw error;
     return NextResponse.json({ success: true });

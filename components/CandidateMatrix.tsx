@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { type Verdict } from '@/lib/evaluation';
 import { CandidateReport } from '@/components/CandidateReport';
 
@@ -29,9 +30,11 @@ function facetTier(score: number | null): 'strong' | 'moderate' | 'limited' {
 }
 
 export function CandidateMatrix({ candidates, positionTitle }: { candidates: MatrixCandidate[]; positionTitle: string }) {
+  const router = useRouter();
   const [dispositionFilter, setDispositionFilter] = useState<DispositionFilter>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [dispositions, setDispositions] = useState<Record<string, Disposition | null>>(() =>
     Object.fromEntries(candidates.map((c) => [c.id, c.disposition]))
   );
@@ -58,6 +61,13 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
         body: JSON.stringify({ disposition: next ?? '' })
       });
       if (!res.ok) throw new Error('Failed to save');
+      if (next === 'delete') {
+        // A real action, not just a label - the candidate leaves the
+        // matrix immediately, and a background refresh keeps the
+        // trash bin's count (fed by the server) in sync.
+        setRemovedIds((prev) => new Set(prev).add(id));
+        router.refresh();
+      }
     } catch {
       setDispositions((prev) => ({ ...prev, [id]: previous }));
     } finally {
@@ -66,8 +76,12 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
   }
 
   const rows = useMemo(
-    () => candidates.filter((candidate) => dispositionFilter === 'all' || dispositions[candidate.id] === dispositionFilter),
-    [candidates, dispositionFilter, dispositions]
+    () =>
+      candidates.filter(
+        (candidate) =>
+          !removedIds.has(candidate.id) && (dispositionFilter === 'all' || dispositions[candidate.id] === dispositionFilter)
+      ),
+    [candidates, dispositionFilter, dispositions, removedIds]
   );
 
   if (!candidates.length) {
@@ -88,8 +102,7 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
               ['all', 'All'],
               ['screen', 'Screen'],
               ['interview', 'Interview'],
-              ['hire', 'Hire'],
-              ['delete', 'Delete']
+              ['hire', 'Hire']
             ] as const
           ).map(([value, label]) => (
             <button key={value} className={dispositionFilter === value ? 'active' : ''} onClick={() => setDispositionFilter(value)}>

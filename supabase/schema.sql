@@ -18,6 +18,10 @@ create table if not exists phase1_candidates (
   -- recruiter's own recorded decision, distinct from the calculated
   -- Match/verdict - null until they've actually reviewed the candidate
   disposition text check (disposition in ('screen', 'interview', 'hire', 'delete')),
+  -- soft-delete - set when disposition is changed to 'delete'. The
+  -- candidate leaves the main matrix but the row (and its evaluation
+  -- history) stays intact until permanently removed from the trash.
+  deleted_at timestamptz,
   created_at timestamptz not null default now()
 );
 
