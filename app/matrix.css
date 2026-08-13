@@ -34,14 +34,23 @@
 .matrix-match{font:800 21px var(--display);color:var(--deep)}
 .matrix-empty,.matrix-no-results{border:1px dashed var(--line-strong);border-radius:6px;padding:26px;background:#fff}
 .matrix-empty p,.matrix-no-results{margin:5px 0 0;color:var(--muted)}
-.upload-queue{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:6px;overflow:hidden}
-.upload-queue-item{display:flex;align-items:center;gap:9px;padding:8px 12px;font-size:12.5px;border-bottom:1px solid var(--line)}
+.upload-bar{margin-bottom:22px}
+.upload-bar-row{display:flex;align-items:center;gap:10px}
+.upload-add-btn{background:none;border:1px solid var(--line-strong);border-radius:6px;color:var(--deep);font:inherit;font-weight:600;font-size:12.5px;padding:7px 13px;cursor:pointer}
+.upload-add-btn:hover{border-color:var(--sapphire);color:var(--sapphire);background:var(--sapphire-pale)}
+.upload-go-btn{background:var(--deep);color:#fff;border:none;border-radius:6px;font:inherit;font-weight:600;font-size:12.5px;padding:8px 14px;cursor:pointer}
+.upload-go-btn:hover{background:var(--sapphire)}
+.upload-go-btn:disabled,.upload-add-btn:disabled{opacity:.55;cursor:default}
+.upload-queue{list-style:none;margin:8px 0 0;padding:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;max-width:420px}
+.upload-queue-item{display:flex;align-items:center;gap:9px;padding:6px 10px;font-size:12px;border-bottom:1px solid var(--line)}
 .upload-queue-item:last-child{border-bottom:none}
-.upload-queue-icon{font-family:var(--mono);font-weight:700;width:14px;text-align:center;flex-shrink:0;color:var(--faint)}
+.upload-queue-icon{font-family:var(--mono);font-weight:700;width:12px;text-align:center;flex-shrink:0;color:var(--faint)}
 .upload-queue-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.upload-queue-msg{font-family:var(--mono);font-size:10.5px;color:var(--red);flex-shrink:0}
+.upload-queue-msg{font-family:var(--mono);font-size:10px;color:var(--red);flex-shrink:0}
 .upload-queue-processing .upload-queue-icon{color:var(--sapphire)}
 .upload-queue-done .upload-queue-icon{color:var(--green)}
 .upload-queue-error{color:var(--red)}
 .upload-queue-error .upload-queue-icon{color:var(--red)}
+.upload-remove-btn{background:none;border:none;color:var(--faint);font-size:14px;line-height:1;padding:0 2px;cursor:pointer;flex-shrink:0}
+.upload-remove-btn:hover{color:var(--red)}
 @media(max-width:700px){.matrix-controls{align-items:flex-start;flex-direction:column}}
