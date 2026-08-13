@@ -57,7 +57,7 @@
 .upload-go-btn{background:var(--deep);color:#fff;border:none;border-radius:6px;font:inherit;font-weight:600;font-size:12.5px;padding:8px 14px;cursor:pointer}
 .upload-go-btn:hover{background:var(--sapphire)}
 .upload-go-btn:disabled,.upload-add-btn:disabled{opacity:.55;cursor:default}
-.upload-queue{list-style:none;margin:8px 0 0;padding:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;max-width:420px}
+.upload-queue{list-style:none;margin:0 0 8px;padding:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;max-width:420px}
 .upload-queue-item{display:flex;align-items:center;gap:9px;padding:6px 10px;font-size:12px;border-bottom:1px solid var(--line)}
 .upload-queue-item:last-child{border-bottom:none}
 .upload-queue-icon{font-family:var(--mono);font-weight:700;width:12px;text-align:center;flex-shrink:0;color:var(--faint)}

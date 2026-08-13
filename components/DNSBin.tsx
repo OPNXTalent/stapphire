@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export type DNSCandidate = { id: string; name: string; deletedAt: string };
@@ -13,6 +13,18 @@ export function DNSBin({ candidates }: { candidates: DNSCandidate[] }) {
   const [open, setOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
 
   const allSelected = candidates.length > 0 && selectedIds.size === candidates.length;
 
@@ -60,7 +72,7 @@ export function DNSBin({ candidates }: { candidates: DNSCandidate[] }) {
   if (!candidates.length) return null;
 
   return (
-    <div className="dns-bin">
+    <div className="dns-bin" ref={rootRef}>
       <button type="button" className="dns-bin-toggle" onClick={() => setOpen((v) => !v)} title="Did Not Select">
         DNS ({candidates.length})
       </button>

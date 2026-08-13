@@ -55,16 +55,6 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   return (
     <div className="upload-bar">
       <input ref={inputRef} type="file" multiple hidden accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" onChange={(e) => addFiles(e.target.files)} />
-      <div className="upload-bar-row">
-        <button type="button" className="upload-add-btn" onClick={() => inputRef.current?.click()} disabled={busy}>
-          + Add résumés
-        </button>
-        {stagedCount > 0 && (
-          <button type="button" className="upload-go-btn" onClick={upload} disabled={busy}>
-            {busy ? 'Uploading…' : `Upload ${stagedCount}`}
-          </button>
-        )}
-      </div>
       {queue.length > 0 && (
         <ul className="upload-queue">
           {queue.map((item, i) => (
@@ -81,6 +71,16 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
           ))}
         </ul>
       )}
+      <div className="upload-bar-row">
+        <button type="button" className="upload-add-btn" onClick={() => inputRef.current?.click()} disabled={busy}>
+          + Add résumés
+        </button>
+        {stagedCount > 0 && (
+          <button type="button" className="upload-go-btn" onClick={upload} disabled={busy}>
+            {busy ? 'Uploading…' : `Upload ${stagedCount}`}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
