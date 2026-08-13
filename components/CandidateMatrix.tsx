@@ -1,8 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { verdictLabel, type Verdict } from '@/lib/evaluation';
+import { type Verdict } from '@/lib/evaluation';
 import { CandidateReport } from '@/components/CandidateReport';
+
+export type Disposition = 'screen' | 'interview' | 'hire' | 'delete';
 
 export type MatrixCandidate = {
   id: string;
@@ -13,13 +15,11 @@ export type MatrixCandidate = {
   hardSkills: number | null;
   softSkills: number | null;
   keywords: number | null;
-  transitEmployer: boolean | null;
   assessment: unknown;
+  disposition: Disposition | null;
 };
 
-type SortKey = 'match' | 'name' | 'responsibilities' | 'hardSkills' | 'softSkills' | 'keywords';
-type VerdictFilter = 'all' | Verdict;
-type TransitFilter = 'all' | 'yes' | 'no';
+type DispositionFilter = 'all' | Disposition;
 
 function facetTier(score: number | null): 'strong' | 'moderate' | 'limited' {
   if (score === null) return 'limited';
@@ -29,45 +29,45 @@ function facetTier(score: number | null): 'strong' | 'moderate' | 'limited' {
 }
 
 export function CandidateMatrix({ candidates, positionTitle }: { candidates: MatrixCandidate[]; positionTitle: string }) {
-  const [sortKey, setSortKey] = useState<SortKey>('match');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>('all');
-  const [transitFilter, setTransitFilter] = useState<TransitFilter>('all');
+  const [dispositionFilter, setDispositionFilter] = useState<DispositionFilter>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [dispositions, setDispositions] = useState<Record<string, Disposition | null>>(() =>
+    Object.fromEntries(candidates.map((c) => [c.id, c.disposition]))
+  );
+  const [savingId, setSavingId] = useState<string | null>(null);
 
-  function sortBy(key: SortKey) {
-    if (key === sortKey) setSortDirection((value) => (value === 'asc' ? 'desc' : 'asc'));
-    else {
-      setSortKey(key);
-      setSortDirection(key === 'name' ? 'asc' : 'desc');
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function updateDisposition(id: string, value: string) {
+    const next = (value || null) as Disposition | null;
+    const previous = dispositions[id];
+    setDispositions((prev) => ({ ...prev, [id]: next }));
+    setSavingId(id);
+    try {
+      const res = await fetch(`/api/candidates/${id}/disposition`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disposition: next ?? '' })
+      });
+      if (!res.ok) throw new Error('Failed to save');
+    } catch {
+      setDispositions((prev) => ({ ...prev, [id]: previous }));
+    } finally {
+      setSavingId(null);
     }
   }
 
   const rows = useMemo(
-    () =>
-      candidates
-        .filter(
-          (candidate) =>
-            (verdictFilter === 'all' || candidate.verdict === verdictFilter) &&
-            (transitFilter === 'all' || candidate.transitEmployer === (transitFilter === 'yes'))
-        )
-        .sort((a, b) => {
-          if (sortKey === 'name') return sortDirection === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-          const av = a[sortKey],
-            bv = b[sortKey];
-          if (av === null && bv === null) return 0;
-          if (av === null) return 1;
-          if (bv === null) return -1;
-          return sortDirection === 'asc' ? av - bv : bv - av;
-        }),
-    [candidates, sortKey, sortDirection, verdictFilter, transitFilter]
-  );
-
-  const sortLabel = (label: string, key: SortKey) => (
-    <button className="matrix-sort" onClick={() => sortBy(key)} aria-label={`Sort by ${label}`}>
-      {label}
-      {sortKey === key ? <span aria-hidden="true"> {sortDirection === 'asc' ? '↑' : '↓'}</span> : null}
-    </button>
+    () => candidates.filter((candidate) => dispositionFilter === 'all' || dispositions[candidate.id] === dispositionFilter),
+    [candidates, dispositionFilter, dispositions]
   );
 
   if (!candidates.length) {
@@ -82,54 +82,69 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
   return (
     <section className="candidate-matrix">
       <div className="matrix-controls">
-        <div className="matrix-filter" aria-label="Filter by verdict">
+        <div className="matrix-filter" aria-label="Filter by disposition">
           {(
             [
               ['all', 'All'],
-              ['greenlight', 'Recommend'],
-              ['consider', 'Hold / Clarify'],
-              ['decline', 'Decline']
+              ['screen', 'Screen'],
+              ['interview', 'Interview'],
+              ['hire', 'Hire'],
+              ['delete', 'Delete']
             ] as const
           ).map(([value, label]) => (
-            <button key={value} className={verdictFilter === value ? 'active' : ''} onClick={() => setVerdictFilter(value)}>
+            <button key={value} className={dispositionFilter === value ? 'active' : ''} onClick={() => setDispositionFilter(value)}>
               {label}
             </button>
           ))}
         </div>
-        <div className="matrix-sort-row">
-          Sort: {sortLabel('Match', 'match')} {sortLabel('Name', 'name')} {sortLabel('Responsibilities', 'responsibilities')}{' '}
-          {sortLabel('Hard Skills', 'hardSkills')} {sortLabel('Soft Skills', 'softSkills')} {sortLabel('Keywords', 'keywords')}
-        </div>
-        <label className="transit-filter">
-          Transit Employer
-          <select value={transitFilter} onChange={(event) => setTransitFilter(event.target.value as TransitFilter)}>
-            <option value="all">All</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-          </select>
-        </label>
       </div>
 
       <div className="matrix-list">
         {rows.map((candidate) => {
           const isOpen = expandedId === candidate.id;
+          const disposition = dispositions[candidate.id];
           return (
             <div className={`matrix-row ${isOpen ? 'expanded' : ''}`} key={candidate.id}>
-              <button
-                type="button"
+              <div
                 className="matrix-row-head"
-                onClick={() => setExpandedId(isOpen ? null : candidate.id)}
+                role="button"
+                tabIndex={0}
                 aria-expanded={isOpen}
+                onClick={() => setExpandedId(isOpen ? null : candidate.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setExpandedId(isOpen ? null : candidate.id);
+                  }
+                }}
               >
+                <input
+                  type="checkbox"
+                  className="matrix-row-checkbox"
+                  checked={selectedIds.has(candidate.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => toggleSelect(candidate.id)}
+                  aria-label={`Select ${candidate.name}`}
+                />
                 <span className="matrix-row-name">{candidate.name}</span>
                 <span className="facet-cell matrix-row-match">
                   <span className="score-num">{candidate.match === null ? '—' : `${candidate.match}%`}</span>
                   <span className={`facet-mini ${facetTier(candidate.match)}`} />
                 </span>
-                <span className={`rec-pill ${candidate.verdict || ''}`}>
-                  {candidate.verdict ? verdictLabel[candidate.verdict].split(' —')[0] : '—'}
-                </span>
-              </button>
+                <select
+                  className={`disposition-select ${disposition || ''}`}
+                  value={disposition || ''}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => updateDisposition(candidate.id, e.target.value)}
+                  disabled={savingId === candidate.id}
+                >
+                  <option value="">Disposition…</option>
+                  <option value="screen">Screen</option>
+                  <option value="interview">Interview</option>
+                  <option value="hire">Hire</option>
+                  <option value="delete">Delete</option>
+                </select>
+              </div>
 
               {isOpen && (
                 <div className="matrix-row-body">
@@ -154,7 +169,7 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
           );
         })}
       </div>
-      {!rows.length && <p className="matrix-no-results">No candidates match these filters.</p>}
+      {!rows.length && <p className="matrix-no-results">No candidates match this filter.</p>}
     </section>
   );
 }

@@ -15,6 +15,9 @@ create table if not exists phase1_candidates (
   full_name text not null,
   source_filename text not null,
   resume_text text not null,
+  -- recruiter's own recorded decision, distinct from the calculated
+  -- Match/verdict - null until they've actually reviewed the candidate
+  disposition text check (disposition in ('screen', 'interview', 'hire', 'delete')),
   created_at timestamptz not null default now()
 );
 
