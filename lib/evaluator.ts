@@ -55,7 +55,7 @@ ACTUAL GAP: The evidence establishes that the candidate lacks a capability mater
 
 If the job description says knowledge, systems, procedures, terminology, or proficiency will be taught or developed through employer onboarding or training, do not require mastery before hire unless the job description explicitly makes it an entry prerequisite. A capability identified as Trainable After Hire must not simultaneously be a major pre-hire scoring deficiency. This includes employer-specific systems, procedures, routes, products or services, terminology, workflows, internal policies, and organizational knowledge. Evaluate whether the resume demonstrates the foundation to learn and apply that material—for example, relevant customer communication, experience learning business systems, transferable route or transportation experience, or administrative documentation experience.
 
-Do not invent unsupported capabilities. Transferability must be grounded in resume evidence. Category scores must reflect the narrative: substantial demonstrated or transferable evidence should receive corresponding numerical credit, while items classified mainly as Unknown / Verify or Trainable After Hire must not be scored as demonstrated failures. Do not double-penalize the same missing capability across categories. Final recommendation reasoning must be logically consistent with the category scores and application-owned threshold.
+Do not invent unsupported capabilities. Transferability must be grounded in resume evidence. Category scores must reflect the narrative: substantial demonstrated or transferable evidence should receive corresponding numerical credit, while items classified mainly as Unknown / Verify or Trainable After Hire must not be scored as demonstrated failures. Do not double-penalize the same missing capability across categories. The evaluation summary must be logically consistent with the category scores and evidence.
 
 5. Candidate Assessment
 
@@ -65,7 +65,7 @@ Percentage match for each evaluation category
 Strengths
 Gaps
 
-Do not calculate or return the overall weighted alignment score or verdict. Application code calculates the final Match and determines the verdict.
+Do not calculate or return the overall weighted alignment score. Application code calculates the final Match. Do not make or imply an employment disposition, hiring recommendation, or proceed/do-not-proceed decision.
 
 6. ATS Evaluation
 
@@ -147,9 +147,7 @@ Lack of measurable accomplishments
 
 Discuss these objectively without making assumptions beyond the information presented.
 
-9. Interview Recommendations
-
-If the candidate is recommended or considered, provide:
+9. Interview Priorities
 
 Areas requiring deeper probing during interview
 Skills requiring validation
@@ -158,9 +156,9 @@ Alternate internal roles if appropriate
 
 Keep interview priorities concise and job-related. Do not provide lengthy legal disclaimers, policy essays, compliance boilerplate, or speculative legal guidance.
 
-10. Final Recommendation
+10. Evaluation Summary
 
-Provide supporting recommendation reasoning based on specific evidence from the resume and job description. Do not calculate or return a final Match or verdict; application code owns that arithmetic and decision threshold.
+Provide a direct analytical synthesis of overall evidence alignment, strongest relevant evidence, important gaps, material risks, unresolved requirements, and significant transferable experience. Preserve plain statements of material deficiencies. Do not prescribe an employment disposition or state whether the candidate should proceed. Do not calculate or return a final Match; application code owns that arithmetic.
 
 Evaluation Principles
 
@@ -169,7 +167,7 @@ Do not infer experience that is not supported by the resume.
 Do not award credit for vague claims lacking evidence.
 Prioritize demonstrated accomplishments over years of experience alone.
 Consider career progression, stability, and organizational relevance alongside technical qualifications.
-Flag prior employment with GRTC, Greater Richmond Transit Company, We Drive U, or First Transit regardless of whether it positively or negatively impacts the recommendation.
+Flag prior employment with GRTC, Greater Richmond Transit Company, We Drive U, or First Transit regardless of whether it positively or negatively impacts the evaluation.
 Report employment gaps and short-duration positions objectively as review findings rather than automatic disqualifiers.
 
 Return the four category scores and all supporting narrative using the structured fields required by the submit_candidate_evaluation tool. These fields are implementation structure only and do not add behavioral reasoning instructions.`;
@@ -193,7 +191,7 @@ const schema = {
     employment_history_review: { type: 'object', additionalProperties: false, required: ['previous_transit_employer','gaps','short_tenure','stability'], properties: { previous_transit_employer:{type:'object',additionalProperties:false,required:['status','employer','position','dates'],properties:{status:{type:'string',enum:['Yes','None Identified']},employer:{type:'string',description:'Employer name only; empty when none.'},position:{type:'string',description:'Position only; empty when none.'},dates:{type:'string',description:'Employment dates only; empty when none.'}}}, gaps:{type:'array',description:'Factual gap findings without section labels.',items:{type:'string',maxLength:300}}, short_tenure:{type:'array',description:'Factual short-tenure findings without section labels.',items:{type:'string',maxLength:300}}, stability:{type:'string',description:'Concise factual stability assessment without a label.'} } },
     strategic_risk: { type: 'string', description: 'Concise objective risk assessment without a heading or boilerplate.' },
     interview_priorities: { type: 'array', description: 'Three to five concise, practical, job-related interview objectives. Each item must contain one objective only. No legal disclaimers, policy or compliance commentary, general hiring advice, alternate-role suggestions, or multiple unrelated questions.', items: { type: 'string', maxLength: 180 }, minItems: 0, maxItems: 5 },
-    final_recommendation_reasoning: { type: 'string', description: 'Concise evidence-based explanation consistent with the application-owned verdict. Do not state or override a verdict label.' },
+    final_recommendation_reasoning: { type: 'string', description: 'Concise evidence-based evaluation summary covering alignment, strongest evidence, important gaps, material risks, unresolved requirements, and significant transferable experience. Do not state or imply an employment disposition or recommendation.' },
     deal_breakers: { type: 'array', items: { type: 'string' } }
   }
 } as const;

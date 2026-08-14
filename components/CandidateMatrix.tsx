@@ -2,7 +2,6 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { type Verdict } from '@/lib/evaluation';
 import { CandidateReport } from '@/components/CandidateReport';
 
 export type Disposition = 'screen' | 'interview' | 'hire' | 'delete';
@@ -11,7 +10,6 @@ export type MatrixCandidate = {
   id: string;
   name: string;
   match: number | null;
-  verdict: Verdict | null;
   responsibilities: number | null;
   hardSkills: number | null;
   softSkills: number | null;
@@ -217,12 +215,11 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
           <div className="matrix-selected-detail">
             <div className="matrix-row expanded">
               <div className="matrix-row-body">
-                {expandedCandidate.match !== null && expandedCandidate.verdict !== null ? (
+                {expandedCandidate.match !== null ? (
                   <CandidateReport
                     candidateName={expandedCandidate.name}
                     positionTitle={positionTitle}
                     overallMatch={expandedCandidate.match}
-                    verdict={expandedCandidate.verdict}
                     responsibilities={expandedCandidate.responsibilities ?? 0}
                     hardSkills={expandedCandidate.hardSkills ?? 0}
                     softSkills={expandedCandidate.softSkills ?? 0}

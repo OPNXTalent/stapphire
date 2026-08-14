@@ -44,14 +44,10 @@ export function calculateMatch(scores: Pick<ModelEvaluation,
   );
 }
 
-export function calculateVerdict(match: number): Verdict {
+// Deprecated compatibility value for the existing non-null database column.
+// It is not part of candidate-facing evaluation output or recruiter workflow.
+export function calculateLegacyVerdict(match: number): Verdict {
   if (match >= 85) return 'greenlight';
   if (match >= 69) return 'consider';
   return 'decline';
 }
-
-export const verdictLabel: Record<Verdict, string> = {
-  greenlight: 'Greenlight — Recommend Interview',
-  consider: 'Consider — Hold / Clarify',
-  decline: 'Decline'
-};

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { extractTextFromBuffer } from '@/lib/extractText';
 import { evaluateCandidate } from '@/lib/evaluator';
-import { calculateMatch, calculateVerdict } from '@/lib/evaluation';
+import { calculateMatch, calculateLegacyVerdict } from '@/lib/evaluation';
 
 export const runtime='nodejs';
 export async function POST(request:Request,{params}:{params:{id:string}}){
@@ -22,7 +22,7 @@ export async function POST(request:Request,{params}:{params:{id:string}}){
     const candidateName=fullName||file.name.replace(/\.[^.]+$/,'');
     const {data:candidate,error:candidateError}=await supabaseAdmin.from('phase1_candidates').insert({requisition_id:params.id,full_name:candidateName,source_filename:file.name,resume_text:resumeText}).select('id').single();
     if(candidateError)throw candidateError; candidateId=candidate.id;
-    const overallMatch=calculateMatch(assessment);const verdict=calculateVerdict(overallMatch);
+    const overallMatch=calculateMatch(assessment);const verdict=calculateLegacyVerdict(overallMatch);
     const {error:evaluationError}=await supabaseAdmin.from('phase1_evaluations').insert({requisition_id:params.id,candidate_id:candidate.id,job_responsibilities_score:assessment.job_responsibilities_score,hard_skills_score:assessment.hard_skills_score,soft_skills_score:assessment.soft_skills_score,keyword_terminology_score:assessment.keyword_terminology_score,overall_match:overallMatch,verdict,assessment,raw_model_response:assessment});
     if(evaluationError)throw evaluationError;
     return NextResponse.json({candidate_id:candidate.id},{status:201});

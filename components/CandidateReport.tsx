@@ -1,5 +1,3 @@
-import { verdictLabel, type Verdict } from '@/lib/evaluation';
-
 function List({ items, empty = 'None identified.' }: { items?: string[]; empty?: string }) {
   return items?.length ? (
     <ul className="bullets">
@@ -23,6 +21,9 @@ function texts(value: unknown): string[] {
 }
 function cleanTransitStatus(value: string): string {
   return value.replace(/^(previous\s+transit\s+employer\s*:\s*)+/i, '').trim();
+}
+function cleanEvaluationSummary(value: string): string {
+  return value.replace(/^(?:(?:greenlight)(?:\s*[—-]\s*recommend interview)?|consider(?:\s*[—-]\s*hold\s*\/\s*clarify)?|decline|recommend(?:ed)?|do not recommend)\s*(?:[.:]\s*|$)/i, '').trim();
 }
 
 function normalizeAssessment(value: unknown) {
@@ -63,7 +64,7 @@ function normalizeAssessment(value: unknown) {
     },
     strategicRisk: text(source.strategic_risk),
     interviewPriorities: texts(source.interview_priorities),
-    finalRecommendationReasoning: text(source.final_recommendation_reasoning)
+    finalRecommendationReasoning: cleanEvaluationSummary(text(source.final_recommendation_reasoning))
   };
 }
 
@@ -71,7 +72,6 @@ export function CandidateReport({
   candidateName,
   positionTitle,
   overallMatch,
-  verdict,
   responsibilities,
   hardSkills,
   softSkills,
@@ -81,7 +81,6 @@ export function CandidateReport({
   candidateName: string;
   positionTitle: string;
   overallMatch: number;
-  verdict: Verdict;
   responsibilities: number;
   hardSkills: number;
   softSkills: number;
@@ -96,7 +95,6 @@ export function CandidateReport({
         <h1>{candidateName}</h1>
         <p>{positionTitle}</p>
         <div className="match">{overallMatch}% Match</div>
-        <p className={`verdict ${verdict}`}>{verdictLabel[verdict]}</p>
       </section>
 
       {a.assessment && (
@@ -274,11 +272,12 @@ export function CandidateReport({
         </>
       )}
 
-      <h2>Final Recommendation</h2>
-      <p>
-        <strong>{verdictLabel[verdict]}.</strong>
-        {a.finalRecommendationReasoning && <> {a.finalRecommendationReasoning}</>}
-      </p>
+      {a.finalRecommendationReasoning && (
+        <>
+          <h2>Evaluation Summary</h2>
+          <p>{a.finalRecommendationReasoning}</p>
+        </>
+      )}
     </article>
   );
 }

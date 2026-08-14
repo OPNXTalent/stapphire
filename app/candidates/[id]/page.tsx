@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { CandidateReport } from '@/components/CandidateReport';
-import type { Verdict } from '@/lib/evaluation';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +35,6 @@ export default async function CandidatePage({ params }: { params: { id: string }
         candidateName={candidate.full_name}
         positionTitle={position}
         overallMatch={e.overall_match}
-        verdict={e.verdict as Verdict}
         responsibilities={e.job_responsibilities_score}
         hardSkills={e.hard_skills_score}
         softSkills={e.soft_skills_score}

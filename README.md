@@ -8,4 +8,4 @@ Minimal Hiring QC: Job Description → Requisition → Resume → Candidate Eval
 2. Copy `.env.example` to `.env.local` and configure Supabase and Anthropic credentials.
 3. Run `npm install` and `npm run dev`.
 
-Claude interprets the evidence and returns four category scores. `lib/evaluation.ts` alone calculates the displayed Match and verdict.
+The evaluator interprets the evidence and returns four category scores. `lib/evaluation.ts` alone calculates the displayed Match. Recruiter-controlled disposition remains separate from evaluation.
