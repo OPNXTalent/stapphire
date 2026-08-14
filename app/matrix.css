@@ -27,9 +27,14 @@
 .facet-mini.limited{background:var(--line-strong)}
 .disposition-select{width:auto;flex-shrink:0;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.03em;padding:5px 9px;border:1px solid var(--line-strong);border-radius:4px;background:#fff;color:var(--muted)}
 
-.matrix-row-body{padding:0 17px 24px;width:100%;box-sizing:border-box}
+.matrix-row-body{padding:0 28px 24px;width:100%;box-sizing:border-box}
 .matrix-row-body .evaluation{border:none;box-shadow:none;padding:0;max-width:none;width:100%;margin:0;box-sizing:border-box}
-.matrix-row-body .hero{padding-top:4px}
+.matrix-row-body .hero{padding-top:4px;padding-bottom:22px}
+.matrix-row-body .hero .muted{margin-bottom:4px}
+.matrix-row-body .hero h1{font-size:30px;line-height:1.15;margin:0 0 4px}
+.matrix-row-body .hero h1+p{margin-bottom:8px}
+.matrix-row-body .hero .match{font-size:34px;line-height:1.1;margin:8px 0 2px}
+.matrix-row-body .hero .verdict{margin-bottom:0}
 
 .candidate-link{color:var(--deep);font-weight:700}
 .matrix-match{font:800 21px var(--display);color:var(--deep)}
