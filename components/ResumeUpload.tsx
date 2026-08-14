@@ -59,7 +59,17 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   }
 
   const stagedCount = queue.filter((q) => q.status === 'staged').length;
+  const successCount = queue.filter((q) => q.status === 'done').length;
+  const errorCount = queue.filter((q) => q.status === 'error').length;
+  const complete = queue.length > 0 && !busy && queue.every((q) => q.status === 'done' || q.status === 'error');
   const remaining = progress.total - progress.done;
+
+  function dismissResults() {
+    setQueue([]);
+    setProgress({ done: 0, total: 0 });
+    if (inputRef.current) inputRef.current.value = '';
+    router.refresh();
+  }
 
   return (
     <div className="upload-bar">
@@ -86,22 +96,32 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
           ))}
         </ul>
       )}
-      <div className="upload-bar-row">
-        <button type="button" className="upload-add-btn" onClick={() => inputRef.current?.click()} disabled={busy}>
-          + Add résumés
-        </button>
-        {stagedCount > 0 && !busy && (
-          <button type="button" className="upload-go-btn" onClick={upload}>
-            Upload {stagedCount}
-          </button>
-        )}
-        {busy && (
-          <span className="upload-progress">
-            <span className="upload-spinner" aria-hidden="true" />
-            Evaluating {progress.done + 1} of {progress.total} — {remaining} remaining
+      {complete ? (
+        <div className="upload-complete">
+          <span className="upload-summary">
+            {successCount} {successCount === 1 ? 'résumé' : 'résumés'} {errorCount === 0 ? 'added successfully' : 'added'}
+            {errorCount > 0 && ` · ${errorCount} could not be processed`}
           </span>
-        )}
-      </div>
+          <button type="button" className="upload-go-btn" onClick={dismissResults}>Done</button>
+        </div>
+      ) : (
+        <div className="upload-bar-row">
+          <button type="button" className="upload-add-btn" onClick={() => inputRef.current?.click()} disabled={busy}>
+            + Add résumés
+          </button>
+          {stagedCount > 0 && !busy && (
+            <button type="button" className="upload-go-btn" onClick={upload}>
+              Upload {stagedCount}
+            </button>
+          )}
+          {busy && (
+            <span className="upload-progress">
+              <span className="upload-spinner" aria-hidden="true" />
+              Evaluating {progress.done + 1} of {progress.total} — {remaining} remaining
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
