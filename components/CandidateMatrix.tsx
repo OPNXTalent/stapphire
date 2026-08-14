@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { type Verdict } from '@/lib/evaluation';
 import { CandidateReport } from '@/components/CandidateReport';
@@ -123,9 +123,57 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
     }
   }
 
-  const rows = expandedId
-    ? [...candidates].sort((a, b) => (a.id === expandedId ? -1 : b.id === expandedId ? 1 : 0))
-    : candidates;
+  // Shared banner markup - used both for the pinned banner (rendered
+  // outside the scroll container, for the currently-expanded candidate)
+  // and for every normal collapsed row. Kept in one place so the two
+  // contexts can never visually drift apart.
+  function renderBanner(candidate: MatrixCandidate, isOpen: boolean, extraClass = ''): ReactNode {
+    const disposition = dispositions[candidate.id];
+    return (
+      <div
+        className={`matrix-row-head ${disposition || ''} ${extraClass}`}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isOpen}
+        onClick={() => setExpandedId(isOpen ? null : candidate.id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setExpandedId(isOpen ? null : candidate.id);
+          }
+        }}
+      >
+        <input
+          type="checkbox"
+          className="matrix-row-checkbox"
+          checked={selectedIds.has(candidate.id)}
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => toggleOne(candidate.id)}
+          aria-label={`Select ${candidate.name}`}
+        />
+        <span className="matrix-row-name">{candidate.name}</span>
+        <span className="facet-cell matrix-row-match">
+          <span className="score-num">{candidate.match === null ? '—' : `${candidate.match}%`}</span>
+          <span className={`facet-mini ${facetTier(candidate.match)}`} />
+        </span>
+        <select
+          className={`disposition-select ${disposition || ''}`}
+          value={disposition || ''}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => updateDisposition(candidate.id, e.target.value)}
+          disabled={savingId === candidate.id}
+        >
+          <option value="">Disposition…</option>
+          <option value="screen">{DISPOSITION_LABEL.screen}</option>
+          <option value="interview">{DISPOSITION_LABEL.interview}</option>
+          <option value="hire">{DISPOSITION_LABEL.hire}</option>
+          <option value="delete">{DISPOSITION_LABEL.delete}</option>
+        </select>
+      </div>
+    );
+  }
+
+  const expandedCandidate = candidates.find((c) => c.id === expandedId) ?? null;
 
   if (!candidates.length) {
     return (
@@ -159,54 +207,19 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
         </select>
       </div>
 
-      <div className="matrix-list">
-        {rows.map((candidate) => {
-          const isOpen = expandedId === candidate.id;
-          const disposition = dispositions[candidate.id];
-          return (
-            <div className={`matrix-row ${isOpen ? 'expanded' : ''}`} key={candidate.id}>
-              <div
-                className={`matrix-row-head ${disposition || ''}`}
-                role="button"
-                tabIndex={0}
-                aria-expanded={isOpen}
-                onClick={() => setExpandedId(isOpen ? null : candidate.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setExpandedId(isOpen ? null : candidate.id);
-                  }
-                }}
-              >
-                <input
-                  type="checkbox"
-                  className="matrix-row-checkbox"
-                  checked={selectedIds.has(candidate.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={() => toggleOne(candidate.id)}
-                  aria-label={`Select ${candidate.name}`}
-                />
-                <span className="matrix-row-name">{candidate.name}</span>
-                <span className="facet-cell matrix-row-match">
-                  <span className="score-num">{candidate.match === null ? '—' : `${candidate.match}%`}</span>
-                  <span className={`facet-mini ${facetTier(candidate.match)}`} />
-                </span>
-                <select
-                  className={`disposition-select ${disposition || ''}`}
-                  value={disposition || ''}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => updateDisposition(candidate.id, e.target.value)}
-                  disabled={savingId === candidate.id}
-                >
-                  <option value="">Disposition…</option>
-                  <option value="screen">{DISPOSITION_LABEL.screen}</option>
-                  <option value="interview">{DISPOSITION_LABEL.interview}</option>
-                  <option value="hire">{DISPOSITION_LABEL.hire}</option>
-                  <option value="delete">{DISPOSITION_LABEL.delete}</option>
-                </select>
-              </div>
+      {/* Pinned outside the scroll container entirely - not sticky
+          within it - so the scrollbar genuinely belongs only to the
+          content beneath it, rather than spanning the banner's own
+          height too. */}
+      {expandedCandidate && <div className="matrix-pinned-banner">{renderBanner(expandedCandidate, true, 'pinned')}</div>}
 
-              {isOpen && (
+      <div className="matrix-list">
+        {candidates.map((candidate) => {
+          const isOpen = expandedId === candidate.id;
+          if (isOpen) {
+            // Banner already rendered above, pinned - just the content here.
+            return (
+              <div className="matrix-row expanded" key={candidate.id}>
                 <div className="matrix-row-body">
                   {candidate.match !== null && candidate.verdict !== null ? (
                     <CandidateReport
@@ -224,7 +237,12 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
                     <p className="muted">No evaluation available for this candidate yet.</p>
                   )}
                 </div>
-              )}
+              </div>
+            );
+          }
+          return (
+            <div className="matrix-row" key={candidate.id}>
+              {renderBanner(candidate, false)}
             </div>
           );
         })}
