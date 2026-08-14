@@ -28,6 +28,10 @@
 .matrix-row-name{flex:1;min-width:0;font-weight:700;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .matrix-row-match{flex-shrink:0}
 .score-num{font-family:var(--mono);font-weight:700;color:var(--ink);font-size:12.5px}
+.matrix-big4{width:330px;flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.matrix-assessment{min-width:0;display:flex;flex-direction:column;line-height:1.15}
+.matrix-assessment-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--faint);font:600 8px var(--mono);letter-spacing:.02em;text-transform:uppercase}
+.matrix-assessment-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:10.5px;font-weight:600}
 .facet-mini{width:11px;height:11px;clip-path:polygon(50% 0%,90% 20%,100% 60%,75% 100%,25% 100%,0% 60%,10% 20%);flex-shrink:0}
 .facet-mini.strong{background:var(--deep)}
 .facet-mini.moderate{background:var(--sapphire-2)}

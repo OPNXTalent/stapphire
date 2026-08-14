@@ -34,6 +34,14 @@ function facetTier(score: number | null): 'strong' | 'moderate' | 'limited' {
   return 'limited';
 }
 
+function categoryAssessment(score: number | null): string {
+  if (score === null) return '—';
+  if (score >= 85) return 'Excellent';
+  if (score >= 70) return 'Strong';
+  if (score >= 55) return 'Moderate';
+  return 'Limited';
+}
+
 export function CandidateMatrix({ candidates, positionTitle, requisitionId }: { candidates: MatrixCandidate[]; positionTitle: string; requisitionId: string }) {
   const router = useRouter();
   const [orderedCandidates, setOrderedCandidates] = useState(candidates);
@@ -231,6 +239,19 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId }: { 
         <span className="facet-cell matrix-row-match">
           <span className="score-num">{candidate.match === null ? '—' : `${candidate.match}%`}</span>
           <span className={`facet-mini ${facetTier(candidate.match)}`} />
+        </span>
+        <span className="matrix-big4" aria-label="Big 4 category assessments">
+          {([
+            ['Responsibilities', candidate.responsibilities],
+            ['Hard Skills', candidate.hardSkills],
+            ['Soft Skills', candidate.softSkills],
+            ['Keywords', candidate.keywords]
+          ] as const).map(([label, score]) => (
+            <span className="matrix-assessment" key={label} title={`${label}: ${categoryAssessment(score)}`}>
+              <span className="matrix-assessment-label">{label}</span>
+              <span className="matrix-assessment-value">{categoryAssessment(score)}</span>
+            </span>
+          ))}
         </span>
         <select
           className={`disposition-select ${disposition || ''}`}
