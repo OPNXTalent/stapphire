@@ -208,34 +208,28 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
       </div>
 
       {expandedCandidate ? (
-        <>
-          {/* Pinned outside the scroll container entirely - not sticky
-              within it - so the scrollbar genuinely belongs only to the
-              content beneath it, rather than spanning the banner's own
-              height too. */}
-          <div className="matrix-pinned-banner">{renderBanner(expandedCandidate, true, 'pinned')}</div>
-          <div className="matrix-list">
-            <div className="matrix-row expanded">
-              <div className="matrix-row-body">
-                {expandedCandidate.match !== null && expandedCandidate.verdict !== null ? (
-                  <CandidateReport
-                    candidateName={expandedCandidate.name}
-                    positionTitle={positionTitle}
-                    overallMatch={expandedCandidate.match}
-                    verdict={expandedCandidate.verdict}
-                    responsibilities={expandedCandidate.responsibilities ?? 0}
-                    hardSkills={expandedCandidate.hardSkills ?? 0}
-                    softSkills={expandedCandidate.softSkills ?? 0}
-                    keywords={expandedCandidate.keywords ?? 0}
-                    assessment={expandedCandidate.assessment}
-                  />
-                ) : (
-                  <p className="muted">No evaluation available for this candidate yet.</p>
-                )}
-              </div>
+        <div className="matrix-list">
+          <div className="matrix-row expanded">
+            {renderBanner(expandedCandidate, true, 'pinned')}
+            <div className="matrix-row-body">
+              {expandedCandidate.match !== null && expandedCandidate.verdict !== null ? (
+                <CandidateReport
+                  candidateName={expandedCandidate.name}
+                  positionTitle={positionTitle}
+                  overallMatch={expandedCandidate.match}
+                  verdict={expandedCandidate.verdict}
+                  responsibilities={expandedCandidate.responsibilities ?? 0}
+                  hardSkills={expandedCandidate.hardSkills ?? 0}
+                  softSkills={expandedCandidate.softSkills ?? 0}
+                  keywords={expandedCandidate.keywords ?? 0}
+                  assessment={expandedCandidate.assessment}
+                />
+              ) : (
+                <p className="muted">No evaluation available for this candidate yet.</p>
+              )}
             </div>
           </div>
-        </>
+        </div>
       ) : (
         // Nothing selected - the full list of every candidate's banner,
         // matching "clicking the bar returns to the main view of all
