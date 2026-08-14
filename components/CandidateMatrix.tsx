@@ -208,25 +208,31 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
       </div>
 
       {expandedCandidate ? (
-        <div className="matrix-list">
-          <div className="matrix-row expanded">
-            {renderBanner(expandedCandidate, true, 'pinned')}
-            <div className="matrix-row-body">
-              {expandedCandidate.match !== null && expandedCandidate.verdict !== null ? (
-                <CandidateReport
-                  candidateName={expandedCandidate.name}
-                  positionTitle={positionTitle}
-                  overallMatch={expandedCandidate.match}
-                  verdict={expandedCandidate.verdict}
-                  responsibilities={expandedCandidate.responsibilities ?? 0}
-                  hardSkills={expandedCandidate.hardSkills ?? 0}
-                  softSkills={expandedCandidate.softSkills ?? 0}
-                  keywords={expandedCandidate.keywords ?? 0}
-                  assessment={expandedCandidate.assessment}
-                />
-              ) : (
-                <p className="muted">No evaluation available for this candidate yet.</p>
-              )}
+        <div className="matrix-selected">
+          <div className="matrix-selected-banner">
+            <div className="matrix-row">
+              {renderBanner(expandedCandidate, true, 'pinned')}
+            </div>
+          </div>
+          <div className="matrix-selected-detail">
+            <div className="matrix-row expanded">
+              <div className="matrix-row-body">
+                {expandedCandidate.match !== null && expandedCandidate.verdict !== null ? (
+                  <CandidateReport
+                    candidateName={expandedCandidate.name}
+                    positionTitle={positionTitle}
+                    overallMatch={expandedCandidate.match}
+                    verdict={expandedCandidate.verdict}
+                    responsibilities={expandedCandidate.responsibilities ?? 0}
+                    hardSkills={expandedCandidate.hardSkills ?? 0}
+                    softSkills={expandedCandidate.softSkills ?? 0}
+                    keywords={expandedCandidate.keywords ?? 0}
+                    assessment={expandedCandidate.assessment}
+                  />
+                ) : (
+                  <p className="muted">No evaluation available for this candidate yet.</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
