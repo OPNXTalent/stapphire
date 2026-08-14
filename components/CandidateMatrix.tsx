@@ -166,7 +166,7 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
           return (
             <div className={`matrix-row ${isOpen ? 'expanded' : ''}`} key={candidate.id}>
               <div
-                className="matrix-row-head"
+                className={`matrix-row-head ${disposition || ''}`}
                 role="button"
                 tabIndex={0}
                 aria-expanded={isOpen}

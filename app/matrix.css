@@ -10,8 +10,12 @@
 .matrix-row-head{display:flex;align-items:center;gap:14px;width:100%;padding:13px 16px;cursor:pointer;background:#fff;border:1px solid var(--line);border-radius:7px;transition:background .12s ease,border-color .12s ease,box-shadow .12s ease}
 .matrix-row-head:hover{border-color:var(--sapphire-2);box-shadow:0 2px 6px rgba(12,18,32,.05)}
 .matrix-row-head:focus-visible{outline:2px solid var(--sapphire);outline-offset:-2px}
-.matrix-row.expanded .matrix-row-head,.matrix-row.expanded .matrix-row-head:hover{background:var(--navy);border-color:var(--navy)}
-.matrix-row.expanded .matrix-row-head .matrix-row-name,.matrix-row.expanded .matrix-row-head .score-num{color:#fff}
+.matrix-row-head.screen{background:var(--sapphire-pale)}
+.matrix-row-head.interview{background:var(--amber-tint)}
+.matrix-row-head.hire{background:var(--green-tint)}
+.matrix-row-head.delete{background:var(--red-tint)}
+.matrix-row.expanded .matrix-row-head,.matrix-row.expanded .matrix-row-head:hover{background:var(--sapphire-pale);border-color:var(--sapphire)}
+.matrix-row.expanded .matrix-row-head .matrix-row-name{color:var(--deep);font-weight:700}
 .matrix-row-checkbox{flex-shrink:0;width:auto;margin:0;cursor:pointer}
 .matrix-row-name{flex:1;min-width:0;font-weight:700;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .matrix-row-match{flex-shrink:0}
@@ -21,13 +25,9 @@
 .facet-mini.moderate{background:var(--sapphire-2)}
 .facet-mini.limited{background:var(--line-strong)}
 .disposition-select{width:auto;flex-shrink:0;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.03em;padding:5px 9px;border:1px solid var(--line-strong);border-radius:4px;background:#fff;color:var(--muted)}
-.disposition-select.screen{background:var(--sapphire);border-color:var(--sapphire);color:#fff}
-.disposition-select.interview{background:var(--amber);border-color:var(--amber);color:#fff}
-.disposition-select.hire{background:var(--green);border-color:var(--green);color:#fff}
-.disposition-select.delete{background:var(--red);border-color:var(--red);color:#fff}
 
-.matrix-row-body{padding:0 16px 24px}
-.matrix-row-body .evaluation{border:none;box-shadow:none;padding:0;max-width:none;margin:0}
+.matrix-row-body{padding:0 16px 24px;width:100%}
+.matrix-row-body .evaluation{border:none;box-shadow:none;padding:0;max-width:none;width:100%;margin:0}
 .matrix-row-body .hero{padding-top:4px}
 
 .candidate-link{color:var(--deep);font-weight:700}
