@@ -10,6 +10,8 @@ export type MatrixCandidate = {
   id: string;
   name: string;
   match: number | null;
+  rankOrder: number | null;
+  createdAt: string;
   responsibilities: number | null;
   hardSkills: number | null;
   softSkills: number | null;
@@ -32,8 +34,9 @@ function facetTier(score: number | null): 'strong' | 'moderate' | 'limited' {
   return 'limited';
 }
 
-export function CandidateMatrix({ candidates, positionTitle }: { candidates: MatrixCandidate[]; positionTitle: string }) {
+export function CandidateMatrix({ candidates, positionTitle, requisitionId }: { candidates: MatrixCandidate[]; positionTitle: string; requisitionId: string }) {
   const router = useRouter();
+  const [orderedCandidates, setOrderedCandidates] = useState(candidates);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [dispositions, setDispositions] = useState<Record<string, Disposition | null>>(() =>
@@ -41,16 +44,19 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
   );
   const [savingId, setSavingId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   // candidates is the single source of truth (server-fetched, already
   // excludes soft-deleted). Resync whenever it changes rather than
   // trusting local state, which can otherwise silently drift after a
   // refresh.
   useEffect(() => {
+    setOrderedCandidates(candidates);
     setDispositions(Object.fromEntries(candidates.map((c) => [c.id, c.disposition])));
   }, [candidates]);
 
-  const allSelected = candidates.length > 0 && selectedIds.size === candidates.length;
+  const allSelected = orderedCandidates.length > 0 && selectedIds.size === orderedCandidates.length;
 
   function toggleOne(id: string) {
     setSelectedIds((prev) => {
@@ -62,7 +68,37 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
   }
 
   function toggleAll() {
-    setSelectedIds(allSelected ? new Set() : new Set(candidates.map((c) => c.id)));
+    setSelectedIds(allSelected ? new Set() : new Set(orderedCandidates.map((c) => c.id)));
+  }
+
+  async function moveCandidate(sourceId: string, targetId: string) {
+    if (sourceId === targetId) return;
+    const previous = orderedCandidates;
+    const source = previous.find((candidate) => candidate.id === sourceId);
+    const targetIndex = previous.findIndex((candidate) => candidate.id === targetId);
+    if (!source || targetIndex < 0) return;
+    const reordered = previous.filter((candidate) => candidate.id !== sourceId);
+    reordered.splice(targetIndex, 0, source);
+    const next = reordered.map((candidate, index) => ({ ...candidate, rankOrder: index + 1 }));
+    setOrderedCandidates(next);
+    try {
+      const response = await fetch(`/api/requisitions/${requisitionId}/candidate-rank`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds: next.map((candidate) => candidate.id) })
+      });
+      if (!response.ok) throw new Error('Unable to save ranking');
+      router.refresh();
+    } catch {
+      setOrderedCandidates(previous);
+      alert('Unable to save candidate ranking. Refresh and try again.');
+    }
+  }
+
+  function moveCandidateByKeyboard(id: string, direction: -1 | 1) {
+    const index = orderedCandidates.findIndex((candidate) => candidate.id === id);
+    const target = orderedCandidates[index + direction];
+    if (index >= 0 && target) void moveCandidate(id, target.id);
   }
 
   // Sets disposition for exactly one candidate - the per-row dropdown.
@@ -125,11 +161,11 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
   // outside the scroll container, for the currently-expanded candidate)
   // and for every normal collapsed row. Kept in one place so the two
   // contexts can never visually drift apart.
-  function renderBanner(candidate: MatrixCandidate, isOpen: boolean, extraClass = ''): ReactNode {
+  function renderBanner(candidate: MatrixCandidate, isOpen: boolean, rank: number, extraClass = ''): ReactNode {
     const disposition = dispositions[candidate.id];
     return (
       <div
-        className={`matrix-row-head ${disposition || ''} ${extraClass}`}
+        className={`matrix-row-head ${disposition || ''} ${extraClass} ${draggedId === candidate.id ? 'dragging' : ''} ${dropTargetId === candidate.id ? 'drop-target' : ''}`}
         role="button"
         tabIndex={0}
         aria-expanded={isOpen}
@@ -140,7 +176,49 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
             setExpandedId(isOpen ? null : candidate.id);
           }
         }}
+        onDragOver={(e) => {
+          if (!isOpen && draggedId && draggedId !== candidate.id) {
+            e.preventDefault();
+            setDropTargetId(candidate.id);
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          const sourceId = draggedId || e.dataTransfer.getData('text/plain');
+          setDropTargetId(null);
+          setDraggedId(null);
+          if (sourceId) void moveCandidate(sourceId, candidate.id);
+        }}
       >
+        <span className="matrix-rank">
+          <button
+            type="button"
+            className="matrix-drag-handle"
+            draggable={!isOpen}
+            aria-label={`Rank ${candidate.name}, currently ${rank}. Use arrow keys to move.`}
+            title="Drag or use arrow keys to rank"
+            onClick={(e) => e.stopPropagation()}
+            onDragStart={(e) => {
+              e.stopPropagation();
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', candidate.id);
+              setDraggedId(candidate.id);
+            }}
+            onDragEnd={() => {
+              setDraggedId(null);
+              setDropTargetId(null);
+            }}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (isOpen) return;
+              if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                moveCandidateByKeyboard(candidate.id, e.key === 'ArrowUp' ? -1 : 1);
+              }
+            }}
+          >⠿</button>
+          <span className="matrix-rank-number">#{rank}</span>
+        </span>
         <input
           type="checkbox"
           className="matrix-row-checkbox"
@@ -171,9 +249,10 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
     );
   }
 
-  const expandedCandidate = candidates.find((c) => c.id === expandedId) ?? null;
+  const expandedCandidate = orderedCandidates.find((c) => c.id === expandedId) ?? null;
+  const expandedRank = expandedCandidate ? orderedCandidates.findIndex((candidate) => candidate.id === expandedCandidate.id) + 1 : 0;
 
-  if (!candidates.length) {
+  if (!orderedCandidates.length) {
     return (
       <div className="matrix-empty">
         <strong>No candidates evaluated yet.</strong>
@@ -209,7 +288,7 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
         <div className="matrix-selected">
           <div className="matrix-selected-banner">
             <div className="matrix-row">
-              {renderBanner(expandedCandidate, true, 'pinned')}
+              {renderBanner(expandedCandidate, true, expandedRank, 'pinned')}
             </div>
           </div>
           <div className="matrix-selected-detail">
@@ -238,9 +317,9 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
         // matching "clicking the bar returns to the main view of all
         // candidate bars."
         <div className="matrix-list">
-          {candidates.map((candidate) => (
+          {orderedCandidates.map((candidate, index) => (
             <div className="matrix-row" key={candidate.id}>
-              {renderBanner(candidate, false)}
+              {renderBanner(candidate, false, index + 1)}
             </div>
           ))}
         </div>

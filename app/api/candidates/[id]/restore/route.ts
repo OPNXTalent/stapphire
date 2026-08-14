@@ -8,7 +8,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
   try {
     const { error } = await supabaseAdmin
       .from('phase1_candidates')
-      .update({ deleted_at: null, disposition: null })
+      .update({ deleted_at: null, disposition: null, rank_order: null })
       .eq('id', params.id);
     if (error) throw error;
     return NextResponse.json({ success: true });
