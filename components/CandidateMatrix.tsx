@@ -161,7 +161,7 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
           onChange={(e) => updateDisposition(candidate.id, e.target.value)}
           disabled={savingId === candidate.id}
         >
-          <option value="">Disposition…</option>
+          <option value="">Status</option>
           <option value="screen">{DISPOSITION_LABEL.screen}</option>
           <option value="interview">{DISPOSITION_LABEL.interview}</option>
           <option value="hire">{DISPOSITION_LABEL.hire}</option>
@@ -196,7 +196,7 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
           disabled={bulkBusy || selectedIds.size === 0}
         >
           <option value="">
-            {selectedIds.size === 0 ? 'Set disposition…' : `Set disposition for ${selectedIds.size} selected…`}
+            {selectedIds.size === 0 ? 'Set status…' : `Set status (${selectedIds.size})…`}
           </option>
           <option value="screen">{DISPOSITION_LABEL.screen}</option>
           <option value="interview">{DISPOSITION_LABEL.interview}</option>
