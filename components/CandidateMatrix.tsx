@@ -207,46 +207,47 @@ export function CandidateMatrix({ candidates, positionTitle }: { candidates: Mat
         </select>
       </div>
 
-      {/* Pinned outside the scroll container entirely - not sticky
-          within it - so the scrollbar genuinely belongs only to the
-          content beneath it, rather than spanning the banner's own
-          height too. */}
-      {expandedCandidate && <div className="matrix-pinned-banner">{renderBanner(expandedCandidate, true, 'pinned')}</div>}
-
-      <div className="matrix-list">
-        {candidates.map((candidate) => {
-          const isOpen = expandedId === candidate.id;
-          if (isOpen) {
-            // Banner already rendered above, pinned - just the content here.
-            return (
-              <div className="matrix-row expanded" key={candidate.id}>
-                <div className="matrix-row-body">
-                  {candidate.match !== null && candidate.verdict !== null ? (
-                    <CandidateReport
-                      candidateName={candidate.name}
-                      positionTitle={positionTitle}
-                      overallMatch={candidate.match}
-                      verdict={candidate.verdict}
-                      responsibilities={candidate.responsibilities ?? 0}
-                      hardSkills={candidate.hardSkills ?? 0}
-                      softSkills={candidate.softSkills ?? 0}
-                      keywords={candidate.keywords ?? 0}
-                      assessment={candidate.assessment}
-                    />
-                  ) : (
-                    <p className="muted">No evaluation available for this candidate yet.</p>
-                  )}
-                </div>
+      {expandedCandidate ? (
+        <>
+          {/* Pinned outside the scroll container entirely - not sticky
+              within it - so the scrollbar genuinely belongs only to the
+              content beneath it, rather than spanning the banner's own
+              height too. */}
+          <div className="matrix-pinned-banner">{renderBanner(expandedCandidate, true, 'pinned')}</div>
+          <div className="matrix-list">
+            <div className="matrix-row expanded">
+              <div className="matrix-row-body">
+                {expandedCandidate.match !== null && expandedCandidate.verdict !== null ? (
+                  <CandidateReport
+                    candidateName={expandedCandidate.name}
+                    positionTitle={positionTitle}
+                    overallMatch={expandedCandidate.match}
+                    verdict={expandedCandidate.verdict}
+                    responsibilities={expandedCandidate.responsibilities ?? 0}
+                    hardSkills={expandedCandidate.hardSkills ?? 0}
+                    softSkills={expandedCandidate.softSkills ?? 0}
+                    keywords={expandedCandidate.keywords ?? 0}
+                    assessment={expandedCandidate.assessment}
+                  />
+                ) : (
+                  <p className="muted">No evaluation available for this candidate yet.</p>
+                )}
               </div>
-            );
-          }
-          return (
+            </div>
+          </div>
+        </>
+      ) : (
+        // Nothing selected - the full list of every candidate's banner,
+        // matching "clicking the bar returns to the main view of all
+        // candidate bars."
+        <div className="matrix-list">
+          {candidates.map((candidate) => (
             <div className="matrix-row" key={candidate.id}>
               {renderBanner(candidate, false)}
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
