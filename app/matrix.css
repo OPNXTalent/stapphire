@@ -24,7 +24,7 @@
 .matrix-drag-handle{background:none;border:0;border-radius:3px;padding:2px;color:var(--faint);font:700 15px/1 var(--mono);cursor:grab}
 .matrix-drag-handle:hover,.matrix-drag-handle:focus-visible{background:var(--wash);color:var(--sapphire);outline:none}
 .matrix-drag-handle:active{cursor:grabbing}
-.matrix-rank-number{font:700 10.5px var(--mono);color:var(--muted)}
+.matrix-rank-number{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--muted)}
 .matrix-row-name{flex:1;min-width:0;font-weight:700;color:var(--ink);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .matrix-row-match{flex-shrink:0}
 .score-num{font-family:var(--mono);font-weight:700;color:var(--ink);font-size:12.5px}

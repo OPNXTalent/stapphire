@@ -217,7 +217,7 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId }: { 
               }
             }}
           >⠿</button>
-          <span className="matrix-rank-number">#{rank}</span>
+          <span className="matrix-rank-number">{rank}.</span>
         </span>
         <input
           type="checkbox"
