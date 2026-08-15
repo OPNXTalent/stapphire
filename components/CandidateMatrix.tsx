@@ -3,15 +3,19 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { CandidateReport } from '@/components/CandidateReport';
+import { CandidateDetailActions } from '@/components/CandidateDetailActions';
 
 export type Disposition = 'screen' | 'interview' | 'hire' | 'delete';
 
 export type MatrixCandidate = {
   id: string;
   name: string;
+  sourceFilename: string;
+  resumeAvailable: boolean;
   match: number | null;
   rankOrder: number | null;
   createdAt: string;
+  evaluationDate: string;
   responsibilities: number | null;
   hardSkills: number | null;
   softSkills: number | null;
@@ -313,6 +317,7 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId }: { 
             <div className="matrix-row">
               {renderBanner(expandedCandidate, true, expandedRank, 'pinned')}
             </div>
+            <CandidateDetailActions candidateId={expandedCandidate.id} sourceFilename={expandedCandidate.sourceFilename} resumeAvailable={expandedCandidate.resumeAvailable}/>
           </div>
           <div className="matrix-selected-detail">
             <div className="matrix-row expanded">
@@ -327,6 +332,7 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId }: { 
                     softSkills={expandedCandidate.softSkills ?? 0}
                     keywords={expandedCandidate.keywords ?? 0}
                     assessment={expandedCandidate.assessment}
+                    evaluationDate={expandedCandidate.evaluationDate}
                   />
                 ) : (
                   <p className="muted">No evaluation available for this candidate yet.</p>

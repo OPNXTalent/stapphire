@@ -59,8 +59,25 @@ alter table phase1_requisitions alter column job_description_updated_at set not 
 
 -- Backward-compatible addition for databases created before ranking existed.
 alter table phase1_candidates add column if not exists rank_order integer;
+alter table phase1_candidates add column if not exists source_storage_path text;
+alter table phase1_candidates add column if not exists source_mime_type text;
 alter table phase1_candidates drop constraint if exists phase1_candidates_rank_order_check;
 alter table phase1_candidates add constraint phase1_candidates_rank_order_check check (rank_order is null or rank_order >= 1);
+
+-- Original resume artifacts are private and are accessed only through the
+-- server-side service-role client and authenticated application routes.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'candidate-resumes',
+  'candidate-resumes',
+  false,
+  10485760,
+  array['application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document','text/plain']::text[]
+)
+on conflict (id) do update set
+  public = false,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
 
 create or replace function set_phase1_candidate_ranks(p_requisition_id uuid, p_ordered_ids uuid[])
 returns void

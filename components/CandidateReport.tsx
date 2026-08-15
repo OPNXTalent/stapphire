@@ -1,3 +1,5 @@
+import { BrandGem } from '@/components/BrandGem';
+
 function List({ items, empty = 'None identified.' }: { items?: string[]; empty?: string }) {
   return items?.length ? (
     <ul className="bullets">
@@ -76,7 +78,8 @@ export function CandidateReport({
   hardSkills,
   softSkills,
   keywords,
-  assessment
+  assessment,
+  evaluationDate
 }: {
   candidateName: string;
   positionTitle: string;
@@ -86,14 +89,18 @@ export function CandidateReport({
   softSkills: number;
   keywords: number;
   assessment: unknown;
+  evaluationDate?: string;
 }) {
   const a = normalizeAssessment(assessment);
+  const formattedEvaluationDate = evaluationDate ? new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(evaluationDate)) : '';
   return (
     <article className="evaluation">
+      <div className="print-evaluation-brand"><BrandGem/><strong>Stapphire</strong><span>Candidate Evaluation</span></div>
       <section className="hero">
         <p className="muted">Candidate Evaluation</p>
         <h1>{candidateName}</h1>
         <p>{positionTitle}</p>
+        {formattedEvaluationDate&&<p className="evaluation-date">Evaluation date: {formattedEvaluationDate}</p>}
         <div className="match">{overallMatch}% Match</div>
       </section>
 

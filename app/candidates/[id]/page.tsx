@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { CandidateReport } from '@/components/CandidateReport';
+import { CandidateDetailActions } from '@/components/CandidateDetailActions';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +32,7 @@ export default async function CandidatePage({ params }: { params: { id: string }
       <a className="back" href={`/requisitions/${requisitionId}`}>
         ← {position}
       </a>
+      <CandidateDetailActions candidateId={candidate.id} sourceFilename={candidate.source_filename} resumeAvailable={Boolean(candidate.source_storage_path)}/>
       <CandidateReport
         candidateName={candidate.full_name}
         positionTitle={position}
@@ -40,6 +42,7 @@ export default async function CandidatePage({ params }: { params: { id: string }
         softSkills={e.soft_skills_score}
         keywords={e.keyword_terminology_score}
         assessment={e.assessment}
+        evaluationDate={e.created_at}
       />
     </>
   );
