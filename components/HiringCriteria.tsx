@@ -155,13 +155,13 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
     <section className="hiring-criteria" aria-labelledby="hiring-criteria-heading">
       <div className="hiring-criteria-heading">
         <div><span className="eyebrow">Hiring calibration</span><h2 id="hiring-criteria-heading">Hiring Criteria</h2></div>
-        {ready && <div className="criteria-actions"><button type="button" className="criteria-reset" onClick={() => runAction('reset')} disabled={!changedFromDefault || action !== null || savingId !== null}>Reset to Default</button><button type="button" className="criteria-apply" onClick={() => runAction('apply')} disabled={total !== 100 || action !== null || savingId !== null}>{action === 'apply' ? 'Applying…' : 'Apply Model'}</button></div>}
+        {ready && <div className="criteria-actions"><button type="button" className="criteria-reset" onClick={() => runAction('reset')} disabled={!changedFromDefault || action !== null || savingId !== null}>Reset</button><button type="button" className="criteria-apply" onClick={() => runAction('apply')} disabled={total !== 100 || action !== null || savingId !== null}>{action === 'apply' ? 'Updating…' : 'Update'}</button></div>}
       </div>
 
       {sourceIsStale&&<div className="source-stale-notice">Job Description has changed since these Hiring Criteria were generated.</div>}
 
       {action === 'apply' ? (
-        <StapphireProcessing title="Applying Hiring Criteria…" detail="Saving the calibrated model"/>
+        <StapphireProcessing title="Updating Hiring Criteria…" detail="Saving the calibrated model"/>
       ) : !ready && (action === 'generate' || model?.extractionStatus === 'pending') ? (
         <StapphireProcessing title="Evaluating Job Description…" detail="Generating Hiring Criteria"/>
       ) : !ready ? (
