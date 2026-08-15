@@ -28,7 +28,7 @@ export default async function RequisitionPage({params}:{params:{id:string}}){
 
   const hiringCriteriaView = <HiringCriteria model={hiringCriteria} requisitionId={req.id}/>;
   const marketAnalysisView = <RequisitionIntelligence analysis={requisitionIntelligence} checkedAt={new Date()}/>;
-  const jobDescriptionView = <section><h2>Job Description</h2><div className="jd">{normalizeJobDescriptionForDisplay(req.job_description)}</div></section>;
+  const jobDescriptionView = <section className="requisition-intelligence" aria-labelledby="job-description-heading"><div className="intelligence-heading"><div><span className="eyebrow">Requisition source</span><h2 id="job-description-heading">Job Description</h2></div></div><div className="jd">{normalizeJobDescriptionForDisplay(req.job_description)}</div></section>;
   const candidatesView = <><ResumeUpload requisitionId={req.id}/><div className="matrix-header-row"><h2>Candidate Matrix</h2><DNSBin candidates={dnsCandidates}/></div><p className="muted">Compare evaluated candidates - click a name to expand the full assessment.</p><CandidateMatrix candidates={matrixCandidates} positionTitle={req.title} requisitionId={req.id}/></>;
 
   return <RequisitionViewToggle title={req.title} requisitionId={req.id} hiringCriteriaView={hiringCriteriaView} marketAnalysisView={marketAnalysisView} jobDescriptionView={jobDescriptionView} candidatesView={candidatesView}/>;
