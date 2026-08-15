@@ -16,7 +16,7 @@
 .jd-upload-zone:hover{background:var(--sapphire-pale);border-color:var(--sapphire)}
 .form-separator{display:flex;align-items:center;gap:14px;color:var(--faint);font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.09em}
 .form-separator:before,.form-separator:after{content:"";height:1px;background:var(--line);flex:1}
-.create-form-actions{flex:none}
+.create-form-actions{flex:none;display:flex;align-items:center;gap:10px}.secondary-action{background:#fff;border:1px solid var(--line-strong);color:var(--deep)}.secondary-action:hover{background:var(--sapphire-pale);border-color:var(--sapphire);color:var(--deep)}.secondary-action:focus-visible{outline:2px solid var(--sapphire);outline-offset:2px}
 .visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 .intake-validation{display:flex;flex-direction:column;gap:2px;color:var(--red);font-size:13px}.intake-validation span{font-size:12px;font-weight:400}
 .view-switch-btn{display:block;width:100%;text-align:center;background:var(--deep);border-color:var(--deep);color:#fff}.view-switch-btn:hover{border-color:var(--sapphire);background:var(--sapphire);color:#fff}

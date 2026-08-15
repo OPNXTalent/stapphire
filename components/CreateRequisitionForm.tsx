@@ -110,6 +110,6 @@ export function CreateRequisitionForm() {
       </button>
     </div>
     {error&&<p className="error">{error}</p>}
-    <div className="create-form-actions"><button disabled={busy||uploading}>{busy?'Saving...':'Create requisition'}</button></div>
+    <div className="create-form-actions"><button disabled={busy||uploading}>{busy?'Saving...':'Create requisition'}</button><button type="button" className="secondary-action" onClick={()=>router.push('/')} disabled={busy}>Cancel</button></div>
   </form>;
 }
