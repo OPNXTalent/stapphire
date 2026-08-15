@@ -20,6 +20,9 @@
 .matrix-row-head:focus-visible{outline:2px solid var(--sapphire);outline-offset:-2px}
 .criteria-category-list{display:grid;gap:7px;margin-top:7px}
 .matrix-row-head.criteria-category-select{grid-template-columns:minmax(0,1fr) auto;gap:18px;text-align:left;color:var(--ink)}
+.matrix-row-head.criteria-category-select:hover{background:var(--paper)}
+.matrix-row-head.criteria-category-select:focus-visible{border-color:var(--sapphire);background:var(--paper)}
+.matrix-row-head.criteria-category-select.pinned{border-color:var(--sapphire);background:var(--paper)}
 .criteria-category-select span{font-weight:700}
 .criteria-category-select strong{font:750 16px var(--display);color:var(--deep)}
 .criteria-category-focused{margin-top:7px}
