@@ -84,7 +84,7 @@ export function RequisitionViewToggle({
         aria-label={goingTo === 'candidates' ? 'Switch to Candidates view' : 'Switch to Requisition view'}
       >
         <span key={view} className="view-switch-label">
-          {goingTo === 'candidates' ? 'Candidates →' : '← Requisition'}
+          {goingTo === 'candidates' ? '← Candidates' : '← Requisition'}
         </span>
       </button>
 
