@@ -8,6 +8,15 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   try {
     const body = await request.json();
     const criterionId = String(body.criterionId || '');
+    if (criterionId && typeof body.isKnockout === 'boolean') {
+      const { data, error } = await supabaseAdmin.rpc('set_phase1_hiring_criterion_knockout', {
+        p_requisition_id: params.id,
+        p_criterion_id: criterionId,
+        p_is_knockout: body.isKnockout
+      });
+      if (error) throw error;
+      return NextResponse.json({ weight: data, isKnockout: body.isKnockout });
+    }
     const delta = Number(body.delta);
     if (!criterionId || (delta !== -1 && delta !== 1)) return NextResponse.json({ error: 'Invalid criterion adjustment.' }, { status: 400 });
     const { data, error } = await supabaseAdmin.rpc('adjust_phase1_hiring_criterion', {

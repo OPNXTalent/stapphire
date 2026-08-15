@@ -1,6 +1,6 @@
 import { supabaseAdmin } from './supabaseAdmin';
 
-export const HIRING_CRITERIA_CATEGORIES = ['responsibilities', 'hard_skills', 'soft_skills', 'keywords'] as const;
+export const HIRING_CRITERIA_CATEGORIES = ['responsibilities', 'hard_skills', 'soft_skills', 'keywords', 'other_requirements'] as const;
 export type HiringCriteriaCategory = typeof HIRING_CRITERIA_CATEGORIES[number];
 export type CriteriaExtractionStatus = 'pending' | 'ready' | 'unavailable' | 'failed';
 export type UnmappedQualification = { label: string; jdEvidence: string; reason: string };
@@ -13,6 +13,8 @@ export type HiringCriterion = {
   jdEvidence: string | null;
   defaultWeight: number;
   draftWeight: number;
+  isKnockout: boolean;
+  knockoutSuggested: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -45,6 +47,8 @@ type CriterionRow = {
   jd_evidence: string | null;
   default_weight: number;
   draft_weight: number;
+  is_knockout: boolean | null;
+  knockout_suggested: boolean | null;
   created_at: string;
   updated_at: string;
 };
@@ -71,6 +75,8 @@ export async function getHiringCriteriaModel(requisitionId: string): Promise<Hir
     jdEvidence: criterion.jd_evidence,
     defaultWeight: criterion.default_weight,
     draftWeight: criterion.draft_weight,
+    isKnockout: criterion.is_knockout === true,
+    knockoutSuggested: criterion.knockout_suggested === true,
     createdAt: criterion.created_at,
     updatedAt: criterion.updated_at
   }));

@@ -147,14 +147,17 @@ create table if not exists phase1_hiring_criteria_models (
 create table if not exists phase1_hiring_criteria_items (
   id uuid primary key default uuid_generate_v4(),
   model_id uuid not null references phase1_hiring_criteria_models(id) on delete cascade,
-  category text not null check (category in ('responsibilities', 'hard_skills', 'soft_skills', 'keywords')),
+  category text not null check (category in ('responsibilities', 'hard_skills', 'soft_skills', 'keywords', 'other_requirements')),
   label text not null check (nullif(btrim(label), '') is not null),
   rationale text,
   jd_evidence text,
   default_weight integer not null check (default_weight between 0 and 100),
   draft_weight integer not null check (draft_weight between 0 and 100),
+  is_knockout boolean not null default false,
+  knockout_suggested boolean not null default false,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  check (not is_knockout or draft_weight = 0)
 );
 
 create table if not exists phase1_hiring_criteria_versions (
@@ -178,6 +181,43 @@ alter table phase1_hiring_criteria_models enable row level security;
 alter table phase1_hiring_criteria_items enable row level security;
 alter table phase1_hiring_criteria_versions enable row level security;
 
+-- Promote previously retained JD-derived qualifications into the editable model.
+alter table phase1_hiring_criteria_items drop constraint if exists phase1_hiring_criteria_items_category_check;
+alter table phase1_hiring_criteria_items
+  add constraint phase1_hiring_criteria_items_category_check
+  check (category in ('responsibilities', 'hard_skills', 'soft_skills', 'keywords', 'other_requirements'));
+alter table phase1_hiring_criteria_items add column if not exists is_knockout boolean not null default false;
+alter table phase1_hiring_criteria_items add column if not exists knockout_suggested boolean not null default false;
+alter table phase1_hiring_criteria_items drop constraint if exists phase1_hiring_criteria_items_knockout_weight_check;
+alter table phase1_hiring_criteria_items
+  add constraint phase1_hiring_criteria_items_knockout_weight_check check (not is_knockout or draft_weight = 0);
+
+insert into phase1_hiring_criteria_items (
+  model_id, category, label, rationale, jd_evidence, default_weight, draft_weight, is_knockout, knockout_suggested
+)
+select
+  model.id,
+  'other_requirements',
+  qualification.value->>'label',
+  nullif(btrim(qualification.value->>'reason'), ''),
+  nullif(btrim(qualification.value->>'jdEvidence'), ''),
+  0,
+  0,
+  false,
+  false
+from phase1_hiring_criteria_models as model
+cross join lateral jsonb_array_elements(
+  case when jsonb_typeof(model.unmapped_qualifications) = 'array' then model.unmapped_qualifications else '[]'::jsonb end
+) as qualification(value)
+where nullif(btrim(qualification.value->>'label'), '') is not null
+  and not exists (
+    select 1 from phase1_hiring_criteria_items as item
+    where item.model_id = model.id
+      and item.category = 'other_requirements'
+      and item.label = qualification.value->>'label'
+      and item.jd_evidence is not distinct from nullif(btrim(qualification.value->>'jdEvidence'), '')
+  );
+
 create or replace function adjust_phase1_hiring_criterion(
   p_requisition_id uuid,
   p_criterion_id uuid,
@@ -199,6 +239,7 @@ begin
   set draft_weight = greatest(0, item.draft_weight + p_delta),
       updated_at = now()
   where item.id = p_criterion_id
+    and not item.is_knockout
     and exists (
       select 1 from phase1_hiring_criteria_models as model
       where model.id = item.model_id
@@ -217,6 +258,43 @@ $$;
 revoke all on function adjust_phase1_hiring_criterion(uuid, uuid, integer) from public, anon, authenticated;
 grant execute on function adjust_phase1_hiring_criterion(uuid, uuid, integer) to service_role;
 
+create or replace function set_phase1_hiring_criterion_knockout(
+  p_requisition_id uuid,
+  p_criterion_id uuid,
+  p_is_knockout boolean
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  next_weight integer;
+begin
+  update phase1_hiring_criteria_items as item
+  set is_knockout = p_is_knockout,
+      draft_weight = case when p_is_knockout then 0 else item.draft_weight end,
+      updated_at = now()
+  where item.id = p_criterion_id
+    and item.category = 'other_requirements'
+    and exists (
+      select 1 from phase1_hiring_criteria_models as model
+      where model.id = item.model_id
+        and model.requisition_id = p_requisition_id
+        and model.extraction_status = 'ready'
+    )
+  returning draft_weight into next_weight;
+
+  if next_weight is null then
+    raise exception 'Other Requirement not found.';
+  end if;
+  return next_weight;
+end;
+$$;
+
+revoke all on function set_phase1_hiring_criterion_knockout(uuid, uuid, boolean) from public, anon, authenticated;
+grant execute on function set_phase1_hiring_criterion_knockout(uuid, uuid, boolean) to service_role;
+
 create or replace function reset_phase1_hiring_criteria(p_requisition_id uuid)
 returns void
 language plpgsql
@@ -226,6 +304,7 @@ as $$
 begin
   update phase1_hiring_criteria_items as item
   set draft_weight = item.default_weight,
+      is_knockout = false,
       updated_at = now()
   where exists (
     select 1 from phase1_hiring_criteria_models as model
@@ -268,7 +347,8 @@ begin
   select count(*), coalesce(sum(draft_weight), 0)
   into criterion_count, draft_total
   from phase1_hiring_criteria_items
-  where model_id = selected_model_id;
+  where model_id = selected_model_id
+    and not is_knockout;
 
   if criterion_count = 0 then
     raise exception 'Hiring Criteria model has no subcriteria.';
@@ -288,7 +368,9 @@ begin
     'rationale', rationale,
     'jdEvidence', jd_evidence,
     'defaultWeight', default_weight,
-    'appliedWeight', draft_weight
+    'appliedWeight', draft_weight,
+    'isKnockout', is_knockout,
+    'knockoutSuggested', knockout_suggested
   ) order by category, created_at, id)
   into snapshot
   from phase1_hiring_criteria_items
@@ -300,6 +382,7 @@ begin
     select category, sum(draft_weight) as category_total
     from phase1_hiring_criteria_items
     where model_id = selected_model_id
+      and not is_knockout
     group by category
   ) as rollups;
 
@@ -411,7 +494,9 @@ begin
     rationale text,
     jd_evidence text,
     default_weight integer,
-    draft_weight integer
+    draft_weight integer,
+    is_knockout boolean,
+    knockout_suggested boolean
   );
 
   if item_count = 0
@@ -426,7 +511,7 @@ begin
   delete from phase1_hiring_criteria_items where model_id = selected_model_id;
 
   insert into phase1_hiring_criteria_items (
-    model_id, category, label, rationale, jd_evidence, default_weight, draft_weight
+    model_id, category, label, rationale, jd_evidence, default_weight, draft_weight, is_knockout, knockout_suggested
   )
   select
     selected_model_id,
@@ -435,14 +520,18 @@ begin
     item.rationale,
     item.jd_evidence,
     item.default_weight,
-    item.draft_weight
+    item.draft_weight,
+    coalesce(item.is_knockout, false),
+    coalesce(item.knockout_suggested, false)
   from jsonb_to_recordset(p_items) as item(
     category text,
     label text,
     rationale text,
     jd_evidence text,
     default_weight integer,
-    draft_weight integer
+    draft_weight integer,
+    is_knockout boolean,
+    knockout_suggested boolean
   );
 
   update phase1_hiring_criteria_models

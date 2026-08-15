@@ -14,17 +14,19 @@ const categories: { id: HiringCriteriaCategory; label: string }[] = [
 export function HiringCriteria({ model, requisitionId }: { model: HiringCriteriaModel | null; requisitionId: string }) {
   const router = useRouter();
   const [weights, setWeights] = useState<Record<string, number>>(() => Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.draftWeight])));
+  const [knockouts, setKnockouts] = useState<Record<string, boolean>>(() => Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.isKnockout])));
   const [savingId, setSavingId] = useState<string | null>(null);
   const [action, setAction] = useState<'apply' | 'reset' | 'generate' | null>(null);
   const criteria = model?.criteria || [];
-  const total = criteria.reduce((sum, criterion) => sum + (weights[criterion.id] ?? criterion.draftWeight), 0);
+  const total = criteria.reduce((sum, criterion) => sum + ((knockouts[criterion.id] ?? criterion.isKnockout) ? 0 : (weights[criterion.id] ?? criterion.draftWeight)), 0);
   const meterState = total < 100 ? 'under' : total > 100 ? 'over' : 'balanced';
   const meterCopy = total < 100 ? `${100 - total} points remain to allocate` : total > 100 ? `${total - 100} points must be removed` : 'Balanced';
   const ready = model?.extractionStatus === 'ready' && criteria.length > 0;
-  const changedFromDefault = criteria.some((criterion) => (weights[criterion.id] ?? criterion.draftWeight) !== criterion.defaultWeight);
+  const changedFromDefault = criteria.some((criterion) => (weights[criterion.id] ?? criterion.draftWeight) !== criterion.defaultWeight || (knockouts[criterion.id] ?? criterion.isKnockout));
 
   useEffect(() => {
     setWeights(Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.draftWeight])));
+    setKnockouts(Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.isKnockout])));
   }, [model]);
 
   async function adjustWeight(criterionId: string, delta: -1 | 1) {
@@ -47,6 +49,27 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
     }
   }
 
+  async function setKnockout(criterionId: string, isKnockout: boolean) {
+    const previousKnockout = knockouts[criterionId] ?? false;
+    const previousWeight = weights[criterionId] ?? 0;
+    setKnockouts((current) => ({ ...current, [criterionId]: isKnockout }));
+    if (isKnockout) setWeights((current) => ({ ...current, [criterionId]: 0 }));
+    setSavingId(criterionId);
+    try {
+      const response = await fetch(`/api/requisitions/${requisitionId}/hiring-criteria`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ criterionId, isKnockout })
+      });
+      if (!response.ok) throw new Error('Unable to save knockout state');
+    } catch {
+      setKnockouts((current) => ({ ...current, [criterionId]: previousKnockout }));
+      setWeights((current) => ({ ...current, [criterionId]: previousWeight }));
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   async function runAction(nextAction: 'apply' | 'reset' | 'generate') {
     setAction(nextAction);
     try {
@@ -56,7 +79,10 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
         body: JSON.stringify({ action: nextAction })
       });
       if (!response.ok) throw new Error(`Unable to ${nextAction} criteria`);
-      if (nextAction === 'reset') setWeights(Object.fromEntries(criteria.map((criterion) => [criterion.id, criterion.defaultWeight])));
+      if (nextAction === 'reset') {
+        setWeights(Object.fromEntries(criteria.map((criterion) => [criterion.id, criterion.defaultWeight])));
+        setKnockouts(Object.fromEntries(criteria.map((criterion) => [criterion.id, false])));
+      }
       router.refresh();
     } catch {
       alert(`Unable to ${nextAction} Hiring Criteria. Try again.`);
@@ -106,7 +132,7 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
               );
             })}
           </div>
-          {model.unmappedQualifications.length > 0 && <details className="criteria-unmapped"><summary>Additional qualifications for future eligibility review · {model.unmappedQualifications.length}</summary>{model.unmappedQualifications.map((qualification) => <div key={`${qualification.label}-${qualification.jdEvidence}`}><strong>{qualification.label}</strong><span>{qualification.reason}</span><small>JD evidence: {qualification.jdEvidence}</small></div>)}</details>}
+          {criteria.some((criterion) => criterion.category === 'other_requirements') && <div className="criteria-categories criteria-other"><details><summary><span>Other Requirements</span><strong>{criteria.filter((criterion) => criterion.category === 'other_requirements').length}</strong></summary><div className="criteria-items">{criteria.filter((criterion) => criterion.category === 'other_requirements').map((criterion) => {const weight=weights[criterion.id]??criterion.draftWeight;const knockout=knockouts[criterion.id]??criterion.isKnockout;return <div className={`criterion-item other-requirement${knockout?' knockout':''}`} key={criterion.id}><div><strong>{criterion.label}</strong>{criterion.rationale&&<span>{criterion.rationale}</span>}{criterion.jdEvidence&&<small>JD evidence: {criterion.jdEvidence}</small>}</div><div className="other-requirement-controls"><div className="criterion-weight" aria-label={`${criterion.label} draft weight ${weight} percent`}><button type="button" onClick={()=>adjustWeight(criterion.id,-1)} disabled={knockout||weight===0||savingId===criterion.id} aria-label={`Decrease ${criterion.label} by 1 percentage point`}>−</button><output>{weight}%</output><button type="button" onClick={()=>adjustWeight(criterion.id,1)} disabled={knockout||weight===100||savingId===criterion.id} aria-label={`Increase ${criterion.label} by 1 percentage point`}>+</button></div><button type="button" className={`knockout-toggle${knockout?' active':''}`} aria-pressed={knockout} disabled={savingId===criterion.id} onClick={()=>setKnockout(criterion.id,!knockout)}>Knockout</button></div></div>})}</div></details></div>}
           <p className="criteria-active-note">{model.latestAppliedVersionId ? 'Draft changes do not affect the latest applied version or Candidate Match.' : 'No applied version yet. Review or calibrate this draft, then apply it at exactly 100%.'}</p>
         </>
       )}

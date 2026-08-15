@@ -3,7 +3,7 @@ import { supabaseAdmin } from './supabaseAdmin';
 import type { HiringCriteriaCategory } from './hiringCriteria';
 
 const HIRING_CRITERIA_MODEL = process.env.OPENAI_HIRING_CRITERIA_MODEL || 'gpt-5.6';
-const CATEGORY_TARGETS: Record<HiringCriteriaCategory, number> = {
+const CATEGORY_TARGETS: Record<Exclude<HiringCriteriaCategory, 'other_requirements'>, number> = {
   responsibilities: 50,
   hard_skills: 25,
   soft_skills: 15,
@@ -104,7 +104,7 @@ function validateEvidence(jobDescription: string, evidence: string): void {
 }
 
 function prepareItems(jobDescription: string, extraction: RawExtraction) {
-  const groups: { category: HiringCriteriaCategory; criteria: RawCriterion[] }[] = [
+  const groups: { category: Exclude<HiringCriteriaCategory, 'other_requirements'>; criteria: RawCriterion[] }[] = [
     { category: 'responsibilities', criteria: extraction.responsibilities },
     { category: 'hard_skills', criteria: extraction.hardSkills },
     { category: 'soft_skills', criteria: extraction.softSkills },
@@ -132,9 +132,19 @@ function prepareItems(jobDescription: string, extraction: RawExtraction) {
     validateEvidence(jobDescription, jdEvidence);
     return { ...qualification, label: qualification.label.trim(), reason: qualification.reason.trim(), jdEvidence };
   });
+  const otherRequirements = unmappedQualifications.map((qualification) => ({
+    category: 'other_requirements' as const,
+    label: qualification.label,
+    rationale: qualification.reason,
+    jd_evidence: qualification.jdEvidence,
+    default_weight: 0,
+    draft_weight: 0,
+    is_knockout: false,
+    knockout_suggested: false
+  }));
   const total = items.reduce((sum, item) => sum + item.default_weight, 0);
   if (total !== 100) throw new Error('Hiring Criteria allocation did not total 100.');
-  return { items, unmappedQualifications };
+  return { items: [...items, ...otherRequirements], unmappedQualifications };
 }
 
 async function extractHiringCriteria(jobDescription: string): Promise<RawExtraction> {
