@@ -1,4 +1,5 @@
 .candidate-matrix{margin-top:8px;min-height:0}
+@media screen{html:has(.requisition-workspace){overflow-y:auto}}
 .workspace-content:has(.requisition-workspace.candidates-active){height:calc(100dvh - 48px);overflow:hidden}
 .requisition-workspace.candidates-active{height:100%;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .workspace-content:has(.requisition-workspace.requisition-active){height:calc(100dvh - 48px);overflow:hidden}
