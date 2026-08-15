@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { HiringCriteriaCategory, HiringCriteriaModel } from '@/lib/hiringCriteria';
+import type { HiringCriteriaCategory, HiringCriteriaModel, HiringCriterion } from '@/lib/hiringCriteria';
 
 const categories: { id: HiringCriteriaCategory; label: string }[] = [
   { id: 'responsibilities', label: 'Job Responsibilities' },
@@ -101,6 +101,28 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
     }
   }
 
+  function renderCriterion(criterion: HiringCriterion) {
+    const weight = weights[criterion.id] ?? criterion.draftWeight;
+    const knockout = knockouts[criterion.id] ?? criterion.isKnockout;
+    const saving = savingId === criterion.id;
+    return (
+      <div className={`criterion-item${knockout ? ' knockout' : ''}`} key={criterion.id}>
+        <div><strong>{criterion.label}</strong>{criterion.rationale && <span>{criterion.rationale}</span>}{criterion.jdEvidence && <small>JD evidence: {criterion.jdEvidence}</small>}</div>
+        <div className="criterion-treatment-controls">
+          <div className="criterion-treatment" aria-label={`${criterion.label} treatment`}>
+            <button type="button" className={!knockout ? 'active' : ''} aria-pressed={!knockout} disabled={saving} onClick={() => knockout && setKnockout(criterion.id, false)}>Weighted</button>
+            <button type="button" className={knockout ? 'active' : ''} aria-pressed={knockout} disabled={saving} onClick={() => !knockout && setKnockout(criterion.id, true)}>Knockout</button>
+          </div>
+          <div className="criterion-weight" aria-label={`${criterion.label} draft weight ${weight} percent`}>
+            <button type="button" onClick={() => adjustWeight(criterion.id, -1)} disabled={knockout || weight === 0 || saving} aria-label={`Decrease ${criterion.label} by 1 percentage point`}>−</button>
+            <output>{weight}%</output>
+            <button type="button" onClick={() => adjustWeight(criterion.id, 1)} disabled={knockout || weight === 100 || saving} aria-label={`Increase ${criterion.label} by 1 percentage point`}>+</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <section className="hiring-criteria" aria-labelledby="hiring-criteria-heading">
       <div className="hiring-criteria-heading">
@@ -115,6 +137,7 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
         </div>
       ) : (
         <>
+          <p className="criteria-treatment-help">Choose whether each criterion contributes to Match or must be satisfied.</p>
           <div className={`criteria-meter ${meterState}`} role="status" aria-live="polite"><span>Total Weight</span><strong>{total}%</strong><span>{meterCopy}</span></div>
           <div className="criteria-categories">
             {categories.map((category) => {
@@ -124,25 +147,13 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
                 <details key={category.id}>
                   <summary><span>{category.label}</span><strong>{categoryTotal}%</strong></summary>
                   <div className="criteria-items">
-                    {children.length ? children.map((criterion) => {
-                      const weight = weights[criterion.id] ?? criterion.draftWeight;
-                      return (
-                        <div className="criterion-item" key={criterion.id}>
-                          <div><strong>{criterion.label}</strong>{criterion.rationale && <span>{criterion.rationale}</span>}{criterion.jdEvidence && <small>JD evidence: {criterion.jdEvidence}</small>}</div>
-                          <div className="criterion-weight" aria-label={`${criterion.label} draft weight ${weight} percent`}>
-                            <button type="button" onClick={() => adjustWeight(criterion.id, -1)} disabled={weight === 0 || savingId === criterion.id} aria-label={`Decrease ${criterion.label} by 1 percentage point`}>−</button>
-                            <output>{weight}</output>
-                            <button type="button" onClick={() => adjustWeight(criterion.id, 1)} disabled={weight === 100 || savingId === criterion.id} aria-label={`Increase ${criterion.label} by 1 percentage point`}>+</button>
-                          </div>
-                        </div>
-                      );
-                    }) : <p className="muted">No criteria in this category.</p>}
+                    {children.length ? children.map(renderCriterion) : <p className="muted">No criteria in this category.</p>}
                   </div>
                 </details>
               );
             })}
           </div>
-          {criteria.some((criterion) => criterion.category === 'other_requirements') && <div className="criteria-categories criteria-other"><details><summary><span>Other Requirements</span><strong>{criteria.filter((criterion) => criterion.category === 'other_requirements').length}</strong></summary><div className="criteria-items">{criteria.filter((criterion) => criterion.category === 'other_requirements').map((criterion) => {const weight=weights[criterion.id]??criterion.draftWeight;const knockout=knockouts[criterion.id]??criterion.isKnockout;return <div className={`criterion-item other-requirement${knockout?' knockout':''}`} key={criterion.id}><div><strong>{criterion.label}</strong>{criterion.rationale&&<span>{criterion.rationale}</span>}{criterion.jdEvidence&&<small>JD evidence: {criterion.jdEvidence}</small>}</div><div className="other-requirement-controls"><div className="criterion-weight" aria-label={`${criterion.label} draft weight ${weight} percent`}><button type="button" onClick={()=>adjustWeight(criterion.id,-1)} disabled={knockout||weight===0||savingId===criterion.id} aria-label={`Decrease ${criterion.label} by 1 percentage point`}>−</button><output>{weight}%</output><button type="button" onClick={()=>adjustWeight(criterion.id,1)} disabled={knockout||weight===100||savingId===criterion.id} aria-label={`Increase ${criterion.label} by 1 percentage point`}>+</button></div><button type="button" className={`knockout-toggle${knockout?' active':''}`} aria-pressed={knockout} disabled={savingId===criterion.id} onClick={()=>setKnockout(criterion.id,!knockout)}>Knockout</button></div></div>})}</div></details></div>}
+          {criteria.some((criterion) => criterion.category === 'other_requirements') && <div className="criteria-categories criteria-other"><details><summary><span>Other Requirements</span><strong>{criteria.filter((criterion) => criterion.category === 'other_requirements').length}</strong></summary><div className="criteria-items">{criteria.filter((criterion) => criterion.category === 'other_requirements').map(renderCriterion)}</div></details></div>}
           <p className="criteria-active-note">{model.latestAppliedVersionId ? 'Draft changes do not affect the latest applied version or Candidate Match.' : 'No applied version yet. Review or calibrate this draft, then apply it at exactly 100%.'}</p>
         </>
       )}

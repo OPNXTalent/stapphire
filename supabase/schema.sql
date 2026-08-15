@@ -279,7 +279,6 @@ begin
       draft_weight = 0,
       updated_at = now()
   where item.id = p_criterion_id
-    and item.category = 'other_requirements'
     and exists (
       select 1 from phase1_hiring_criteria_models as model
       where model.id = item.model_id
