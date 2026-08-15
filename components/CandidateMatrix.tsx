@@ -16,6 +16,7 @@ export type MatrixCandidate = {
   rankOrder: number | null;
   createdAt: string;
   evaluationDate: string;
+  evaluationBasisId: string | null;
   responsibilities: number | null;
   hardSkills: number | null;
   softSkills: number | null;

@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { hashJobDescription } from '@/lib/evaluationBasis';
 
-function comparableJobDescription(value: string): string {
-  return value.replace(/\r\n?/g, '\n').trim();
-}
+type UpdatedRequisition = {
+  requisition_id: string;
+  position_title: string;
+  persisted_job_description: string;
+  persisted_job_description_updated_at: string;
+};
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -12,28 +16,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const jobDescription = String(body.job_description || '').trim();
     if (!title || !jobDescription) return NextResponse.json({ error: 'Position title and Job Description are required.' }, { status: 400 });
 
-    const { data: current, error: readError } = await supabaseAdmin
-      .from('phase1_requisitions')
-      .select('id,job_description')
-      .eq('id', params.id)
-      .is('archived_at', null)
-      .maybeSingle();
-    if (readError) throw readError;
-    if (!current) return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 });
-
-    const jobDescriptionChanged = comparableJobDescription(current.job_description) !== comparableJobDescription(jobDescription);
-    const updates: Record<string, string> = { title, job_description: jobDescription, updated_at: new Date().toISOString() };
-    if (jobDescriptionChanged) updates.job_description_updated_at = new Date().toISOString();
-
     const { data, error } = await supabaseAdmin
-      .from('phase1_requisitions')
-      .update(updates)
-      .eq('id', params.id)
-      .is('archived_at', null)
-      .select('id,title,job_description,job_description_updated_at')
-      .single();
+      .rpc('update_phase1_requisition_with_evaluation_basis', {
+        p_requisition_id: params.id,
+        p_title: title,
+        p_job_description: jobDescription,
+        p_job_description_hash: hashJobDescription(jobDescription)
+      })
+      .maybeSingle();
     if (error) throw error;
-    return NextResponse.json({ id: data.id, title: data.title, jobDescription: data.job_description, jobDescriptionUpdatedAt: data.job_description_updated_at });
+    if (!data) return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 });
+    const updated = data as unknown as UpdatedRequisition;
+    return NextResponse.json({ id: updated.requisition_id, title: updated.position_title, jobDescription: updated.persisted_job_description, jobDescriptionUpdatedAt: updated.persisted_job_description_updated_at });
   } catch (error) {
     console.error('Requisition update failed', error);
     return NextResponse.json({ error: 'Unable to update requisition.' }, { status: 500 });
