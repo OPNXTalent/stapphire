@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { StapphirePrintHeader } from '@/components/StapphirePrintHeader';
 import { printStapphireDocument } from '@/lib/printDocument';
 
+const EDIT_ACTIVATION_GUARD_MS = 500;
+
 function normalizeForDisplay(value: string): string {
   return value.replace(/\r\n?/g, '\n').replace(/\n(?:[ \t]*\n){2,}/g, '\n\n');
 }
@@ -33,6 +35,7 @@ export function RequisitionJobDescription({ requisitionId, title, jobDescription
   const titleInput = useRef<HTMLInputElement>(null);
   const jobDescriptionInput = useRef<HTMLTextAreaElement>(null);
   const savingRequest = useRef(false);
+  const editOpenedAt = useRef(0);
   const [editing, setEditing] = useState(false);
   const [savedTitle, setSavedTitle] = useState(title);
   const [savedJobDescription, setSavedJobDescription] = useState(jobDescription);
@@ -52,8 +55,14 @@ export function RequisitionJobDescription({ requisitionId, title, jobDescription
     setEditing(false);
   }
 
+  function beginEditing() {
+    editOpenedAt.current = Date.now();
+    setEditing(true);
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (Date.now() - editOpenedAt.current < EDIT_ACTIVATION_GUARD_MS) return;
     if (savingRequest.current) return;
     setError('');
     if (!draftJobDescription.trim()) {
@@ -96,7 +105,7 @@ export function RequisitionJobDescription({ requisitionId, title, jobDescription
   return <><section className="requisition-intelligence job-description-workspace" aria-labelledby="job-description-heading">
     <div className="intelligence-heading">
       <div><span className="eyebrow">Requisition source</span><h2 id="job-description-heading">Job Description</h2></div>
-      {editing ? <div className="jd-edit-header-actions"><button type="submit" form="requisition-jd-edit-form" disabled={saving}>{saving?'Saving…':'Save changes'}</button><button type="button" className="secondary-action" onClick={cancel} disabled={saving}>Cancel</button></div> : <div className="jd-view-actions"><button type="button" className="jd-edit-action" onClick={()=>setEditing(true)}>Edit</button><button type="button" className="jd-edit-action" onClick={()=>printStapphireDocument('job-description')}>Print Job Description</button></div>}
+      {editing ? <div className="jd-edit-header-actions"><button type="submit" form="requisition-jd-edit-form" disabled={saving}>{saving?'Saving…':'Save changes'}</button><button type="button" className="secondary-action" onClick={cancel} disabled={saving}>Cancel</button></div> : <div className="jd-view-actions"><button type="button" className="jd-edit-action" onClick={beginEditing}>Edit</button><button type="button" className="jd-edit-action" onClick={()=>printStapphireDocument('job-description')}>Print Job Description</button></div>}
     </div>
     {editing ? <form id="requisition-jd-edit-form" className="jd-edit-form job-description-scroll" onSubmit={save} noValidate>
       <div className="field">
