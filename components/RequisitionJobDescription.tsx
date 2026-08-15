@@ -9,6 +9,25 @@ function normalizeForDisplay(value: string): string {
   return value.replace(/\r\n?/g, '\n').replace(/\n(?:[ \t]*\n){2,}/g, '\n\n');
 }
 
+function isLikelySectionHeading(line: string): boolean {
+  const trimmed = line.trim().replace(/:$/, '');
+  if (!trimmed || trimmed.length > 90 || /[.!?;]$/.test(trimmed)) return false;
+  const words = trimmed.split(/\s+/);
+  if (words.length > 12) return false;
+  const letters = trimmed.replace(/[^A-Za-z]/g, '');
+  if (letters.length >= 3 && letters === letters.toUpperCase()) return true;
+  const connectors = /^(and|or|of|for|to|the|a|an|in|on|with)$/i;
+  const significant = words.filter((word) => !connectors.test(word));
+  return significant.length > 0 && significant.every((word) => /^[A-Z][A-Za-z0-9&/()+,'’-]*$/.test(word));
+}
+
+function PrintableJobDescription({ value }: { value: string }) {
+  return <div className="job-description-print-body">{normalizeForDisplay(value).split('\n').map((line, index) => {
+    const className = !line.trim() ? 'job-description-print-blank' : isLikelySectionHeading(line) ? 'job-description-print-heading' : 'job-description-print-line';
+    return <div className={className} key={index}>{line || '\u00a0'}</div>;
+  })}</div>;
+}
+
 export function RequisitionJobDescription({ requisitionId, title, jobDescription }: { requisitionId: string; title: string; jobDescription: string }) {
   const router = useRouter();
   const titleInput = useRef<HTMLInputElement>(null);
@@ -92,5 +111,5 @@ export function RequisitionJobDescription({ requisitionId, title, jobDescription
       </div>
       {error&&<p className="error" role="alert">{error}</p>}
     </form> : <div className="jd job-description-scroll">{normalizeForDisplay(savedJobDescription)}</div>}
-  </section><article className="print-document job-description-print" aria-hidden="true"><StapphirePrintHeader documentTitle="Job Description"/><h1>{savedTitle}</h1><h2>Job Description</h2><div className="job-description-print-body">{normalizeForDisplay(savedJobDescription)}</div></article></>;
+  </section><article className="print-document job-description-print" aria-hidden="true"><StapphirePrintHeader documentTitle="Job Description"/><h1>{savedTitle}</h1><h2>Job Description</h2><PrintableJobDescription value={savedJobDescription}/></article></>;
 }

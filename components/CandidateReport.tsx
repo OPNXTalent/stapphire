@@ -112,7 +112,7 @@ export function CandidateReport({
       )}
 
       <h2>Weighted Alignment</h2>
-      <table>
+      <table className="weighted-alignment-table">
         <thead>
           <tr>
             <th>Category</th>
