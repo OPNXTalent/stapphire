@@ -7,6 +7,8 @@ import { detectPositionTitle } from '@/lib/detectPositionTitle';
 export function CreateRequisitionForm() {
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
+  const titleInput = useRef<HTMLInputElement>(null);
+  const jobDescriptionInput = useRef<HTMLTextAreaElement>(null);
   const [title, setTitle] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [titleEdited, setTitleEdited] = useState(false);
@@ -14,10 +16,14 @@ export function CreateRequisitionForm() {
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [jobDescriptionError, setJobDescriptionError] = useState(false);
+  const [titleError, setTitleError] = useState(false);
 
   function updateJobDescription(value: string, suggestedTitle = detectPositionTitle(value)) {
     setJobDescription(value);
+    if (value.trim()) setJobDescriptionError(false);
     if (!titleEdited && suggestedTitle) setTitle(suggestedTitle);
+    if (!titleEdited && suggestedTitle) setTitleError(false);
   }
 
   async function readFile(file: File) {
@@ -52,8 +58,21 @@ export function CreateRequisitionForm() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setBusy(true);
     setError('');
+    if (!jobDescription.trim()) {
+      setJobDescriptionError(true);
+      setTitleError(false);
+      jobDescriptionInput.current?.focus();
+      return;
+    }
+    setJobDescriptionError(false);
+    if (!title.trim()) {
+      setTitleError(true);
+      titleInput.current?.focus();
+      return;
+    }
+    setTitleError(false);
+    setBusy(true);
     try {
       const response = await fetch('/api/requisitions', {
         method: 'POST',
@@ -70,14 +89,16 @@ export function CreateRequisitionForm() {
     }
   }
 
-  return <form className="card create-requisition-form" onSubmit={submit}>
+  return <form className="card create-requisition-form" onSubmit={submit} noValidate>
     <div className="field">
       <label htmlFor="title">Position title</label>
-      <input id="title" name="title" required value={title} onChange={(event)=>{setTitle(event.target.value);setTitleEdited(true)}}/>
+      <input ref={titleInput} id="title" name="title" value={title} aria-invalid={titleError} aria-describedby={titleError ? 'title-validation' : undefined} onChange={(event)=>{setTitle(event.target.value);setTitleEdited(true);if(event.target.value.trim())setTitleError(false)}}/>
+      {titleError&&<div id="title-validation" className="intake-validation" role="alert"><strong>Position title is required.</strong><span>Enter the position title before creating the requisition.</span></div>}
     </div>
     <div className="field create-jd-field">
       <label htmlFor="job_description">Paste Job Description</label>
-      <textarea className="create-jd-textarea" id="job_description" name="job_description" required value={jobDescription} onChange={(event)=>updateJobDescription(event.target.value)}/>
+      <textarea ref={jobDescriptionInput} className="create-jd-textarea" id="job_description" name="job_description" value={jobDescription} aria-invalid={jobDescriptionError} aria-describedby={jobDescriptionError ? 'job-description-validation' : undefined} onChange={(event)=>updateJobDescription(event.target.value)}/>
+      {jobDescriptionError&&<div id="job-description-validation" className="intake-validation" role="alert"><strong>A Job Description is required to create a requisition.</strong><span>Paste a Job Description or upload a PDF, DOCX, or TXT file.</span></div>}
     </div>
     <div className="form-separator"><span>OR</span></div>
     <div className="field">
