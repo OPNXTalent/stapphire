@@ -72,12 +72,12 @@ export function RequisitionJobDescription({ requisitionId, title, jobDescription
     }
   }
 
-  return <section className="requisition-intelligence" aria-labelledby="job-description-heading">
+  return <section className="requisition-intelligence job-description-workspace" aria-labelledby="job-description-heading">
     <div className="intelligence-heading">
       <div><span className="eyebrow">Requisition source</span><h2 id="job-description-heading">Job Description</h2></div>
-      {!editing&&<button type="button" className="jd-edit-action" onClick={()=>setEditing(true)}>Edit</button>}
+      {editing ? <div className="jd-edit-header-actions"><button type="submit" form="requisition-jd-edit-form" disabled={saving}>{saving?'Saving…':'Save changes'}</button><button type="button" className="secondary-action" onClick={cancel} disabled={saving}>Cancel</button></div> : <button type="button" className="jd-edit-action" onClick={()=>setEditing(true)}>Edit</button>}
     </div>
-    {editing ? <form className="jd-edit-form" onSubmit={save} noValidate>
+    {editing ? <form id="requisition-jd-edit-form" className="jd-edit-form job-description-scroll" onSubmit={save} noValidate>
       <div className="field">
         <label htmlFor="edit-requisition-title">Position title</label>
         <input ref={titleInput} id="edit-requisition-title" value={draftTitle} aria-invalid={titleError} aria-describedby={titleError?'edit-title-validation':undefined} onChange={(event)=>{setDraftTitle(event.target.value);if(event.target.value.trim())setTitleError(false)}} disabled={saving}/>
@@ -89,7 +89,6 @@ export function RequisitionJobDescription({ requisitionId, title, jobDescription
         {jobDescriptionError&&<div id="edit-jd-validation" className="intake-validation" role="alert"><strong>A Job Description is required to save the requisition.</strong><span>Enter the Job Description before saving.</span></div>}
       </div>
       {error&&<p className="error" role="alert">{error}</p>}
-      <div className="create-form-actions"><button disabled={saving}>{saving?'Saving…':'Save changes'}</button><button type="button" className="secondary-action" onClick={cancel} disabled={saving}>Cancel</button></div>
-    </form> : <div className="jd">{normalizeForDisplay(savedJobDescription)}</div>}
+    </form> : <div className="jd job-description-scroll">{normalizeForDisplay(savedJobDescription)}</div>}
   </section>;
 }

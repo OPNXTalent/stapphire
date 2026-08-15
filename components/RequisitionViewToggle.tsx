@@ -96,7 +96,7 @@ export function RequisitionViewToggle({
         <div className="requisition-workspace-tabs" role="tablist" aria-label="Requisition workspace">
           {requisitionTabs.map((tab, index) => <button key={tab.id} id={`requisition-tab-${tab.id}`} type="button" role="tab" aria-selected={requisitionTab === tab.id} aria-controls="requisition-tab-panel" tabIndex={requisitionTab === tab.id ? 0 : -1} className={requisitionTab === tab.id ? 'active' : ''} onClick={() => setRequisitionTab(tab.id)} onKeyDown={(event) => navigateTabs(event, index)}>{tab.label}</button>)}
         </div>
-        <div id="requisition-tab-panel" className="requisition-tab-panel" role="tabpanel" aria-labelledby={`requisition-tab-${requisitionTab}`}>{activeRequisitionView}</div>
+        <div id="requisition-tab-panel" className={`requisition-tab-panel${requisitionTab === 'job-description' ? ' job-description-panel' : ''}`} role="tabpanel" aria-labelledby={`requisition-tab-${requisitionTab}`}>{activeRequisitionView}</div>
       </div>
       <div className="requisition-candidates-view" hidden={view !== 'candidates'}>{candidatesView}</div>
     </div>
