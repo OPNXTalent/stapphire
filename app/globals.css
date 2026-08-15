@@ -8,7 +8,7 @@
 .create-workspace{min-height:calc(100dvh - 182px);display:flex;flex-direction:column}
 .create-workspace .page-heading{flex:none}
 .create-workspace .create-section{max-width:none;width:100%;display:flex;flex:1}
-.create-requisition-form{width:100%;margin:0;display:flex;flex-direction:column;gap:16px;border-top:2px solid var(--sapphire)}
+.create-requisition-form{width:100%;margin:0;display:flex;flex-direction:column;gap:12px;border-top:2px solid var(--sapphire)}
 .create-jd-field{display:flex;flex:1;flex-direction:column;min-height:300px}
 .create-jd-textarea{flex:1;min-height:300px}
 .jd-upload-zone{width:100%;display:flex;flex-direction:column;align-items:center;gap:5px;padding:18px;border:1px dashed var(--line-strong);background:#fff;color:var(--deep);font-weight:600}
