@@ -7,9 +7,9 @@ type View = 'requisition' | 'candidates';
 type RequisitionTab = 'hiring-criteria' | 'market-analysis' | 'job-description';
 
 const requisitionTabs: { id: RequisitionTab; label: string }[] = [
+  { id: 'job-description', label: 'Job Description' },
   { id: 'hiring-criteria', label: 'Hiring Criteria' },
-  { id: 'market-analysis', label: 'Market Analysis' },
-  { id: 'job-description', label: 'Job Description' }
+  { id: 'market-analysis', label: 'Market Analysis' }
 ];
 
 // A mode switch, not navigation - both views' content is already
@@ -37,7 +37,7 @@ export function RequisitionViewToggle({
 }) {
   const router = useRouter();
   const [view, setView] = useState<View>('requisition');
-  const [requisitionTab, setRequisitionTab] = useState<RequisitionTab>('hiring-criteria');
+  const [requisitionTab, setRequisitionTab] = useState<RequisitionTab>('job-description');
   const [archiving, setArchiving] = useState(false);
   const goingTo = view === 'requisition' ? 'candidates' : 'requisition';
   const activeRequisitionView = requisitionTab === 'hiring-criteria'
