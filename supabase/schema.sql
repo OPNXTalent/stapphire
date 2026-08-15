@@ -50,6 +50,13 @@ create index if not exists phase1_evaluations_candidate_idx on phase1_evaluation
 -- Backward-compatible requisition lifecycle field. Existing rows remain active.
 alter table phase1_requisitions add column if not exists archived_at timestamptz;
 
+-- Tracks changes to the JD source independently from title-only edits so
+-- existing analyses can be identified as based on an earlier source.
+alter table phase1_requisitions add column if not exists job_description_updated_at timestamptz;
+update phase1_requisitions set job_description_updated_at = created_at where job_description_updated_at is null;
+alter table phase1_requisitions alter column job_description_updated_at set default now();
+alter table phase1_requisitions alter column job_description_updated_at set not null;
+
 -- Backward-compatible addition for databases created before ranking existed.
 alter table phase1_candidates add column if not exists rank_order integer;
 alter table phase1_candidates drop constraint if exists phase1_candidates_rank_order_check;

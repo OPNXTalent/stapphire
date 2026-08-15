@@ -64,7 +64,7 @@ function measuresFor(analysis: RequisitionIntelligenceAnalysis): DisplayMeasure[
   ];
 }
 
-export function RequisitionIntelligence({ analysis, checkedAt }: { analysis: RequisitionIntelligenceAnalysis | null; checkedAt: Date }) {
+export function RequisitionIntelligence({ analysis, checkedAt, sourceIsStale = false }: { analysis: RequisitionIntelligenceAnalysis | null; checkedAt: Date; sourceIsStale?: boolean }) {
   const measures = analysis ? measuresFor(analysis) : noAnalysisMeasures;
   const analysisDate = analysis?.analysisGeneratedAt || analysis?.createdAt;
   const comparableCount = analysis?.observedEvidence.usableComparableCount ?? 0;
@@ -84,6 +84,8 @@ export function RequisitionIntelligence({ analysis, checkedAt }: { analysis: Req
         <div><span className="eyebrow">Requisition intelligence</span><h2 id="market-analysis-heading">Market Analysis</h2></div>
         <span className="intelligence-date">{analysisDate ? `Analysis generated ${formatDate(analysisDate)}` : `Availability checked ${formatDate(checkedAt)}`}</span>
       </div>
+
+      {sourceIsStale&&<div className="source-stale-notice">Job Description has changed since this Market Analysis was generated.</div>}
 
       <div className="intelligence-notice"><strong>{notice.title}</strong><span>{notice.detail}</span></div>
       <div className="intelligence-grid">

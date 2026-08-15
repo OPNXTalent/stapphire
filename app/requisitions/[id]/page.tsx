@@ -5,6 +5,7 @@ import { RequisitionViewToggle } from '@/components/RequisitionViewToggle';
 import { DNSBin, type DNSCandidate } from '@/components/DNSBin';
 import { RequisitionIntelligence } from '@/components/RequisitionIntelligence';
 import { HiringCriteria } from '@/components/HiringCriteria';
+import { RequisitionJobDescription } from '@/components/RequisitionJobDescription';
 import { getHiringCriteriaModel } from '@/lib/hiringCriteria';
 import { getLatestRequisitionIntelligence } from '@/lib/requisitionIntelligence';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
@@ -12,7 +13,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 export const dynamic='force-dynamic';
 type EvaluationRow={overall_match:unknown;job_responsibilities_score:unknown;hard_skills_score:unknown;soft_skills_score:unknown;keyword_terminology_score:unknown;assessment:unknown;created_at:string};
 function number(value:unknown):number|null{return typeof value==='number'&&Number.isFinite(value)?value:null}
-function normalizeJobDescriptionForDisplay(value:unknown):string{return String(value??'').replace(/\r\n?/g,'\n').replace(/\n(?:[ \t]*\n){2,}/g,'\n\n')}
+function sourceIsNewer(sourceTimestamp:unknown, analysisTimestamp:unknown):boolean{if(!sourceTimestamp||!analysisTimestamp)return false;return new Date(String(sourceTimestamp)).getTime()>new Date(String(analysisTimestamp)).getTime()}
 
 export default async function RequisitionPage({params}:{params:{id:string}}){
   const {data:req}=await supabaseAdmin.from('phase1_requisitions').select('*').eq('id',params.id).is('archived_at',null).single();if(!req)notFound();
@@ -26,9 +27,9 @@ export default async function RequisitionPage({params}:{params:{id:string}}){
     : ((b.match??-1)-(a.match??-1))||a.createdAt.localeCompare(b.createdAt));
   const dnsCandidates:DNSCandidate[]=(dnsList||[]).map(c=>({id:c.id,name:c.full_name,deletedAt:c.deleted_at as string}));
 
-  const hiringCriteriaView = <HiringCriteria model={hiringCriteria} requisitionId={req.id}/>;
-  const marketAnalysisView = <RequisitionIntelligence analysis={requisitionIntelligence} checkedAt={new Date()}/>;
-  const jobDescriptionView = <section className="requisition-intelligence" aria-labelledby="job-description-heading"><div className="intelligence-heading"><div><span className="eyebrow">Requisition source</span><h2 id="job-description-heading">Job Description</h2></div></div><div className="jd">{normalizeJobDescriptionForDisplay(req.job_description)}</div></section>;
+  const hiringCriteriaView = <HiringCriteria model={hiringCriteria} requisitionId={req.id} sourceIsStale={sourceIsNewer(req.job_description_updated_at,hiringCriteria?.generatedAt)}/>;
+  const marketAnalysisView = <RequisitionIntelligence analysis={requisitionIntelligence} checkedAt={new Date()} sourceIsStale={sourceIsNewer(req.job_description_updated_at,requisitionIntelligence?.analysisGeneratedAt||requisitionIntelligence?.createdAt)}/>;
+  const jobDescriptionView = <RequisitionJobDescription requisitionId={req.id} title={req.title} jobDescription={req.job_description}/>;
   const candidatesView = <><ResumeUpload requisitionId={req.id}/><div className="matrix-header-row"><h2>Candidate Matrix</h2><DNSBin candidates={dnsCandidates}/></div><p className="muted">Compare evaluated candidates - click a name to expand the full assessment.</p><CandidateMatrix candidates={matrixCandidates} positionTitle={req.title} requisitionId={req.id}/></>;
 
   return <RequisitionViewToggle title={req.title} requisitionId={req.id} hiringCriteriaView={hiringCriteriaView} marketAnalysisView={marketAnalysisView} jobDescriptionView={jobDescriptionView} candidatesView={candidatesView}/>;

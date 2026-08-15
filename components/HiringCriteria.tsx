@@ -13,7 +13,7 @@ const categories: { id: HiringCriteriaCategory; label: string }[] = [
   { id: 'other_requirements', label: 'Other Requirements' }
 ];
 
-export function HiringCriteria({ model, requisitionId }: { model: HiringCriteriaModel | null; requisitionId: string }) {
+export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: { model: HiringCriteriaModel | null; requisitionId: string; sourceIsStale?: boolean }) {
   const router = useRouter();
   const actionInFlight = useRef(false);
   const [weights, setWeights] = useState<Record<string, number>>(() => Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.draftWeight])));
@@ -157,6 +157,8 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
         <div><span className="eyebrow">Hiring calibration</span><h2 id="hiring-criteria-heading">Hiring Criteria</h2></div>
         {ready && <div className="criteria-actions"><button type="button" className="criteria-reset" onClick={() => runAction('reset')} disabled={!changedFromDefault || action !== null || savingId !== null}>Reset to Default</button><button type="button" className="criteria-apply" onClick={() => runAction('apply')} disabled={total !== 100 || action !== null || savingId !== null}>{action === 'apply' ? 'Applying…' : 'Apply Model'}</button></div>}
       </div>
+
+      {sourceIsStale&&<div className="source-stale-notice">Job Description has changed since these Hiring Criteria were generated.</div>}
 
       {action === 'apply' ? (
         <StapphireProcessing title="Applying Hiring Criteria…" detail="Saving the calibrated model"/>
