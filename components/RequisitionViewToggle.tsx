@@ -36,7 +36,7 @@ export function RequisitionViewToggle({
   candidatesView: ReactNode;
 }) {
   const router = useRouter();
-  const [view, setView] = useState<View>('candidates');
+  const [view, setView] = useState<View>('requisition');
   const [requisitionTab, setRequisitionTab] = useState<RequisitionTab>('hiring-criteria');
   const [archiving, setArchiving] = useState(false);
   const goingTo = view === 'requisition' ? 'candidates' : 'requisition';
