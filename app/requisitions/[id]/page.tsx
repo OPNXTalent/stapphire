@@ -3,6 +3,7 @@ import { ResumeUpload } from '@/components/ResumeUpload';
 import { CandidateMatrix, type MatrixCandidate, type Disposition } from '@/components/CandidateMatrix';
 import { RequisitionViewToggle } from '@/components/RequisitionViewToggle';
 import { DNSBin, type DNSCandidate } from '@/components/DNSBin';
+import { RequisitionIntelligence } from '@/components/RequisitionIntelligence';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic='force-dynamic';
@@ -21,7 +22,7 @@ export default async function RequisitionPage({params}:{params:{id:string}}){
     : ((b.match??-1)-(a.match??-1))||a.createdAt.localeCompare(b.createdAt));
   const dnsCandidates:DNSCandidate[]=(dnsList||[]).map(c=>({id:c.id,name:c.full_name,deletedAt:c.deleted_at as string}));
 
-  const requisitionView = <section><h2>Job Description</h2><div className="jd">{normalizeJobDescriptionForDisplay(req.job_description)}</div></section>;
+  const requisitionView = <><RequisitionIntelligence checkedAt={new Date()}/><section><h2>Job Description</h2><div className="jd">{normalizeJobDescriptionForDisplay(req.job_description)}</div></section></>;
   const candidatesView = <><ResumeUpload requisitionId={req.id}/><div className="matrix-header-row"><h2>Candidate Matrix</h2><DNSBin candidates={dnsCandidates}/></div><p className="muted">Compare evaluated candidates - click a name to expand the full assessment.</p><CandidateMatrix candidates={matrixCandidates} positionTitle={req.title} requisitionId={req.id}/></>;
 
   return <RequisitionViewToggle title={req.title} requisitionId={req.id} requisitionView={requisitionView} candidatesView={candidatesView}/>;
