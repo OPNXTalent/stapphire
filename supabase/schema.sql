@@ -916,7 +916,7 @@ begin
     (select category,sum(draft_weight) category_total from phase1_hiring_criteria_items where model_id=selected_model_id and not is_knockout group by category) rollups;
   insert into phase1_hiring_criteria_versions(requisition_id,model_id,version_number,criteria_snapshot,category_totals,total_weight)
     values(p_requisition_id,selected_model_id,next_version,snapshot,coalesce(totals,'{}'::jsonb),draft_total) returning id into applied_version_id;
-  source_hash:=encode(digest(btrim(replace(replace(current_requisition.job_description,E'\r\n',E'\n'),E'\r',E'\n')),'sha256'),'hex');
+  source_hash:=encode(extensions.digest(btrim(replace(replace(current_requisition.job_description,E'\r\n',E'\n'),E'\r',E'\n')),'sha256'),'hex');
   insert into phase1_evaluation_bases(requisition_id,basis_type,job_description_snapshot,job_description_hash,job_description_updated_at,hiring_criteria_version_id)
     values(p_requisition_id,'hiring_criteria',current_requisition.job_description,source_hash,current_requisition.job_description_updated_at,applied_version_id) returning id into evaluation_basis_id;
   update phase1_requisitions set current_evaluation_basis_id=evaluation_basis_id,updated_at=now() where id=p_requisition_id;
