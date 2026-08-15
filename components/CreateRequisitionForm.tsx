@@ -3,12 +3,14 @@
 import { ChangeEvent, DragEvent, FormEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { detectPositionTitle } from '@/lib/detectPositionTitle';
+import { StapphireProcessing } from '@/components/StapphireProcessing';
 
 export function CreateRequisitionForm() {
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
   const titleInput = useRef<HTMLInputElement>(null);
   const jobDescriptionInput = useRef<HTMLTextAreaElement>(null);
+  const submitting = useRef(false);
   const [title, setTitle] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [titleEdited, setTitleEdited] = useState(false);
@@ -58,6 +60,7 @@ export function CreateRequisitionForm() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting.current) return;
     setError('');
     if (!jobDescription.trim()) {
       setJobDescriptionError(true);
@@ -72,6 +75,7 @@ export function CreateRequisitionForm() {
       return;
     }
     setTitleError(false);
+    submitting.current = true;
     setBusy(true);
     try {
       const response = await fetch('/api/requisitions', {
@@ -85,9 +89,12 @@ export function CreateRequisitionForm() {
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to save requisition.');
+      submitting.current = false;
       setBusy(false);
     }
   }
+
+  if (busy) return <StapphireProcessing className="card create-requisition-form create-processing" title="Creating your requisition…" detail="Generating Hiring Criteria"/>;
 
   return <form className="card create-requisition-form" onSubmit={submit} noValidate>
     <div className="field">

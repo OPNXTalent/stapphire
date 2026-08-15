@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { StapphireProcessing } from '@/components/StapphireProcessing';
 
 type FileStatus = 'staged' | 'processing' | 'done' | 'error';
 type QueueItem = { file: File; status: FileStatus; message?: string };
@@ -8,9 +9,9 @@ type QueueItem = { file: File; status: FileStatus; message?: string };
 export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const processing = useRef(false);
   const [busy, setBusy] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>([]);
-  const [progress, setProgress] = useState({ done: 0, total: 0 });
 
   function addFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -29,9 +30,11 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   }
 
   async function upload() {
+    if (processing.current) return;
     const toProcess = queue.map((q, i) => ({ ...q, i })).filter((q) => q.status === 'staged');
+    if (toProcess.length === 0) return;
+    processing.current = true;
     setBusy(true);
-    setProgress({ done: 0, total: toProcess.length });
 
     for (let k = 0; k < toProcess.length; k++) {
       const i = toProcess[k].i;
@@ -51,10 +54,10 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
       // Streamed, not batched - each candidate appears in the matrix
       // as soon as their own evaluation finishes, not after the whole
       // upload completes.
-      setProgress((prev) => ({ ...prev, done: prev.done + 1 }));
       router.refresh();
     }
 
+    processing.current = false;
     setBusy(false);
   }
 
@@ -62,11 +65,9 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const successCount = queue.filter((q) => q.status === 'done').length;
   const errorCount = queue.filter((q) => q.status === 'error').length;
   const complete = queue.length > 0 && !busy && queue.every((q) => q.status === 'done' || q.status === 'error');
-  const remaining = progress.total - progress.done;
 
   function dismissResults() {
     setQueue([]);
-    setProgress({ done: 0, total: 0 });
     if (inputRef.current) inputRef.current.value = '';
     router.refresh();
   }
@@ -79,15 +80,13 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
           {queue.map((item, i) => (
             <li key={i} className={`upload-queue-item upload-queue-${item.status}`}>
               <span className="upload-queue-icon">
-                {item.status === 'processing' ? (
-                  <span className="upload-spinner" aria-hidden="true" />
-                ) : (
+                {item.status === 'processing' ? '…' : (
                   { staged: '·', done: '✓', error: '✕' }[item.status]
                 )}
               </span>
               <span className="upload-queue-name">{item.file.name}</span>
               {item.message && <span className="upload-queue-msg">{item.message}</span>}
-              {item.status === 'staged' && (
+              {item.status === 'staged' && !busy && (
                 <button type="button" className="upload-remove-btn" onClick={() => removeStaged(i)} aria-label={`Remove ${item.file.name}`}>
                   ×
                 </button>
@@ -115,10 +114,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
             </button>
           )}
           {busy && (
-            <span className="upload-progress">
-              <span className="upload-spinner" aria-hidden="true" />
-              Evaluating {progress.done + 1} of {progress.total} — {remaining} remaining
-            </span>
+            <StapphireProcessing className="processing-compact" title="Evaluating candidate…" detail="Comparing qualifications against the current evaluation basis"/>
           )}
         </div>
       )}

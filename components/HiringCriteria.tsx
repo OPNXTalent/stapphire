@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { HiringCriteriaCategory, HiringCriteriaModel, HiringCriterion } from '@/lib/hiringCriteria';
+import { StapphireProcessing } from '@/components/StapphireProcessing';
 
 const categories: { id: HiringCriteriaCategory; label: string }[] = [
   { id: 'responsibilities', label: 'Job Responsibilities' },
@@ -14,6 +15,7 @@ const categories: { id: HiringCriteriaCategory; label: string }[] = [
 
 export function HiringCriteria({ model, requisitionId }: { model: HiringCriteriaModel | null; requisitionId: string }) {
   const router = useRouter();
+  const actionInFlight = useRef(false);
   const [weights, setWeights] = useState<Record<string, number>>(() => Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.draftWeight])));
   const [knockouts, setKnockouts] = useState<Record<string, boolean>>(() => Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.isKnockout])));
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -83,6 +85,8 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
   }
 
   async function runAction(nextAction: 'apply' | 'reset' | 'generate') {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
     setAction(nextAction);
     try {
       const response = await fetch(`/api/requisitions/${requisitionId}/hiring-criteria`, {
@@ -99,6 +103,7 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
     } catch {
       alert(`Unable to ${nextAction} Hiring Criteria. Try again.`);
     } finally {
+      actionInFlight.current = false;
       setAction(null);
     }
   }
@@ -153,10 +158,14 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
         {ready && <div className="criteria-actions"><button type="button" className="criteria-reset" onClick={() => runAction('reset')} disabled={!changedFromDefault || action !== null || savingId !== null}>Reset to Default</button><button type="button" className="criteria-apply" onClick={() => runAction('apply')} disabled={total !== 100 || action !== null || savingId !== null}>{action === 'apply' ? 'Applying…' : 'Apply Model'}</button></div>}
       </div>
 
-      {!ready ? (
+      {action === 'apply' ? (
+        <StapphireProcessing title="Applying Hiring Criteria…" detail="Saving the calibrated model"/>
+      ) : !ready && (action === 'generate' || model?.extractionStatus === 'pending') ? (
+        <StapphireProcessing title="Evaluating Job Description…" detail="Generating Hiring Criteria"/>
+      ) : !ready ? (
         <div className="criteria-unavailable">
-          <div><strong>{action === 'generate' || model?.extractionStatus === 'pending' ? 'Analyzing requisition…' : model?.extractionStatus === 'failed' ? 'Hiring Criteria analysis could not be completed.' : 'Hiring Criteria not generated'}</strong><span>{action === 'generate' || model?.extractionStatus === 'pending' ? 'Extracting JD-specific hiring measures.' : 'Generate a reviewable starting model from this requisition’s Job Description.'}</span></div>
-          {model?.extractionStatus !== 'pending' && action !== 'generate' && <button type="button" className="criteria-generate" onClick={() => runAction('generate')}>{model?.extractionStatus === 'failed' ? 'Retry' : 'Generate Hiring Criteria'}</button>}
+          <div><strong>{model?.extractionStatus === 'failed' ? 'Hiring Criteria analysis could not be completed.' : 'Hiring Criteria not generated'}</strong><span>Generate a reviewable starting model from this requisition’s Job Description.</span></div>
+          <button type="button" className="criteria-generate" onClick={() => runAction('generate')}>{model?.extractionStatus === 'failed' ? 'Retry' : 'Generate Hiring Criteria'}</button>
         </div>
       ) : (
         <>
