@@ -8,7 +8,8 @@ const categories: { id: HiringCriteriaCategory; label: string }[] = [
   { id: 'responsibilities', label: 'Job Responsibilities' },
   { id: 'hard_skills', label: 'Hard Skills' },
   { id: 'soft_skills', label: 'Soft Skills' },
-  { id: 'keywords', label: 'Keywords' }
+  { id: 'keywords', label: 'Keywords' },
+  { id: 'other_requirements', label: 'Other Requirements' }
 ];
 
 export function HiringCriteria({ model, requisitionId }: { model: HiringCriteriaModel | null; requisitionId: string }) {
@@ -17,6 +18,7 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
   const [knockouts, setKnockouts] = useState<Record<string, boolean>>(() => Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.isKnockout])));
   const [savingId, setSavingId] = useState<string | null>(null);
   const [action, setAction] = useState<'apply' | 'reset' | 'generate' | null>(null);
+  const [activeCategory, setActiveCategory] = useState<HiringCriteriaCategory | null>(null);
   const criteria = model?.criteria || [];
   const total = criteria.reduce((sum, criterion) => sum + ((knockouts[criterion.id] ?? criterion.isKnockout) ? 0 : (weights[criterion.id] ?? criterion.draftWeight)), 0);
   const meterState = total < 100 ? 'under' : total > 100 ? 'over' : 'balanced';
@@ -123,6 +125,27 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
     );
   }
 
+  function categoryTotal(category: HiringCriteriaCategory): number {
+    return criteria
+      .filter((criterion) => criterion.category === category)
+      .reduce((sum, criterion) => sum + ((knockouts[criterion.id] ?? criterion.isKnockout) ? 0 : (weights[criterion.id] ?? criterion.draftWeight)), 0);
+  }
+
+  function renderCategorySelection(category: { id: HiringCriteriaCategory; label: string }, active: boolean) {
+    return (
+      <button
+        type="button"
+        className={`matrix-row-head criteria-category-select${active ? ' pinned' : ''}`}
+        key={category.id}
+        aria-expanded={active}
+        onClick={() => setActiveCategory(active ? null : category.id)}
+      >
+        <span>{category.label}</span>
+        <strong>{categoryTotal(category.id)}%</strong>
+      </button>
+    );
+  }
+
   return (
     <section className="hiring-criteria" aria-labelledby="hiring-criteria-heading">
       <div className="hiring-criteria-heading">
@@ -139,21 +162,18 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
         <>
           <p className="criteria-treatment-help">Choose whether each criterion contributes to Match or must be satisfied.</p>
           <div className={`criteria-meter ${meterState}`} role="status" aria-live="polite"><span>Total Weight</span><strong>{total}%</strong><span>{meterCopy}</span></div>
-          <div className="criteria-categories">
-            {categories.map((category) => {
-              const children = criteria.filter((criterion) => criterion.category === category.id);
-              const categoryTotal = children.reduce((sum, criterion) => sum + (weights[criterion.id] ?? criterion.draftWeight), 0);
-              return (
-                <details key={category.id}>
-                  <summary><span>{category.label}</span><strong>{categoryTotal}%</strong></summary>
-                  <div className="criteria-items">
-                    {children.length ? children.map(renderCriterion) : <p className="muted">No criteria in this category.</p>}
-                  </div>
-                </details>
-              );
-            })}
-          </div>
-          {criteria.some((criterion) => criterion.category === 'other_requirements') && <div className="criteria-categories criteria-other"><details><summary><span>Other Requirements</span><strong>{criteria.filter((criterion) => criterion.category === 'other_requirements').length}</strong></summary><div className="criteria-items">{criteria.filter((criterion) => criterion.category === 'other_requirements').map(renderCriterion)}</div></details></div>}
+          {activeCategory ? (
+            <div className="criteria-category-focused">
+              {renderCategorySelection(categories.find((category) => category.id === activeCategory)!, true)}
+              <div className="criteria-category-detail">
+                {criteria.filter((criterion) => criterion.category === activeCategory).length
+                  ? criteria.filter((criterion) => criterion.category === activeCategory).map(renderCriterion)
+                  : <p className="muted">No criteria in this category.</p>}
+              </div>
+            </div>
+          ) : (
+            <div className="criteria-category-list">{categories.map((category) => renderCategorySelection(category, false))}</div>
+          )}
           <p className="criteria-active-note">{model.latestAppliedVersionId ? 'Draft changes do not affect the latest applied version or Candidate Match.' : 'No applied version yet. Review or calibrate this draft, then apply it at exactly 100%.'}</p>
         </>
       )}
