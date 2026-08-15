@@ -78,3 +78,54 @@ begin
 end;
 $$;
 
+-- Requisition Intelligence is independent of candidate evaluation. Each row is
+-- one historical analysis event; later refreshes insert new rows rather than
+-- replacing prior market evidence.
+create table if not exists phase1_requisition_intelligence_analyses (
+  id uuid primary key default uuid_generate_v4(),
+  requisition_id uuid not null references phase1_requisitions(id) on delete cascade,
+  status text not null check (status in ('pending', 'completed', 'insufficient_evidence', 'failed')),
+  internal_evidence jsonb,
+  observed_evidence_summary jsonb,
+  estimated_intelligence jsonb,
+  usable_comparable_count integer not null default 0 check (usable_comparable_count >= 0),
+  evidence_quality_descriptor text,
+  geographic_scope text,
+  market_evidence_retrieved_at timestamptz,
+  analysis_generated_at timestamptz,
+  failure_reason text,
+  created_at timestamptz not null default now(),
+  check ((status = 'pending' and analysis_generated_at is null) or (status <> 'pending' and analysis_generated_at is not null)),
+  check (status <> 'failed' or nullif(btrim(failure_reason), '') is not null)
+);
+
+create table if not exists phase1_requisition_market_comparables (
+  id uuid primary key default uuid_generate_v4(),
+  analysis_id uuid not null references phase1_requisition_intelligence_analyses(id) on delete cascade,
+  comparable_title text not null,
+  employer text not null,
+  location text,
+  work_arrangement text not null default 'unknown' check (work_arrangement in ('onsite', 'hybrid', 'remote', 'unknown')),
+  compensation_minimum numeric,
+  compensation_maximum numeric,
+  compensation_unit text not null default 'unknown' check (compensation_unit in ('hour', 'day', 'week', 'month', 'year', 'unknown')),
+  currency text,
+  posting_date date,
+  source_name text not null check (btrim(source_name) <> ''),
+  source_url text not null check (source_url ~ '^https?://'),
+  retrieved_at timestamptz not null,
+  title_similarity integer check (title_similarity between 0 and 100),
+  responsibility_similarity integer check (responsibility_similarity between 0 and 100),
+  comparable_quality text,
+  evidence_notes text,
+  created_at timestamptz not null default now(),
+  check (compensation_minimum is null or compensation_minimum >= 0),
+  check (compensation_maximum is null or compensation_maximum >= 0),
+  check (compensation_minimum is null or compensation_maximum is null or compensation_minimum <= compensation_maximum)
+);
+
+create index if not exists phase1_requisition_intelligence_latest_idx
+  on phase1_requisition_intelligence_analyses(requisition_id, created_at desc);
+create index if not exists phase1_requisition_market_comparables_analysis_idx
+  on phase1_requisition_market_comparables(analysis_id, retrieved_at desc);
+
