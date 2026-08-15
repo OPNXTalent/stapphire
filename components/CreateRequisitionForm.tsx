@@ -72,21 +72,21 @@ export function CreateRequisitionForm() {
 
   return <form className="card create-requisition-form" onSubmit={submit}>
     <div className="field">
+      <label htmlFor="title">Position title</label>
+      <input id="title" name="title" required value={title} onChange={(event)=>{setTitle(event.target.value);setTitleEdited(true)}}/>
+    </div>
+    <div className="field create-jd-field">
+      <label htmlFor="job_description">Paste Job Description</label>
+      <textarea className="create-jd-textarea" id="job_description" name="job_description" required value={jobDescription} onChange={(event)=>updateJobDescription(event.target.value)}/>
+    </div>
+    <div className="form-separator"><span>OR</span></div>
+    <div className="field">
       <label>Upload Job Description</label>
       <input ref={fileInput} className="visually-hidden" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" onChange={chooseFile}/>
       <button className="jd-upload-zone" type="button" onClick={()=>fileInput.current?.click()} onDragOver={(event)=>event.preventDefault()} onDrop={dropFile} disabled={uploading}>
         <strong>{uploading ? 'Reading file...' : fileName || 'Choose or drop a JD file'}</strong>
         <span>PDF, DOCX, or TXT</span>
       </button>
-    </div>
-    <div className="form-separator"><span>OR</span></div>
-    <div className="field create-jd-field">
-      <label htmlFor="job_description">Paste Job Description</label>
-      <textarea className="create-jd-textarea" id="job_description" name="job_description" required value={jobDescription} onChange={(event)=>updateJobDescription(event.target.value)}/>
-    </div>
-    <div className="field">
-      <label htmlFor="title">Position title</label>
-      <input id="title" name="title" required value={title} onChange={(event)=>{setTitle(event.target.value);setTitleEdited(true)}}/>
     </div>
     {error&&<p className="error">{error}</p>}
     <div className="create-form-actions"><button disabled={busy||uploading}>{busy?'Saving...':'Create requisition'}</button></div>
