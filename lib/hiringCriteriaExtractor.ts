@@ -160,10 +160,49 @@ async function extractHiringCriteria(jobDescription: string): Promise<RawExtract
   }
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error || 'Hiring Criteria extraction failed.');
+}
+
+async function persistExtractionFailure(requisitionId: string, message: string, modelExists: boolean): Promise<void> {
+  const extractionError = message.slice(0, 1000);
+  const { error: rpcError } = await supabaseAdmin.rpc('fail_phase1_hiring_criteria_extraction', {
+    p_requisition_id: requisitionId,
+    p_error: extractionError
+  });
+  if (!rpcError) return;
+
+  const failureRow = {
+    requisition_id: requisitionId,
+    extraction_status: 'failed',
+    extraction_error: extractionError,
+    generated_at: null
+  };
+  const { error: fallbackError } = modelExists
+    ? await supabaseAdmin.from('phase1_hiring_criteria_models').update(failureRow).eq('requisition_id', requisitionId)
+    : await supabaseAdmin.from('phase1_hiring_criteria_models').insert(failureRow);
+  if (fallbackError) {
+    console.error('Hiring Criteria failure state could not be persisted', {
+      requisitionId,
+      failRpcError: rpcError.message,
+      fallbackError: fallbackError.message
+    });
+  } else {
+    console.error('Hiring Criteria failure state persisted without fail RPC', {
+      requisitionId,
+      failRpcError: rpcError.message
+    });
+  }
+}
+
 export async function generateHiringCriteria(requisitionId: string, jobDescription: string): Promise<void> {
-  const { error: beginError } = await supabaseAdmin.rpc('begin_phase1_hiring_criteria_extraction', { p_requisition_id: requisitionId });
-  if (beginError) throw beginError;
+  let modelExists = false;
   try {
+    const { error: beginError } = await supabaseAdmin.rpc('begin_phase1_hiring_criteria_extraction', { p_requisition_id: requisitionId });
+    if (beginError) throw new Error(`Unable to begin Hiring Criteria extraction: ${beginError.message}`);
+    modelExists = true;
+
+    console.info('Hiring Criteria extraction started', { requisitionId, model: HIRING_CRITERIA_MODEL });
     const extraction = await extractHiringCriteria(jobDescription);
     const prepared = prepareItems(jobDescription, extraction);
     const { error } = await supabaseAdmin.rpc('complete_phase1_hiring_criteria_extraction', {
@@ -172,9 +211,10 @@ export async function generateHiringCriteria(requisitionId: string, jobDescripti
       p_unmapped_qualifications: prepared.unmappedQualifications
     });
     if (error) throw error;
+    console.info('Hiring Criteria extraction completed', { requisitionId, itemCount: prepared.items.length });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Hiring Criteria extraction failed.';
-    await supabaseAdmin.rpc('fail_phase1_hiring_criteria_extraction', { p_requisition_id: requisitionId, p_error: message.slice(0, 1000) });
+    const message = errorMessage(error);
+    await persistExtractionFailure(requisitionId, message, modelExists);
     throw error;
   }
 }
