@@ -30,6 +30,8 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
   }, [model]);
 
   async function adjustWeight(criterionId: string, delta: -1 | 1) {
+    const criterion = criteria.find((item) => item.id === criterionId);
+    if ((knockouts[criterionId] ?? criterion?.isKnockout ?? false) || savingId === criterionId) return;
     const previous = weights[criterionId] ?? 0;
     const next = Math.max(0, previous + delta);
     if (next === previous) return;
@@ -42,6 +44,9 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
         body: JSON.stringify({ criterionId, delta })
       });
       if (!response.ok) throw new Error('Unable to save draft weight');
+      const result = await response.json() as { weight?: unknown };
+      if (typeof result.weight !== 'number') throw new Error('Invalid saved draft weight');
+      setWeights((current) => ({ ...current, [criterionId]: result.weight as number }));
     } catch {
       setWeights((current) => ({ ...current, [criterionId]: previous }));
     } finally {
@@ -50,10 +55,11 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
   }
 
   async function setKnockout(criterionId: string, isKnockout: boolean) {
+    if (savingId === criterionId) return;
     const previousKnockout = knockouts[criterionId] ?? false;
     const previousWeight = weights[criterionId] ?? 0;
     setKnockouts((current) => ({ ...current, [criterionId]: isKnockout }));
-    if (isKnockout) setWeights((current) => ({ ...current, [criterionId]: 0 }));
+    setWeights((current) => ({ ...current, [criterionId]: 0 }));
     setSavingId(criterionId);
     try {
       const response = await fetch(`/api/requisitions/${requisitionId}/hiring-criteria`, {
@@ -62,6 +68,10 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
         body: JSON.stringify({ criterionId, isKnockout })
       });
       if (!response.ok) throw new Error('Unable to save knockout state');
+      const result = await response.json() as { weight?: unknown; isKnockout?: unknown };
+      if (typeof result.weight !== 'number' || typeof result.isKnockout !== 'boolean') throw new Error('Invalid saved knockout state');
+      setWeights((current) => ({ ...current, [criterionId]: result.weight as number }));
+      setKnockouts((current) => ({ ...current, [criterionId]: result.isKnockout as boolean }));
     } catch {
       setKnockouts((current) => ({ ...current, [criterionId]: previousKnockout }));
       setWeights((current) => ({ ...current, [criterionId]: previousWeight }));

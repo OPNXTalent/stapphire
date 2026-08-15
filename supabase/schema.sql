@@ -273,7 +273,7 @@ declare
 begin
   update phase1_hiring_criteria_items as item
   set is_knockout = p_is_knockout,
-      draft_weight = case when p_is_knockout then 0 else item.draft_weight end,
+      draft_weight = 0,
       updated_at = now()
   where item.id = p_criterion_id
     and item.category = 'other_requirements'
