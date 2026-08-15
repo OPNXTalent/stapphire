@@ -24,6 +24,9 @@ function texts(value: unknown): string[] {
 function cleanTransitStatus(value: string): string {
   return value.replace(/^(previous\s+transit\s+employer\s*:\s*)+/i, '').trim();
 }
+function number(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
 function cleanEvaluationSummary(value: string): string {
   return value.replace(/^(?:(?:greenlight)(?:\s*[—-]\s*recommend interview)?|consider(?:\s*[—-]\s*hold\s*\/\s*clarify)?|decline|recommend(?:ed)?|do not recommend)\s*(?:[.:]\s*|$)/i, '').trim();
 }
@@ -44,7 +47,18 @@ function normalizeAssessment(value: unknown) {
         return requirement || evidence || assessment ? [{ requirement, evidence, assessment }] : [];
       })
     : [];
+  const weightedCriteria = Array.isArray(source.weighted_criteria) ? source.weighted_criteria.flatMap((item) => {
+    const criterion = record(item); const label = text(criterion.label); const evidence = text(criterion.evidence); const assessment = text(criterion.assessment); const weight = number(criterion.applied_weight); const score = number(criterion.score);
+    return label && weight !== null && score !== null ? [{ id: text(criterion.criterion_id), label, category: text(criterion.category), weight, score, evidence, assessment }] : [];
+  }) : [];
+  const knockoutCriteria = Array.isArray(source.knockout_criteria) ? source.knockout_criteria.flatMap((item) => {
+    const criterion = record(item); const label = text(criterion.label); const status = text(criterion.status); const evidence = text(criterion.evidence); const assessment = text(criterion.assessment);
+    return label && status ? [{ id: text(criterion.criterion_id), label, status, evidence, assessment }] : [];
+  }) : [];
+  const categoryWeights = record(source.category_weights);
+  const categoryRollups = record(source.category_rollups);
   return {
+    evaluationFormat: text(source.evaluation_format), weightedCriteria, knockoutCriteria, categoryWeights, categoryRollups,
     assessment: text(source.assessment),
     standoutReasons: texts(source.standout_reasons),
     strongestMatches,
@@ -84,10 +98,10 @@ export function CandidateReport({
   candidateName: string;
   positionTitle: string;
   overallMatch: number;
-  responsibilities: number;
-  hardSkills: number;
-  softSkills: number;
-  keywords: number;
+  responsibilities: number | null;
+  hardSkills: number | null;
+  softSkills: number | null;
+  keywords: number | null;
   assessment: unknown;
   evaluationDate?: string;
 }) {
@@ -112,7 +126,21 @@ export function CandidateReport({
       )}
 
       <h2>Weighted Alignment</h2>
-      <table className="weighted-alignment-table">
+      {a.evaluationFormat === 'criteria_v1' ? <>
+        <table className="weighted-alignment-table criteria-category-rollups">
+          <thead><tr><th>Category</th><th>Applied Weight</th><th>Score</th></tr></thead>
+          <tbody>
+            {([['responsibilities','Job Responsibilities'],['hard_skills','Hard Skills'],['soft_skills','Soft Skills'],['keywords','Keywords & Terminology'],['other_requirements','Other Requirements']] as const).map(([key,label])=><tr key={key}><td>{label}</td><td className="numeric">{number(a.categoryWeights[key]) ?? 0}%</td><td className="numeric">{number(a.categoryRollups[key]) === null ? '—' : `${number(a.categoryRollups[key])}%`}</td></tr>)}
+            <tr><td><strong>Match</strong></td><td className="numeric"><strong>100%</strong></td><td className="numeric"><strong>{overallMatch}%</strong></td></tr>
+          </tbody>
+        </table>
+        <h3>Weighted Criteria</h3>
+        <table className="criteria-results-table">
+          <thead><tr><th>Criterion</th><th>Weight</th><th>Score</th><th>Evidence</th></tr></thead>
+          <tbody>{a.weightedCriteria.map((criterion)=><tr key={criterion.id}><td><strong>{criterion.label}</strong>{criterion.assessment&&<small>{criterion.assessment}</small>}</td><td className="numeric">{criterion.weight}%</td><td className="numeric">{criterion.score}%</td><td>{criterion.evidence||'No supporting evidence identified.'}</td></tr>)}</tbody>
+        </table>
+        {a.knockoutCriteria.length>0&&<><h2>Knockouts</h2><table className="knockout-results-table"><thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{a.knockoutCriteria.map((criterion)=><tr key={criterion.id}><td><strong>{criterion.label}</strong>{criterion.assessment&&<small>{criterion.assessment}</small>}</td><td>{criterion.status.replaceAll('_',' ')}</td><td>{criterion.evidence||'Resume evidence was insufficient.'}</td></tr>)}</tbody></table></>}
+      </> : <table className="weighted-alignment-table">
         <thead>
           <tr>
             <th>Category</th>
@@ -153,7 +181,7 @@ export function CandidateReport({
             </td>
           </tr>
         </tbody>
-      </table>
+      </table>}
 
       {a.standoutReasons.length > 0 && (
         <>

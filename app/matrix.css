@@ -14,6 +14,7 @@
 .requisition-workspace-tabs button:focus-visible{position:relative;z-index:1;outline:2px solid var(--sapphire);outline-offset:-2px}
 .requisition-tab-panel{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}
 .requisition-tab-panel .jd{max-height:none;overflow:visible}
+.criteria-results-table small,.knockout-results-table small{display:block;margin-top:5px;color:var(--muted);font-weight:400;line-height:1.45}.criteria-results-table th:nth-child(n+2),.knockout-results-table th:nth-child(n+2){text-align:left}.criteria-results-table td.numeric{text-align:right;white-space:nowrap}.knockout-results-table td:nth-child(2){font-weight:700;white-space:nowrap}
 .requisition-tab-panel.job-description-panel{display:flex;overflow:hidden;scrollbar-gutter:auto}.job-description-workspace{display:flex;flex:1;min-height:0;flex-direction:column;margin-bottom:0}.job-description-workspace>.intelligence-heading{flex:none}.requisition-tab-panel .job-description-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}.jd-edit-header-actions,.jd-view-actions{display:flex;align-items:center;gap:8px}.jd-edit-header-actions button,.jd-view-actions button{padding:7px 11px;font-size:12px}
 .requisition-candidates-view:not([hidden]){display:flex;flex:1;flex-direction:column;min-height:0}
 .requisition-candidates-view .candidate-matrix{display:flex;flex:1;flex-direction:column}

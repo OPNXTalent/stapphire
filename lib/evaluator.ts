@@ -172,7 +172,7 @@ Report employment gaps and short-duration positions objectively as review findin
 
 Return the four category scores and all supporting narrative using the structured fields required by the submit_candidate_evaluation tool. These fields are implementation structure only and do not add behavioral reasoning instructions.`;
 
-const schema = {
+export const candidateEvaluationSchema = {
   type: 'object', additionalProperties: false,
   required: ['candidate_name','job_responsibilities_score','hard_skills_score','soft_skills_score','keyword_terminology_score','assessment','standout_reasons','strongest_matches','most_important_concern','what_to_verify','trainable_after_hire','ats_compatibility','employment_history_review','strategic_risk','interview_priorities','final_recommendation_reasoning','deal_breakers'],
   properties: {
@@ -209,7 +209,7 @@ export async function evaluateCandidate(jobDescription: string, resumeText: stri
         type: 'json_schema',
         name: 'candidate_evaluation',
         strict: true,
-        schema
+        schema: candidateEvaluationSchema
       }
     }
   });

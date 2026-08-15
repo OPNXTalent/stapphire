@@ -47,7 +47,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (body.action === 'apply') {
       const { data, error } = await supabaseAdmin.rpc('apply_phase1_hiring_criteria', { p_requisition_id: params.id });
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-      return NextResponse.json({ versionId: data }, { status: 201 });
+      if (!data || typeof data !== 'object' || typeof data.versionId !== 'string' || typeof data.basisId !== 'string') throw new Error('Hiring Criteria activation returned an invalid state.');
+      return NextResponse.json({ versionId: data.versionId, basisId: data.basisId }, { status: 201 });
     }
     if (body.action === 'generate') {
       const { data: requisition, error: requisitionError } = await supabaseAdmin

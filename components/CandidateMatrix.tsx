@@ -328,10 +328,10 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId }: { 
                     candidateName={expandedCandidate.name}
                     positionTitle={positionTitle}
                     overallMatch={expandedCandidate.match}
-                    responsibilities={expandedCandidate.responsibilities ?? 0}
-                    hardSkills={expandedCandidate.hardSkills ?? 0}
-                    softSkills={expandedCandidate.softSkills ?? 0}
-                    keywords={expandedCandidate.keywords ?? 0}
+                    responsibilities={expandedCandidate.responsibilities}
+                    hardSkills={expandedCandidate.hardSkills}
+                    softSkills={expandedCandidate.softSkills}
+                    keywords={expandedCandidate.keywords}
                     assessment={expandedCandidate.assessment}
                     evaluationDate={expandedCandidate.evaluationDate}
                   />
