@@ -23,6 +23,28 @@ export type CriteriaScores = {
   categoryWeights: Record<CriteriaCategory, number>;
 };
 
+function criterionIdSchema(ids: string[]) {
+  return ids.length > 0 ? { type: 'string' as const, enum: ids } : { type: 'string' as const };
+}
+
+export function buildCriterionResultArraySchema(criteria: AppliedCriterion[], knockout: boolean) {
+  const ids = criteria.filter((criterion) => criterion.isKnockout === knockout).map((criterion) => criterion.id);
+  const resultProperties = knockout
+    ? { status: { type: 'string' as const, enum: KNOCKOUT_STATUSES }, evidence: { type: 'string' as const }, assessment: { type: 'string' as const } }
+    : { score: { type: 'integer' as const, enum: CRITERION_SCORES }, evidence: { type: 'string' as const }, assessment: { type: 'string' as const } };
+  return {
+    type: 'array' as const,
+    minItems: ids.length,
+    maxItems: ids.length,
+    items: {
+      type: 'object' as const,
+      additionalProperties: false,
+      required: knockout ? ['criterion_id', 'status', 'evidence', 'assessment'] : ['criterion_id', 'score', 'evidence', 'assessment'],
+      properties: { criterion_id: criterionIdSchema(ids), ...resultProperties }
+    }
+  };
+}
+
 function object(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateCriteriaScores, validateAppliedCriteriaSnapshot, validateCriterionResults, type AppliedCriterion, type KnockoutCriterionResult, type WeightedCriterionResult } from './criteriaEvaluation.ts';
+import { buildCriterionResultArraySchema, calculateCriteriaScores, validateAppliedCriteriaSnapshot, validateCriterionResults, type AppliedCriterion, type KnockoutCriterionResult, type WeightedCriterionResult } from './criteriaEvaluation.ts';
 
 const criteria: AppliedCriterion[] = [
   { id: 'r1', category: 'responsibilities', label: 'Lead close', rationale: null, jdEvidence: null, appliedWeight: 35, isKnockout: false },
@@ -63,4 +63,52 @@ test('applied snapshots require valid exhaustive weighting', () => {
   assert.throws(() => validateAppliedCriteriaSnapshot(criteria.map((item) => item.id === 'r1' ? { ...item, appliedWeight: 34 } : item)), /exactly 100/);
   assert.throws(() => validateAppliedCriteriaSnapshot([...criteria, criteria[0]]), /malformed/);
   assert.throws(() => validateAppliedCriteriaSnapshot(criteria.map((item) => item.id === 'o1' ? { ...item, appliedWeight: 1 } : item)), /cannot carry/);
+});
+
+test('structured output constrains criterion IDs by Knockout treatment', () => {
+  const weightedSchema = buildCriterionResultArraySchema(criteria, false);
+  const knockoutSchema = buildCriterionResultArraySchema(criteria, true);
+  const weightedIds = weightedSchema.items.properties.criterion_id;
+  const knockoutIds = knockoutSchema.items.properties.criterion_id;
+  assert.deepEqual('enum' in weightedIds ? weightedIds.enum : null, ['r1', 'r2', 'h1', 's1', 'k1', 'z1']);
+  assert.deepEqual('enum' in knockoutIds ? knockoutIds.enum : null, ['o1']);
+  assert.equal(weightedSchema.minItems, 6);
+  assert.equal(weightedSchema.maxItems, 6);
+  assert.equal(knockoutSchema.minItems, 1);
+  assert.equal(knockoutSchema.maxItems, 1);
+});
+
+test('structured output requires an empty Knockout array without an invalid empty enum', () => {
+  const withoutKnockouts = criteria.filter((criterion) => !criterion.isKnockout);
+  const knockoutSchema = buildCriterionResultArraySchema(withoutKnockouts, true);
+  const knockoutIds = knockoutSchema.items.properties.criterion_id;
+  assert.equal('enum' in knockoutIds, false);
+  assert.equal(knockoutSchema.minItems, 0);
+  assert.equal(knockoutSchema.maxItems, 0);
+});
+
+test('Marketing Outreach Liaison schema contains exactly its immutable criterion IDs', () => {
+  const weightedIds = [
+    '051d41b3-be46-4e28-abb7-92c4ea81f07e', '30682928-8303-4f6d-9482-641d49ef1e2c',
+    'c1d3956e-abd1-4c3a-ac76-30fcefa955c4', 'e211533c-805e-48ab-b563-4fdbe57994f9',
+    '9b309b47-4fc1-4f67-bea7-63b52492e70e', 'fda8cc32-f0ed-447d-8b5a-dcfe87d6a3bb',
+    '7ec7b475-c279-4593-9211-a491ae5eb32e', '4ae07a10-ef2f-4a3d-981a-78ba5cb29534',
+    '21286af4-0b6e-4972-8f32-383ef91504e6', '6066cf4a-0d78-44cf-ac90-acb1df1e22d0',
+    '639d34f3-1570-49bf-a56f-e80a0ae53def', '812ae4b8-ecf6-4b26-87c9-87985d19817f',
+    'a62430f0-b301-4f67-8a11-c199a99dad91', '239eb2b0-be5b-4cd5-8399-cca43ffbd1a7',
+    '9dba876a-3a03-4967-8e27-38215bc0a3ea', 'a3b7cac9-03a4-4bd7-ac40-f78cdbf59f7b',
+    'aabb849e-4d0d-4cf7-bca2-5fd5ac42dedb', '8fb77e40-574d-4756-89ea-00b43a7304f2',
+    '6a647049-ab5d-43b3-9249-e00b3660bbe7', '971cb1f8-3de1-40cc-adff-0a71c167faf7',
+    '5337d2e0-f554-4f32-a543-27c55ec28f2e', '518c07a7-848a-4120-8b61-0e8bed94d406',
+    '7b31398c-330b-4ab0-ba0c-7a5bdf96b634', '72d915eb-b30b-4aab-a6a2-b4aebf61b975'
+  ];
+  const knockoutIds = ['4f206b64-5ff4-4b42-9efd-791a047c0d79'];
+  const fixture = [...weightedIds.map((id) => ({ id, isKnockout: false })), ...knockoutIds.map((id) => ({ id, isKnockout: true }))]
+    .map((criterion): AppliedCriterion => ({ ...criterion, category: 'other_requirements', label: criterion.id, rationale: null, jdEvidence: null, appliedWeight: 0 }));
+  const weightedEnum = buildCriterionResultArraySchema(fixture, false).items.properties.criterion_id;
+  const knockoutEnum = buildCriterionResultArraySchema(fixture, true).items.properties.criterion_id;
+  assert.deepEqual('enum' in weightedEnum ? weightedEnum.enum : null, weightedIds);
+  assert.deepEqual('enum' in knockoutEnum ? knockoutEnum.enum : null, knockoutIds);
+  const allowedWeightedIds = 'enum' in weightedEnum && Array.isArray(weightedEnum.enum) ? weightedEnum.enum : [];
+  assert.equal(allowedWeightedIds.includes('invented-id'), false);
 });
