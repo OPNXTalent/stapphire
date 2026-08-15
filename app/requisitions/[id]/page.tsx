@@ -8,6 +8,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 export const dynamic='force-dynamic';
 type EvaluationRow={overall_match:unknown;job_responsibilities_score:unknown;hard_skills_score:unknown;soft_skills_score:unknown;keyword_terminology_score:unknown;assessment:unknown;created_at:string};
 function number(value:unknown):number|null{return typeof value==='number'&&Number.isFinite(value)?value:null}
+function normalizeJobDescriptionForDisplay(value:unknown):string{return String(value??'').replace(/\r\n?/g,'\n').replace(/\n(?:[ \t]*\n){2,}/g,'\n\n')}
 
 export default async function RequisitionPage({params}:{params:{id:string}}){
   const {data:req}=await supabaseAdmin.from('phase1_requisitions').select('*').eq('id',params.id).is('archived_at',null).single();if(!req)notFound();
@@ -20,7 +21,7 @@ export default async function RequisitionPage({params}:{params:{id:string}}){
     : ((b.match??-1)-(a.match??-1))||a.createdAt.localeCompare(b.createdAt));
   const dnsCandidates:DNSCandidate[]=(dnsList||[]).map(c=>({id:c.id,name:c.full_name,deletedAt:c.deleted_at as string}));
 
-  const requisitionView = <section><h2>Job Description</h2><div className="jd">{req.job_description}</div></section>;
+  const requisitionView = <section><h2>Job Description</h2><div className="jd">{normalizeJobDescriptionForDisplay(req.job_description)}</div></section>;
   const candidatesView = <><ResumeUpload requisitionId={req.id}/><div className="matrix-header-row"><h2>Candidate Matrix</h2><DNSBin candidates={dnsCandidates}/></div><p className="muted">Compare evaluated candidates - click a name to expand the full assessment.</p><CandidateMatrix candidates={matrixCandidates} positionTitle={req.title} requisitionId={req.id}/></>;
 
   return <RequisitionViewToggle title={req.title} requisitionId={req.id} requisitionView={requisitionView} candidatesView={candidatesView}/>;
