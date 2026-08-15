@@ -25,6 +25,7 @@ export function RequisitionViewToggle({
   title,
   requisitionId,
   jobDescription,
+  candidateHeaderAction,
   hiringCriteriaView,
   marketAnalysisView,
   candidatesView
@@ -32,6 +33,7 @@ export function RequisitionViewToggle({
   title: string;
   requisitionId: string;
   jobDescription: string;
+  candidateHeaderAction: ReactNode;
   hiringCriteriaView: ReactNode;
   marketAnalysisView: ReactNode;
   candidatesView: ReactNode;
@@ -77,7 +79,7 @@ export function RequisitionViewToggle({
     <div className={`requisition-workspace ${view === 'candidates' ? 'candidates-active' : 'requisition-active'}`}>
       <button
         type="button"
-        className="view-switch-btn"
+        className={`view-switch-btn${view === 'candidates' ? ' candidate-back-link' : ''}`}
         onClick={() => setView(goingTo)}
         aria-label={goingTo === 'candidates' ? 'Switch to Candidates view' : 'Switch to Requisition view'}
       >
@@ -88,9 +90,12 @@ export function RequisitionViewToggle({
 
       <div className="requisition-title-row">
         <h1>{title}</h1>
-        <button type="button" className="req-archive-btn" onClick={archiveRequisition} disabled={archiving}>
-          {archiving ? 'Archiving…' : 'Archive requisition'}
-        </button>
+        <div className="requisition-title-actions">
+          {view === 'candidates' && candidateHeaderAction}
+          <button type="button" className="req-archive-btn" onClick={archiveRequisition} disabled={archiving}>
+            {archiving ? 'Archiving…' : 'Archive requisition'}
+          </button>
+        </div>
       </div>
 
       <div className="requisition-detail-view" hidden={view !== 'requisition'}>

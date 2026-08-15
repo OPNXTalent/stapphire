@@ -29,7 +29,8 @@ export default async function RequisitionPage({params}:{params:{id:string}}){
 
   const hiringCriteriaView = <HiringCriteria model={hiringCriteria} requisitionId={req.id} sourceIsStale={sourceIsNewer(req.job_description_updated_at,hiringCriteria?.generatedAt)}/>;
   const marketAnalysisView = <RequisitionIntelligence analysis={requisitionIntelligence} checkedAt={new Date()} sourceIsStale={sourceIsNewer(req.job_description_updated_at,requisitionIntelligence?.analysisGeneratedAt||requisitionIntelligence?.createdAt)}/>;
-  const candidatesView = <><ResumeUpload requisitionId={req.id}/><div className="matrix-header-row"><h2>Candidate Matrix</h2><DNSBin candidates={dnsCandidates}/></div><p className="muted">Compare evaluated candidates - click a name to expand the full assessment.</p><CandidateMatrix candidates={matrixCandidates} positionTitle={req.title} requisitionId={req.id}/></>;
+  const candidateHeaderAction = <ResumeUpload requisitionId={req.id}/>;
+  const candidatesView = <CandidateMatrix candidates={matrixCandidates} positionTitle={req.title} requisitionId={req.id} headerAction={<DNSBin candidates={dnsCandidates}/>}/>;
 
-  return <RequisitionViewToggle title={req.title} requisitionId={req.id} jobDescription={req.job_description} hiringCriteriaView={hiringCriteriaView} marketAnalysisView={marketAnalysisView} candidatesView={candidatesView}/>;
+  return <RequisitionViewToggle title={req.title} requisitionId={req.id} jobDescription={req.job_description} candidateHeaderAction={candidateHeaderAction} hiringCriteriaView={hiringCriteriaView} marketAnalysisView={marketAnalysisView} candidatesView={candidatesView}/>;
 }

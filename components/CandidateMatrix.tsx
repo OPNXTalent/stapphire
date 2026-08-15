@@ -47,7 +47,7 @@ function categoryAssessment(score: number | null): string {
   return 'Limited';
 }
 
-export function CandidateMatrix({ candidates, positionTitle, requisitionId }: { candidates: MatrixCandidate[]; positionTitle: string; requisitionId: string }) {
+export function CandidateMatrix({ candidates, positionTitle, requisitionId, headerAction }: { candidates: MatrixCandidate[]; positionTitle: string; requisitionId: string; headerAction?: ReactNode }) {
   const router = useRouter();
   const [orderedCandidates, setOrderedCandidates] = useState(candidates);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -280,37 +280,41 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId }: { 
   const expandedCandidate = orderedCandidates.find((c) => c.id === expandedId) ?? null;
   const expandedRank = expandedCandidate ? orderedCandidates.findIndex((candidate) => candidate.id === expandedCandidate.id) + 1 : 0;
 
+  const matrixToolbar = <div className="matrix-toolbar">
+    <div className="matrix-heading-copy">
+      <div className="matrix-header-row"><h2>Candidate Matrix</h2>{headerAction}</div>
+      <p className="muted">Compare evaluated candidates — click a name to expand the full assessment.</p>
+    </div>
+    <div className="matrix-controls">
+      <label className="matrix-selectall">
+        <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+        Select all
+      </label>
+      <select className="matrix-bulk-disposition" value="" onChange={(e) => applyDispositionToSelected(e.target.value)} disabled={bulkBusy || selectedIds.size === 0}>
+        <option value="">{selectedIds.size === 0 ? 'Set status…' : `Set status (${selectedIds.size})…`}</option>
+        <option value="screen">{DISPOSITION_LABEL.screen}</option>
+        <option value="interview">{DISPOSITION_LABEL.interview}</option>
+        <option value="hire">{DISPOSITION_LABEL.hire}</option>
+        <option value="delete">{DISPOSITION_LABEL.delete}</option>
+      </select>
+    </div>
+  </div>;
+
   if (!orderedCandidates.length) {
     return (
-      <div className="matrix-empty">
-        <strong>No candidates evaluated yet.</strong>
-        <p>Add a resume to begin building the candidate comparison.</p>
-      </div>
+      <section className="candidate-matrix">
+        {matrixToolbar}
+        <div className="matrix-empty">
+          <strong>No candidates evaluated yet.</strong>
+          <p>Add a resume to begin building the candidate comparison.</p>
+        </div>
+      </section>
     );
   }
 
   return (
     <section className="candidate-matrix">
-      <div className="matrix-controls">
-        <label className="matrix-selectall">
-          <input type="checkbox" checked={allSelected} onChange={toggleAll} />
-          Select all
-        </label>
-        <select
-          className="matrix-bulk-disposition"
-          value=""
-          onChange={(e) => applyDispositionToSelected(e.target.value)}
-          disabled={bulkBusy || selectedIds.size === 0}
-        >
-          <option value="">
-            {selectedIds.size === 0 ? 'Set status…' : `Set status (${selectedIds.size})…`}
-          </option>
-          <option value="screen">{DISPOSITION_LABEL.screen}</option>
-          <option value="interview">{DISPOSITION_LABEL.interview}</option>
-          <option value="hire">{DISPOSITION_LABEL.hire}</option>
-          <option value="delete">{DISPOSITION_LABEL.delete}</option>
-        </select>
-      </div>
+      {matrixToolbar}
 
       {expandedCandidate ? (
         <div className="matrix-selected">
