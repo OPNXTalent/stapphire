@@ -1,6 +1,10 @@
 .candidate-matrix{margin-top:20px;min-height:0}
 .workspace-content:has(.requisition-workspace.candidates-active){height:calc(100dvh - 48px);overflow:hidden}
 .requisition-workspace.candidates-active{height:100%;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.workspace-content:has(.requisition-workspace.requisition-active){height:calc(100dvh - 48px);overflow:hidden}
+.requisition-workspace.requisition-active{height:100%;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.requisition-workspace.requisition-active>.view-switch-btn,.requisition-workspace.requisition-active>.requisition-title-row{flex:none}
+.requisition-detail-view:not([hidden]){flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}
 .requisition-candidates-view:not([hidden]){display:flex;flex:1;flex-direction:column;min-height:0}
 .requisition-candidates-view .candidate-matrix{display:flex;flex:1;flex-direction:column}
 .matrix-controls{display:flex;flex:none;flex-wrap:wrap;align-items:center;gap:14px 18px;margin-bottom:14px}
@@ -108,5 +112,5 @@
 .upload-remove-btn{background:none;border:none;color:var(--faint);font-size:14px;line-height:1;padding:0 2px;cursor:pointer;flex-shrink:0}
 .upload-remove-btn:hover{color:var(--red)}
 @media(max-width:1000px){.matrix-row-head{grid-template-columns:72px minmax(140px,1.5fr) 60px repeat(4,minmax(60px,1fr)) 100px;gap:8px;padding-left:12px;padding-right:12px}}
-@media(max-width:860px){.workspace-content:has(.requisition-workspace.candidates-active){height:auto;overflow:visible}.requisition-workspace.candidates-active{height:auto;min-height:0;overflow:visible}}
+@media(max-width:860px){.workspace-content:has(.requisition-workspace.candidates-active),.workspace-content:has(.requisition-workspace.requisition-active){height:auto;overflow:visible}.requisition-workspace.candidates-active,.requisition-workspace.requisition-active{height:auto;min-height:0;overflow:visible}.requisition-detail-view:not([hidden]){overflow:visible}}
 @media(max-width:700px){.matrix-controls{align-items:flex-start;flex-direction:column}}

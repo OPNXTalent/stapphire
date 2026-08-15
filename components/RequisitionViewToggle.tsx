@@ -43,7 +43,7 @@ export function RequisitionViewToggle({
   }
 
   return (
-    <div className={`requisition-workspace ${view === 'candidates' ? 'candidates-active' : ''}`}>
+    <div className={`requisition-workspace ${view === 'candidates' ? 'candidates-active' : 'requisition-active'}`}>
       <button
         type="button"
         className="view-switch-btn"
