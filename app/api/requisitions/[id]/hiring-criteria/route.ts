@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { generateHiringCriteria } from '@/lib/hiringCriteriaExtractor';
+import { normalizeHiringCriteriaError } from '@/lib/hiringCriteriaError';
 
 export const runtime = 'nodejs';
 
@@ -27,7 +28,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (error) throw error;
     return NextResponse.json({ weight: data });
   } catch (error) {
-    console.error(error);
+    console.error('Hiring Criteria update failed', { requisitionId: params.id, error: normalizeHiringCriteriaError(error) });
     return NextResponse.json({ error: 'Unable to update Hiring Criteria.' }, { status: 500 });
   }
 }
@@ -58,7 +59,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
     return NextResponse.json({ error: 'Invalid Hiring Criteria action.' }, { status: 400 });
   } catch (error) {
-    console.error(error);
+    console.error('Hiring Criteria action failed', { requisitionId: params.id, error: normalizeHiringCriteriaError(error) });
     return NextResponse.json({ error: 'Unable to update Hiring Criteria.' }, { status: 500 });
   }
 }
