@@ -1,9 +1,16 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
 type View = 'requisition' | 'candidates';
+type RequisitionTab = 'hiring-criteria' | 'market-analysis' | 'job-description';
+
+const requisitionTabs: { id: RequisitionTab; label: string }[] = [
+  { id: 'hiring-criteria', label: 'Hiring Criteria' },
+  { id: 'market-analysis', label: 'Market Analysis' },
+  { id: 'job-description', label: 'Job Description' }
+];
 
 // A mode switch, not navigation - both views' content is already
 // rendered by the server (from the same existing components, nothing
@@ -16,18 +23,28 @@ type View = 'requisition' | 'candidates';
 export function RequisitionViewToggle({
   title,
   requisitionId,
-  requisitionView,
+  hiringCriteriaView,
+  marketAnalysisView,
+  jobDescriptionView,
   candidatesView
 }: {
   title: string;
   requisitionId: string;
-  requisitionView: ReactNode;
+  hiringCriteriaView: ReactNode;
+  marketAnalysisView: ReactNode;
+  jobDescriptionView: ReactNode;
   candidatesView: ReactNode;
 }) {
   const router = useRouter();
   const [view, setView] = useState<View>('candidates');
+  const [requisitionTab, setRequisitionTab] = useState<RequisitionTab>('hiring-criteria');
   const [archiving, setArchiving] = useState(false);
   const goingTo = view === 'requisition' ? 'candidates' : 'requisition';
+  const activeRequisitionView = requisitionTab === 'hiring-criteria'
+    ? hiringCriteriaView
+    : requisitionTab === 'market-analysis'
+      ? marketAnalysisView
+      : jobDescriptionView;
 
   async function archiveRequisition() {
     setArchiving(true);
@@ -40,6 +57,19 @@ export function RequisitionViewToggle({
       setArchiving(false);
       alert('Unable to archive requisition. Try again.');
     }
+  }
+
+  function navigateTabs(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex = index;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % requisitionTabs.length;
+    else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + requisitionTabs.length) % requisitionTabs.length;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = requisitionTabs.length - 1;
+    else return;
+    event.preventDefault();
+    const nextTab = requisitionTabs[nextIndex];
+    setRequisitionTab(nextTab.id);
+    requestAnimationFrame(() => document.getElementById(`requisition-tab-${nextTab.id}`)?.focus());
   }
 
   return (
@@ -62,7 +92,12 @@ export function RequisitionViewToggle({
         </button>
       </div>
 
-      <div className="requisition-detail-view" hidden={view !== 'requisition'}>{requisitionView}</div>
+      <div className="requisition-detail-view" hidden={view !== 'requisition'}>
+        <div className="requisition-workspace-tabs" role="tablist" aria-label="Requisition workspace">
+          {requisitionTabs.map((tab, index) => <button key={tab.id} id={`requisition-tab-${tab.id}`} type="button" role="tab" aria-selected={requisitionTab === tab.id} aria-controls="requisition-tab-panel" tabIndex={requisitionTab === tab.id ? 0 : -1} className={requisitionTab === tab.id ? 'active' : ''} onClick={() => setRequisitionTab(tab.id)} onKeyDown={(event) => navigateTabs(event, index)}>{tab.label}</button>)}
+        </div>
+        <div id="requisition-tab-panel" className="requisition-tab-panel" role="tabpanel" aria-labelledby={`requisition-tab-${requisitionTab}`}>{activeRequisitionView}</div>
+      </div>
       <div className="requisition-candidates-view" hidden={view !== 'candidates'}>{candidatesView}</div>
     </div>
   );

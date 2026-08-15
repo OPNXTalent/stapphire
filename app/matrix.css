@@ -4,7 +4,16 @@
 .workspace-content:has(.requisition-workspace.requisition-active){height:calc(100dvh - 48px);overflow:hidden}
 .requisition-workspace.requisition-active{height:100%;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .requisition-workspace.requisition-active>.view-switch-btn,.requisition-workspace.requisition-active>.requisition-title-row{flex:none}
-.requisition-detail-view:not([hidden]){flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}
+.requisition-detail-view:not([hidden]){display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden}
+.requisition-workspace-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));flex:none;margin-bottom:10px;border:1px solid var(--line-strong);border-radius:6px;overflow:hidden;background:var(--paper)}
+.requisition-workspace-tabs button{min-width:0;padding:8px 10px;border:0;border-right:1px solid var(--line-strong);border-radius:0;background:var(--paper);color:var(--deep);font-size:11.5px;white-space:nowrap}
+.requisition-workspace-tabs button:last-child{border-right:0}
+.requisition-workspace-tabs button:hover:not(.active){position:relative;box-shadow:inset 0 0 0 1px var(--sapphire);background:var(--paper);color:var(--deep)}
+.requisition-workspace-tabs button.active{background:var(--deep);color:#fff}
+.requisition-workspace-tabs button.active:hover{background:var(--deep)}
+.requisition-workspace-tabs button:focus-visible{position:relative;z-index:1;outline:2px solid var(--sapphire);outline-offset:-2px}
+.requisition-tab-panel{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}
+.requisition-tab-panel .jd{max-height:none;overflow:visible}
 .requisition-candidates-view:not([hidden]){display:flex;flex:1;flex-direction:column;min-height:0}
 .requisition-candidates-view .candidate-matrix{display:flex;flex:1;flex-direction:column}
 .matrix-controls{display:flex;flex:none;flex-wrap:wrap;align-items:center;gap:14px 18px;margin-bottom:14px}
@@ -112,5 +121,5 @@
 .upload-remove-btn{background:none;border:none;color:var(--faint);font-size:14px;line-height:1;padding:0 2px;cursor:pointer;flex-shrink:0}
 .upload-remove-btn:hover{color:var(--red)}
 @media(max-width:1000px){.matrix-row-head{grid-template-columns:72px minmax(140px,1.5fr) 60px repeat(4,minmax(60px,1fr)) 100px;gap:8px;padding-left:12px;padding-right:12px}}
-@media(max-width:860px){.workspace-content:has(.requisition-workspace.candidates-active),.workspace-content:has(.requisition-workspace.requisition-active){height:auto;overflow:visible}.requisition-workspace.candidates-active,.requisition-workspace.requisition-active{height:auto;min-height:0;overflow:visible}.requisition-detail-view:not([hidden]){overflow:visible}}
-@media(max-width:700px){.matrix-controls{align-items:flex-start;flex-direction:column}}
+@media(max-width:860px){.workspace-content:has(.requisition-workspace.candidates-active),.workspace-content:has(.requisition-workspace.requisition-active){height:auto;overflow:visible}.requisition-workspace.candidates-active,.requisition-workspace.requisition-active{height:auto;min-height:0;overflow:visible}.requisition-detail-view:not([hidden]),.requisition-tab-panel{overflow:visible}}
+@media(max-width:700px){.matrix-controls{align-items:flex-start;flex-direction:column}.requisition-workspace-tabs button{padding:7px 5px;font-size:10px}}

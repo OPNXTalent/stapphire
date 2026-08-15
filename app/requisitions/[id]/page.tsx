@@ -26,8 +26,10 @@ export default async function RequisitionPage({params}:{params:{id:string}}){
     : ((b.match??-1)-(a.match??-1))||a.createdAt.localeCompare(b.createdAt));
   const dnsCandidates:DNSCandidate[]=(dnsList||[]).map(c=>({id:c.id,name:c.full_name,deletedAt:c.deleted_at as string}));
 
-  const requisitionView = <><HiringCriteria model={hiringCriteria} requisitionId={req.id}/><RequisitionIntelligence analysis={requisitionIntelligence} checkedAt={new Date()}/><section><h2>Job Description</h2><div className="jd">{normalizeJobDescriptionForDisplay(req.job_description)}</div></section></>;
+  const hiringCriteriaView = <HiringCriteria model={hiringCriteria} requisitionId={req.id}/>;
+  const marketAnalysisView = <RequisitionIntelligence analysis={requisitionIntelligence} checkedAt={new Date()}/>;
+  const jobDescriptionView = <section><h2>Job Description</h2><div className="jd">{normalizeJobDescriptionForDisplay(req.job_description)}</div></section>;
   const candidatesView = <><ResumeUpload requisitionId={req.id}/><div className="matrix-header-row"><h2>Candidate Matrix</h2><DNSBin candidates={dnsCandidates}/></div><p className="muted">Compare evaluated candidates - click a name to expand the full assessment.</p><CandidateMatrix candidates={matrixCandidates} positionTitle={req.title} requisitionId={req.id}/></>;
 
-  return <RequisitionViewToggle title={req.title} requisitionId={req.id} requisitionView={requisitionView} candidatesView={candidatesView}/>;
+  return <RequisitionViewToggle title={req.title} requisitionId={req.id} hiringCriteriaView={hiringCriteriaView} marketAnalysisView={marketAnalysisView} jobDescriptionView={jobDescriptionView} candidatesView={candidatesView}/>;
 }

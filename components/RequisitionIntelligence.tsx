@@ -79,9 +79,9 @@ export function RequisitionIntelligence({ analysis, checkedAt }: { analysis: Req
           : { title: 'Market analysis complete', detail: analysis.observedEvidence.evidenceQualityDescriptor || `${comparableCount} advertised comparables analyzed.` };
 
   return (
-    <section className="requisition-intelligence" aria-labelledby="market-outlook-heading">
+    <section className="requisition-intelligence" aria-labelledby="market-analysis-heading">
       <div className="intelligence-heading">
-        <div><span className="eyebrow">Requisition intelligence</span><h2 id="market-outlook-heading">Market Outlook</h2></div>
+        <div><span className="eyebrow">Requisition intelligence</span><h2 id="market-analysis-heading">Market Analysis</h2></div>
         <span className="intelligence-date">{analysisDate ? `Analysis generated ${formatDate(analysisDate)}` : `Availability checked ${formatDate(checkedAt)}`}</span>
       </div>
 
