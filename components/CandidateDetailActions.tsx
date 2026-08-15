@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { printStapphireDocument } from '@/lib/printDocument';
 
 export function CandidateDetailActions({ candidateId, sourceFilename, resumeAvailable }: { candidateId: string; sourceFilename: string; resumeAvailable: boolean }) {
   const [downloading, setDownloading] = useState(false);
@@ -30,7 +31,7 @@ export function CandidateDetailActions({ candidateId, sourceFilename, resumeAvai
 
   return <div className="candidate-detail-actions" aria-label="Candidate documents">
     {resumeAvailable ? <button type="button" onClick={downloadResume} disabled={downloading}>{downloading?'Downloading…':'Download Resume'}</button> : <span className="resume-unavailable">Resume unavailable</span>}
-    <button type="button" onClick={()=>window.print()}>Print Evaluation</button>
+    <button type="button" onClick={()=>printStapphireDocument('candidate-evaluation')}>Print Evaluation</button>
     {error&&<span className="candidate-action-error" role="alert">{error}</span>}
   </div>;
 }

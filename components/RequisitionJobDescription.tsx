@@ -2,6 +2,8 @@
 
 import { FormEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { StapphirePrintHeader } from '@/components/StapphirePrintHeader';
+import { printStapphireDocument } from '@/lib/printDocument';
 
 function normalizeForDisplay(value: string): string {
   return value.replace(/\r\n?/g, '\n').replace(/\n(?:[ \t]*\n){2,}/g, '\n\n');
@@ -72,10 +74,10 @@ export function RequisitionJobDescription({ requisitionId, title, jobDescription
     }
   }
 
-  return <section className="requisition-intelligence job-description-workspace" aria-labelledby="job-description-heading">
+  return <><section className="requisition-intelligence job-description-workspace" aria-labelledby="job-description-heading">
     <div className="intelligence-heading">
       <div><span className="eyebrow">Requisition source</span><h2 id="job-description-heading">Job Description</h2></div>
-      {editing ? <div className="jd-edit-header-actions"><button type="submit" form="requisition-jd-edit-form" disabled={saving}>{saving?'Saving…':'Save changes'}</button><button type="button" className="secondary-action" onClick={cancel} disabled={saving}>Cancel</button></div> : <button type="button" className="jd-edit-action" onClick={()=>setEditing(true)}>Edit</button>}
+      {editing ? <div className="jd-edit-header-actions"><button type="submit" form="requisition-jd-edit-form" disabled={saving}>{saving?'Saving…':'Save changes'}</button><button type="button" className="secondary-action" onClick={cancel} disabled={saving}>Cancel</button></div> : <div className="jd-view-actions"><button type="button" className="jd-edit-action" onClick={()=>setEditing(true)}>Edit</button><button type="button" className="jd-edit-action" onClick={()=>printStapphireDocument('job-description')}>Print Job Description</button></div>}
     </div>
     {editing ? <form id="requisition-jd-edit-form" className="jd-edit-form job-description-scroll" onSubmit={save} noValidate>
       <div className="field">
@@ -90,5 +92,5 @@ export function RequisitionJobDescription({ requisitionId, title, jobDescription
       </div>
       {error&&<p className="error" role="alert">{error}</p>}
     </form> : <div className="jd job-description-scroll">{normalizeForDisplay(savedJobDescription)}</div>}
-  </section>;
+  </section><article className="print-document job-description-print" aria-hidden="true"><StapphirePrintHeader documentTitle="Job Description"/><h1>{savedTitle}</h1><h2>Job Description</h2><div className="job-description-print-body">{normalizeForDisplay(savedJobDescription)}</div></article></>;
 }

@@ -1,4 +1,4 @@
-import { BrandGem } from '@/components/BrandGem';
+import { StapphirePrintHeader } from '@/components/StapphirePrintHeader';
 
 function List({ items, empty = 'None identified.' }: { items?: string[]; empty?: string }) {
   return items?.length ? (
@@ -94,8 +94,8 @@ export function CandidateReport({
   const a = normalizeAssessment(assessment);
   const formattedEvaluationDate = evaluationDate ? new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(evaluationDate)) : '';
   return (
-    <article className="evaluation">
-      <div className="print-evaluation-brand"><BrandGem/><strong>Stapphire</strong><span>Candidate Evaluation</span></div>
+    <article className="evaluation print-document candidate-print-document">
+      <StapphirePrintHeader documentTitle="Candidate Evaluation"/>
       <section className="hero">
         <p className="muted">Candidate Evaluation</p>
         <h1>{candidateName}</h1>

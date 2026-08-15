@@ -1,0 +1,52 @@
+[33mcommit 7d68f697ec000eb8447cb20e4547d03aec6b67b5[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: Keenan Dale <kdhogg@opnx-talent.com>
+Date:   Fri Aug 14 13:50:27 2026 -0400
+
+    Add persistent candidate ranking
+
+[1mdiff --git a/supabase/schema.sql b/supabase/schema.sql[m
+[1mindex 18524f1..cf94534 100644[m
+[1m--- a/supabase/schema.sql[m
+[1m+++ b/supabase/schema.sql[m
+[36m@@ -18,6 +18,9 @@[m [mcreate table if not exists phase1_candidates ([m
+   -- recruiter's own recorded decision, distinct from the calculated[m
+   -- Match/verdict - null until they've actually reviewed the candidate[m
+   disposition text check (disposition in ('screen', 'interview', 'hire', 'delete')),[m
+[32m+[m[32m  -- Null until the recruiter establishes a custom order. Once ranked,[m
+[32m+[m[32m  -- active candidates receive a sequential human-controlled sort position.[m
+[32m+[m[32m  rank_order integer check (rank_order is null or rank_order >= 1),[m
+   -- soft-delete - set when disposition is changed to 'delete'. The[m
+   -- candidate leaves the main matrix but the row (and its evaluation[m
+   -- history) stays intact until permanently removed from the trash.[m
+[36m@@ -43,3 +46,31 @@[m [mcreate table if not exists phase1_evaluations ([m
+ create index if not exists phase1_candidates_requisition_idx on phase1_candidates(requisition_id);[m
+ create index if not exists phase1_evaluations_candidate_idx on phase1_evaluations(candidate_id, created_at desc);[m
+ [m
+[32m+[m[32m-- Backward-compatible addition for databases created before ranking existed.[m
+[32m+[m[32malter table phase1_candidates add column if not exists rank_order integer;[m
+[32m+[m[32malter table phase1_candidates drop constraint if exists phase1_candidates_rank_order_check;[m
+[32m+[m[32malter table phase1_candidates add constraint phase1_candidates_rank_order_check check (rank_order is null or rank_order >= 1);[m
+[32m+[m
+[32m+[m[32mcreate or replace function set_phase1_candidate_ranks(p_requisition_id uuid, p_ordered_ids uuid[])[m
+[32m+[m[32mreturns void[m
+[32m+[m[32mlanguage plpgsql[m
+[32m+[m[32msecurity definer[m
+[32m+[m[32mset search_path = public[m
+[32m+[m[32mas $$[m
+[32m+[m[32mdeclare[m
+[32m+[m[32m  updated_count integer;[m
+[32m+[m[32mbegin[m
+[32m+[m[32m  update phase1_candidates as candidate[m
+[32m+[m[32m  set rank_order = ordered.rank::integer[m
+[32m+[m[32m  from unnest(p_ordered_ids) with ordinality as ordered(id, rank)[m
+[32m+[m[32m  where candidate.id = ordered.id[m
+[32m+[m[32m    and candidate.requisition_id = p_requisition_id[m
+[32m+[m[32m    and candidate.deleted_at is null;[m
+[32m+[m
+[32m+[m[32m  get diagnostics updated_count = row_count;[m
+[32m+[m[32m  if updated_count <> cardinality(p_ordered_ids) then[m
+[32m+[m[32m    raise exception 'Candidate order is stale.';[m
+[32m+[m[32m  end if;[m
+[32m+[m[32mend;[m
+[32m+[m[32m$$;[m
+[32m+[m
