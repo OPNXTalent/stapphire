@@ -2,6 +2,7 @@
 
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { RequisitionJobDescription } from '@/components/RequisitionJobDescription';
 
 type View = 'requisition' | 'candidates';
 type RequisitionTab = 'hiring-criteria' | 'market-analysis' | 'job-description';
@@ -23,16 +24,16 @@ const requisitionTabs: { id: RequisitionTab; label: string }[] = [
 export function RequisitionViewToggle({
   title,
   requisitionId,
+  jobDescription,
   hiringCriteriaView,
   marketAnalysisView,
-  jobDescriptionView,
   candidatesView
 }: {
   title: string;
   requisitionId: string;
+  jobDescription: string;
   hiringCriteriaView: ReactNode;
   marketAnalysisView: ReactNode;
-  jobDescriptionView: ReactNode;
   candidatesView: ReactNode;
 }) {
   const router = useRouter();
@@ -44,7 +45,7 @@ export function RequisitionViewToggle({
     ? hiringCriteriaView
     : requisitionTab === 'market-analysis'
       ? marketAnalysisView
-      : jobDescriptionView;
+      : <RequisitionJobDescription requisitionId={requisitionId} title={title} jobDescription={jobDescription} />;
 
   async function archiveRequisition() {
     setArchiving(true);

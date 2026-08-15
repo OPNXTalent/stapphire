@@ -5,7 +5,6 @@ import { RequisitionViewToggle } from '@/components/RequisitionViewToggle';
 import { DNSBin, type DNSCandidate } from '@/components/DNSBin';
 import { RequisitionIntelligence } from '@/components/RequisitionIntelligence';
 import { HiringCriteria } from '@/components/HiringCriteria';
-import { RequisitionJobDescription } from '@/components/RequisitionJobDescription';
 import { getHiringCriteriaModel } from '@/lib/hiringCriteria';
 import { getLatestRequisitionIntelligence } from '@/lib/requisitionIntelligence';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
@@ -29,8 +28,7 @@ export default async function RequisitionPage({params}:{params:{id:string}}){
 
   const hiringCriteriaView = <HiringCriteria model={hiringCriteria} requisitionId={req.id} sourceIsStale={sourceIsNewer(req.job_description_updated_at,hiringCriteria?.generatedAt)}/>;
   const marketAnalysisView = <RequisitionIntelligence analysis={requisitionIntelligence} checkedAt={new Date()} sourceIsStale={sourceIsNewer(req.job_description_updated_at,requisitionIntelligence?.analysisGeneratedAt||requisitionIntelligence?.createdAt)}/>;
-  const jobDescriptionView = <RequisitionJobDescription requisitionId={req.id} title={req.title} jobDescription={req.job_description}/>;
   const candidatesView = <><ResumeUpload requisitionId={req.id}/><div className="matrix-header-row"><h2>Candidate Matrix</h2><DNSBin candidates={dnsCandidates}/></div><p className="muted">Compare evaluated candidates - click a name to expand the full assessment.</p><CandidateMatrix candidates={matrixCandidates} positionTitle={req.title} requisitionId={req.id}/></>;
 
-  return <RequisitionViewToggle title={req.title} requisitionId={req.id} hiringCriteriaView={hiringCriteriaView} marketAnalysisView={marketAnalysisView} jobDescriptionView={jobDescriptionView} candidatesView={candidatesView}/>;
+  return <RequisitionViewToggle title={req.title} requisitionId={req.id} jobDescription={req.job_description} hiringCriteriaView={hiringCriteriaView} marketAnalysisView={marketAnalysisView} candidatesView={candidatesView}/>;
 }
