@@ -9,3 +9,5 @@
 .archived-list{display:grid}.archived-row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:15px 22px;border-bottom:1px solid var(--line)}.archived-row:last-child{border-bottom:0}.archived-row small{display:block;margin-top:3px;color:var(--faint);font-size:11px}.archived-actions{display:flex;align-items:center;gap:7px;flex:none}.archived-actions button{padding:7px 11px;font-size:12px}.archived-actions .archived-delete{background:var(--paper);border:1px solid var(--line-strong);color:var(--red)}.archived-actions .archived-delete:hover{background:var(--red-tint);border-color:var(--red)}
 @media(max-width:860px){.req-nav-footer{display:block;padding-top:10px}}
 .req-nav-all,.eval-balance-label{font-family:var(--body);font-size:14px;font-weight:600;letter-spacing:normal}
+.req-nav{overflow:hidden}.req-nav-head{flex:none}.req-nav nav{display:flex;flex:1;min-height:0;flex-direction:column;overflow:hidden}.req-nav-all{flex:none}.req-nav-list{min-height:0;overflow-y:auto}
+@media(max-width:860px){.req-nav nav{flex-direction:row;flex:none;overflow-x:auto}.req-nav-list{display:flex;gap:6px;overflow:visible;flex:none}}
