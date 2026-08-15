@@ -16,7 +16,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         p_is_knockout: body.isKnockout
       });
       if (error) throw error;
-      return NextResponse.json({ weight: data, isKnockout: body.isKnockout });
+      if (!data || typeof data !== 'object' || typeof data.draftWeight !== 'number' || typeof data.isKnockout !== 'boolean') {
+        throw new Error('Knockout update returned an invalid persisted state.');
+      }
+      return NextResponse.json({ draftWeight: data.draftWeight, isKnockout: data.isKnockout });
     }
     const delta = Number(body.delta);
     if (!criterionId || (delta !== -1 && delta !== 1)) return NextResponse.json({ error: 'Invalid criterion adjustment.' }, { status: 400 });

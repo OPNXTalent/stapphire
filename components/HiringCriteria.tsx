@@ -68,9 +68,9 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
         body: JSON.stringify({ criterionId, isKnockout })
       });
       if (!response.ok) throw new Error('Unable to save knockout state');
-      const result = await response.json() as { weight?: unknown; isKnockout?: unknown };
-      if (typeof result.weight !== 'number' || typeof result.isKnockout !== 'boolean') throw new Error('Invalid saved knockout state');
-      setWeights((current) => ({ ...current, [criterionId]: result.weight as number }));
+      const result = await response.json() as { draftWeight?: unknown; isKnockout?: unknown };
+      if (typeof result.draftWeight !== 'number' || typeof result.isKnockout !== 'boolean') throw new Error('Invalid saved knockout state');
+      setWeights((current) => ({ ...current, [criterionId]: result.draftWeight as number }));
       setKnockouts((current) => ({ ...current, [criterionId]: result.isKnockout as boolean }));
     } catch {
       setKnockouts((current) => ({ ...current, [criterionId]: previousKnockout }));

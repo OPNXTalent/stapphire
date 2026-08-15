@@ -189,6 +189,7 @@ alter table phase1_hiring_criteria_items
 alter table phase1_hiring_criteria_items add column if not exists is_knockout boolean not null default false;
 alter table phase1_hiring_criteria_items add column if not exists knockout_suggested boolean not null default false;
 alter table phase1_hiring_criteria_items drop constraint if exists phase1_hiring_criteria_items_knockout_weight_check;
+update phase1_hiring_criteria_items set draft_weight = 0, updated_at = now() where is_knockout and draft_weight <> 0;
 alter table phase1_hiring_criteria_items
   add constraint phase1_hiring_criteria_items_knockout_weight_check check (not is_knockout or draft_weight = 0);
 
@@ -258,18 +259,20 @@ $$;
 revoke all on function adjust_phase1_hiring_criterion(uuid, uuid, integer) from public, anon, authenticated;
 grant execute on function adjust_phase1_hiring_criterion(uuid, uuid, integer) to service_role;
 
-create or replace function set_phase1_hiring_criterion_knockout(
+drop function if exists set_phase1_hiring_criterion_knockout(uuid, uuid, boolean);
+
+create function set_phase1_hiring_criterion_knockout(
   p_requisition_id uuid,
   p_criterion_id uuid,
   p_is_knockout boolean
 )
-returns integer
+returns jsonb
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
-  next_weight integer;
+  persisted_state jsonb;
 begin
   update phase1_hiring_criteria_items as item
   set is_knockout = p_is_knockout,
@@ -283,17 +286,21 @@ begin
         and model.requisition_id = p_requisition_id
         and model.extraction_status = 'ready'
     )
-  returning draft_weight into next_weight;
+  returning jsonb_build_object(
+    'draftWeight', item.draft_weight,
+    'isKnockout', item.is_knockout
+  ) into persisted_state;
 
-  if next_weight is null then
+  if persisted_state is null then
     raise exception 'Other Requirement not found.';
   end if;
-  return next_weight;
+  return persisted_state;
 end;
 $$;
 
 revoke all on function set_phase1_hiring_criterion_knockout(uuid, uuid, boolean) from public, anon, authenticated;
 grant execute on function set_phase1_hiring_criterion_knockout(uuid, uuid, boolean) to service_role;
+notify pgrst, 'reload schema';
 
 create or replace function reset_phase1_hiring_criteria(p_requisition_id uuid)
 returns void
