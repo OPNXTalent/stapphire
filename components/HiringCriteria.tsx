@@ -15,7 +15,7 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
   const router = useRouter();
   const [weights, setWeights] = useState<Record<string, number>>(() => Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.draftWeight])));
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [action, setAction] = useState<'apply' | 'reset' | null>(null);
+  const [action, setAction] = useState<'apply' | 'reset' | 'generate' | null>(null);
   const criteria = model?.criteria || [];
   const total = criteria.reduce((sum, criterion) => sum + (weights[criterion.id] ?? criterion.draftWeight), 0);
   const meterState = total < 100 ? 'under' : total > 100 ? 'over' : 'balanced';
@@ -47,7 +47,7 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
     }
   }
 
-  async function runAction(nextAction: 'apply' | 'reset') {
+  async function runAction(nextAction: 'apply' | 'reset' | 'generate') {
     setAction(nextAction);
     try {
       const response = await fetch(`/api/requisitions/${requisitionId}/hiring-criteria`, {
@@ -73,7 +73,10 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
       </div>
 
       {!ready ? (
-        <div className="criteria-unavailable"><strong>Hiring Criteria unavailable</strong><span>JD-specific criteria extraction is required before this requisition can be calibrated.</span></div>
+        <div className="criteria-unavailable">
+          <div><strong>{action === 'generate' || model?.extractionStatus === 'pending' ? 'Analyzing requisition…' : model?.extractionStatus === 'failed' ? 'Hiring Criteria analysis could not be completed.' : 'Hiring Criteria not generated'}</strong><span>{action === 'generate' || model?.extractionStatus === 'pending' ? 'Extracting JD-specific hiring measures.' : 'Generate a reviewable starting model from this requisition’s Job Description.'}</span></div>
+          {model?.extractionStatus !== 'pending' && action !== 'generate' && <button type="button" className="criteria-generate" onClick={() => runAction('generate')}>{model?.extractionStatus === 'failed' ? 'Retry' : 'Generate Hiring Criteria'}</button>}
+        </div>
       ) : (
         <>
           <div className={`criteria-meter ${meterState}`} role="status" aria-live="polite"><span>Total Weight</span><strong>{total}%</strong><span>{meterCopy}</span></div>
@@ -103,7 +106,8 @@ export function HiringCriteria({ model, requisitionId }: { model: HiringCriteria
               );
             })}
           </div>
-          <p className="criteria-active-note">Draft changes do not affect Candidate Match. Applied versions are preserved for future evaluator integration.</p>
+          {model.unmappedQualifications.length > 0 && <details className="criteria-unmapped"><summary>Additional qualifications for future eligibility review · {model.unmappedQualifications.length}</summary>{model.unmappedQualifications.map((qualification) => <div key={`${qualification.label}-${qualification.jdEvidence}`}><strong>{qualification.label}</strong><span>{qualification.reason}</span><small>JD evidence: {qualification.jdEvidence}</small></div>)}</details>}
+          <p className="criteria-active-note">{model.latestAppliedVersionId ? 'Draft changes do not affect the latest applied version or Candidate Match.' : 'No applied version yet. Review or calibrate this draft, then apply it at exactly 100%.'}</p>
         </>
       )}
     </section>

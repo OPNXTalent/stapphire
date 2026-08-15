@@ -136,6 +136,7 @@ create table if not exists phase1_hiring_criteria_models (
   requisition_id uuid not null unique references phase1_requisitions(id) on delete cascade,
   extraction_status text not null default 'unavailable' check (extraction_status in ('pending', 'ready', 'unavailable', 'failed')),
   extraction_error text,
+  unmapped_qualifications jsonb not null default '[]'::jsonb,
   generated_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -324,4 +325,158 @@ $$;
 
 revoke all on function apply_phase1_hiring_criteria(uuid) from public, anon, authenticated;
 grant execute on function apply_phase1_hiring_criteria(uuid) to service_role;
+
+alter table phase1_hiring_criteria_models
+  add column if not exists unmapped_qualifications jsonb not null default '[]'::jsonb;
+
+create or replace function begin_phase1_hiring_criteria_extraction(p_requisition_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  selected_model_id uuid;
+  current_status text;
+begin
+  insert into phase1_hiring_criteria_models (requisition_id, extraction_status)
+  values (p_requisition_id, 'pending')
+  on conflict (requisition_id) do nothing;
+
+  select id, extraction_status into selected_model_id, current_status
+  from phase1_hiring_criteria_models
+  where requisition_id = p_requisition_id
+  for update;
+
+  if current_status = 'ready' then
+    raise exception 'Hiring Criteria already exist for this requisition.';
+  end if;
+
+  update phase1_hiring_criteria_models
+  set extraction_status = 'pending',
+      extraction_error = null,
+      updated_at = now()
+  where id = selected_model_id;
+
+  return selected_model_id;
+end;
+$$;
+
+revoke all on function begin_phase1_hiring_criteria_extraction(uuid) from public, anon, authenticated;
+grant execute on function begin_phase1_hiring_criteria_extraction(uuid) to service_role;
+
+create or replace function complete_phase1_hiring_criteria_extraction(
+  p_requisition_id uuid,
+  p_items jsonb,
+  p_unmapped_qualifications jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  selected_model_id uuid;
+  item_count integer;
+  mismatched_weight_count integer;
+  responsibilities_total integer;
+  hard_skills_total integer;
+  soft_skills_total integer;
+  keywords_total integer;
+begin
+  select id into selected_model_id
+  from phase1_hiring_criteria_models
+  where requisition_id = p_requisition_id
+    and extraction_status = 'pending'
+  for update;
+
+  if selected_model_id is null then
+    raise exception 'No pending Hiring Criteria extraction exists.';
+  end if;
+  if jsonb_typeof(p_items) <> 'array' or jsonb_typeof(p_unmapped_qualifications) <> 'array' then
+    raise exception 'Hiring Criteria extraction payload is invalid.';
+  end if;
+
+  select
+    count(*),
+    count(*) filter (where draft_weight <> default_weight),
+    coalesce(sum(default_weight) filter (where category = 'responsibilities'), 0),
+    coalesce(sum(default_weight) filter (where category = 'hard_skills'), 0),
+    coalesce(sum(default_weight) filter (where category = 'soft_skills'), 0),
+    coalesce(sum(default_weight) filter (where category = 'keywords'), 0)
+  into item_count, mismatched_weight_count, responsibilities_total, hard_skills_total, soft_skills_total, keywords_total
+  from jsonb_to_recordset(p_items) as item(
+    category text,
+    label text,
+    rationale text,
+    jd_evidence text,
+    default_weight integer,
+    draft_weight integer
+  );
+
+  if item_count = 0
+    or mismatched_weight_count <> 0
+    or responsibilities_total <> 50
+    or hard_skills_total <> 25
+    or soft_skills_total <> 15
+    or keywords_total <> 10 then
+    raise exception 'Hiring Criteria category totals are invalid.';
+  end if;
+
+  delete from phase1_hiring_criteria_items where model_id = selected_model_id;
+
+  insert into phase1_hiring_criteria_items (
+    model_id, category, label, rationale, jd_evidence, default_weight, draft_weight
+  )
+  select
+    selected_model_id,
+    item.category,
+    item.label,
+    item.rationale,
+    item.jd_evidence,
+    item.default_weight,
+    item.draft_weight
+  from jsonb_to_recordset(p_items) as item(
+    category text,
+    label text,
+    rationale text,
+    jd_evidence text,
+    default_weight integer,
+    draft_weight integer
+  );
+
+  update phase1_hiring_criteria_models
+  set extraction_status = 'ready',
+      extraction_error = null,
+      unmapped_qualifications = p_unmapped_qualifications,
+      generated_at = now(),
+      updated_at = now()
+  where id = selected_model_id;
+end;
+$$;
+
+revoke all on function complete_phase1_hiring_criteria_extraction(uuid, jsonb, jsonb) from public, anon, authenticated;
+grant execute on function complete_phase1_hiring_criteria_extraction(uuid, jsonb, jsonb) to service_role;
+
+create or replace function fail_phase1_hiring_criteria_extraction(
+  p_requisition_id uuid,
+  p_error text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update phase1_hiring_criteria_models
+  set extraction_status = 'failed',
+      extraction_error = coalesce(nullif(btrim(p_error), ''), 'Hiring Criteria extraction failed.'),
+      updated_at = now()
+  where requisition_id = p_requisition_id
+    and extraction_status = 'pending';
+end;
+$$;
+
+revoke all on function fail_phase1_hiring_criteria_extraction(uuid, text) from public, anon, authenticated;
+grant execute on function fail_phase1_hiring_criteria_extraction(uuid, text) to service_role;
 

@@ -3,6 +3,7 @@ import { supabaseAdmin } from './supabaseAdmin';
 export const HIRING_CRITERIA_CATEGORIES = ['responsibilities', 'hard_skills', 'soft_skills', 'keywords'] as const;
 export type HiringCriteriaCategory = typeof HIRING_CRITERIA_CATEGORIES[number];
 export type CriteriaExtractionStatus = 'pending' | 'ready' | 'unavailable' | 'failed';
+export type UnmappedQualification = { label: string; jdEvidence: string; reason: string };
 
 export type HiringCriterion = {
   id: string;
@@ -22,6 +23,7 @@ export type HiringCriteriaModel = {
   extractionStatus: CriteriaExtractionStatus;
   extractionError: string | null;
   generatedAt: string | null;
+  unmappedQualifications: UnmappedQualification[];
   latestAppliedVersionId: string | null;
   criteria: HiringCriterion[];
 };
@@ -32,6 +34,7 @@ type ModelRow = {
   extraction_status: CriteriaExtractionStatus;
   extraction_error: string | null;
   generated_at: string | null;
+  unmapped_qualifications: UnmappedQualification[] | null;
 };
 
 type CriterionRow = {
@@ -78,6 +81,7 @@ export async function getHiringCriteriaModel(requisitionId: string): Promise<Hir
     extractionStatus: model.extraction_status,
     extractionError: model.extraction_error,
     generatedAt: model.generated_at,
+    unmappedQualifications: Array.isArray(model.unmapped_qualifications) ? model.unmapped_qualifications : [],
     latestAppliedVersionId: versionData?.id || null,
     criteria
   };
