@@ -5,6 +5,7 @@ create table if not exists phase1_requisitions (
   id uuid primary key default uuid_generate_v4(),
   title text not null,
   job_description text not null,
+  archived_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -45,6 +46,9 @@ create table if not exists phase1_evaluations (
 
 create index if not exists phase1_candidates_requisition_idx on phase1_candidates(requisition_id);
 create index if not exists phase1_evaluations_candidate_idx on phase1_evaluations(candidate_id, created_at desc);
+
+-- Backward-compatible requisition lifecycle field. Existing rows remain active.
+alter table phase1_requisitions add column if not exists archived_at timestamptz;
 
 -- Backward-compatible addition for databases created before ranking existed.
 alter table phase1_candidates add column if not exists rank_order integer;

@@ -15,7 +15,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // entirely regardless of what middleware blocks.
   const authenticated = await isGateCookieValid(cookies().get(GATE_COOKIE)?.value);
   const { data } = authenticated
-    ? await supabaseAdmin.from('phase1_requisitions').select('id,title').order('created_at', { ascending: false })
+    ? await supabaseAdmin.from('phase1_requisitions').select('id,title').is('archived_at', null).order('created_at', { ascending: false })
     : { data: [] };
 
   return (

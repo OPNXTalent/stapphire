@@ -8,7 +8,7 @@ export const runtime='nodejs';
 export async function POST(request:Request,{params}:{params:{id:string}}){
   let candidateId:string|undefined;
   try{
-    const {data:requisition,error:reqError}=await supabaseAdmin.from('phase1_requisitions').select('id,job_description').eq('id',params.id).single();
+    const {data:requisition,error:reqError}=await supabaseAdmin.from('phase1_requisitions').select('id,job_description').eq('id',params.id).is('archived_at',null).single();
     if(reqError||!requisition)return NextResponse.json({error:'Requisition not found.'},{status:404});
     const form=await request.formData();const file=form.get('resume');
     if(!(file instanceof File)||file.size===0)return NextResponse.json({error:'A resume file is required.'},{status:400});
