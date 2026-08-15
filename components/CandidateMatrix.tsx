@@ -198,43 +198,45 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId }: { 
           if (sourceId) void moveCandidate(sourceId, candidate.id);
         }}
       >
-        <span className="matrix-rank">
-          <button
-            type="button"
-            className="matrix-drag-handle"
-            draggable={!isOpen}
-            aria-label={`Rank ${candidate.name}, currently ${rank}. Use arrow keys to move.`}
-            title="Drag or use arrow keys to rank"
+        <span className="matrix-rank-controls">
+          <span className="matrix-rank">
+            <button
+              type="button"
+              className="matrix-drag-handle"
+              draggable={!isOpen}
+              aria-label={`Rank ${candidate.name}, currently ${rank}. Use arrow keys to move.`}
+              title="Drag or use arrow keys to rank"
+              onClick={(e) => e.stopPropagation()}
+              onDragStart={(e) => {
+                e.stopPropagation();
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', candidate.id);
+                setDraggedId(candidate.id);
+              }}
+              onDragEnd={() => {
+                setDraggedId(null);
+                setDropTargetId(null);
+              }}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (isOpen) return;
+                if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  moveCandidateByKeyboard(candidate.id, e.key === 'ArrowUp' ? -1 : 1);
+                }
+              }}
+            >⠿</button>
+            <span className="matrix-rank-number">{rank}.</span>
+          </span>
+          <input
+            type="checkbox"
+            className="matrix-row-checkbox"
+            checked={selectedIds.has(candidate.id)}
             onClick={(e) => e.stopPropagation()}
-            onDragStart={(e) => {
-              e.stopPropagation();
-              e.dataTransfer.effectAllowed = 'move';
-              e.dataTransfer.setData('text/plain', candidate.id);
-              setDraggedId(candidate.id);
-            }}
-            onDragEnd={() => {
-              setDraggedId(null);
-              setDropTargetId(null);
-            }}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (isOpen) return;
-              if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                e.preventDefault();
-                moveCandidateByKeyboard(candidate.id, e.key === 'ArrowUp' ? -1 : 1);
-              }
-            }}
-          >⠿</button>
-          <span className="matrix-rank-number">{rank}.</span>
+            onChange={() => toggleOne(candidate.id)}
+            aria-label={`Select ${candidate.name}`}
+          />
         </span>
-        <input
-          type="checkbox"
-          className="matrix-row-checkbox"
-          checked={selectedIds.has(candidate.id)}
-          onClick={(e) => e.stopPropagation()}
-          onChange={() => toggleOne(candidate.id)}
-          aria-label={`Select ${candidate.name}`}
-        />
         <span className="matrix-row-name">{candidate.name}</span>
         <span className="facet-cell matrix-row-match">
           <span className="score-num">{candidate.match === null ? '—' : `${candidate.match}%`}</span>
