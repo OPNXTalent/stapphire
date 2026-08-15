@@ -17,11 +17,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const { data } = authenticated
     ? await supabaseAdmin.from('phase1_requisitions').select('id,title').is('archived_at', null).order('created_at', { ascending: false })
     : { data: [] };
+  const activeRequisitions = [...(data || [])].sort((a, b) =>
+    a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
+  );
 
   return (
     <html lang="en">
       <body>
-        <AppShell requisitions={data || []}>{children}</AppShell>
+        <AppShell requisitions={activeRequisitions}>{children}</AppShell>
       </body>
     </html>
   );
