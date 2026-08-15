@@ -1,13 +1,18 @@
-.candidate-matrix{margin-top:20px}
-.matrix-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px 18px;margin-bottom:14px}
+.candidate-matrix{margin-top:20px;min-height:0}
+.workspace-content:has(.requisition-workspace.candidates-active){height:calc(100dvh - 48px);overflow:hidden}
+.requisition-workspace.candidates-active{height:100%;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.requisition-candidates-view:not([hidden]){display:flex;flex:1;flex-direction:column;min-height:0}
+.requisition-candidates-view .candidate-matrix{display:flex;flex:1;flex-direction:column}
+.matrix-controls{display:flex;flex:none;flex-wrap:wrap;align-items:center;gap:14px 18px;margin-bottom:14px}
 .matrix-selectall{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
 .matrix-bulk-disposition{width:120px;font:inherit;font-size:12.5px;font-weight:600;padding:8px 11px;border:1px solid var(--line-strong);border-radius:6px;background:#fff;color:var(--deep)}
 .matrix-bulk-disposition:disabled{opacity:.55;color:var(--faint)}
 
-.matrix-list{max-height:calc(100vh - 300px);overflow-y:auto;overflow-x:hidden;padding:2px;scrollbar-gutter:stable}
-.matrix-selected-banner{overflow-y:hidden;overflow-x:hidden;padding:2px;scrollbar-gutter:stable}
+.matrix-list{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:2px;scrollbar-gutter:stable}
+.matrix-selected{display:flex;flex:1;flex-direction:column;min-height:0}
+.matrix-selected-banner{flex:none;overflow-y:hidden;overflow-x:hidden;padding:2px;scrollbar-gutter:stable}
 .matrix-selected-banner .matrix-row{margin-bottom:7px}
-.matrix-selected-detail{max-height:calc(100vh - 365px);overflow-y:auto;overflow-x:hidden;padding:2px;scrollbar-gutter:stable}
+.matrix-selected-detail{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:2px;scrollbar-gutter:stable}
 .matrix-row{margin-bottom:7px}
 .matrix-row:last-child{margin-bottom:0}
 .matrix-row-head{display:grid;grid-template-columns:80px minmax(200px,1.6fr) 70px repeat(4,minmax(76px,1fr)) 100px;align-items:center;gap:12px;width:100%;padding:13px 16px;cursor:pointer;background:#fff;border:1px solid var(--line);border-radius:7px;transition:background .12s ease,border-color .12s ease,box-shadow .12s ease}
@@ -93,4 +98,5 @@
 .upload-remove-btn{background:none;border:none;color:var(--faint);font-size:14px;line-height:1;padding:0 2px;cursor:pointer;flex-shrink:0}
 .upload-remove-btn:hover{color:var(--red)}
 @media(max-width:1000px){.matrix-row-head{grid-template-columns:72px minmax(140px,1.5fr) 60px repeat(4,minmax(60px,1fr)) 100px;gap:8px;padding-left:12px;padding-right:12px}}
+@media(max-width:860px){.workspace-content:has(.requisition-workspace.candidates-active){height:auto;overflow:visible}.requisition-workspace.candidates-active{height:auto;min-height:0;overflow:visible}}
 @media(max-width:700px){.matrix-controls{align-items:flex-start;flex-direction:column}}
