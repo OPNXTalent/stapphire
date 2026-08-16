@@ -1,10 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/resume-operations",
-      "schedule": "* * * * *"
-    }
-  ],
   "functions": {
     "app/api/queues/hiring-criteria/route.ts": {
       "maxDuration": 300,

@@ -8,8 +8,12 @@ export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
+  const reconciliationSecret = process.env.RESUME_RECONCILIATION_SECRET;
+  if (!reconciliationSecret) {
+    console.error('Resume reconciliation secret is not configured');
+    return NextResponse.json({ error: 'Reconciliation is unavailable.' }, { status: 503 });
+  }
+  if (request.headers.get('authorization') !== `Bearer ${reconciliationSecret}`) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   }
 
