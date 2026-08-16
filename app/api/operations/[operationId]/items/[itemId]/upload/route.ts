@@ -23,6 +23,7 @@ export async function POST(request: Request, { params }: { params: { operationId
     if (!item) return NextResponse.json({ error: 'Resume operation item not found.' }, { status: 404 });
     if (['queued', 'processing', 'completed'].includes(item.status)) return NextResponse.json({ accepted: true, itemId: item.id });
     if (item.status !== 'uploading') return NextResponse.json({ error: 'Resume operation item cannot accept an upload.' }, { status: 409 });
+    console.info('Resume upload item started', { operationId: params.operationId, operationItemId: params.itemId });
 
     const inputRef = item.input_ref as Record<string, unknown>;
     storagePath = typeof inputRef.storagePath === 'string' ? inputRef.storagePath : null;
@@ -45,6 +46,7 @@ export async function POST(request: Request, { params }: { params: { operationId
     });
     if (storageError) throw new Error('Unable to preserve the original resume file.');
     storageAccepted = true;
+    console.info('Resume upload item stored', { operationId: params.operationId, operationItemId: params.itemId });
 
     const { error: uploadedError } = await supabaseAdmin.rpc('mark_phase1_resume_item_uploaded', {
       p_operation_id: params.operationId,
@@ -53,8 +55,10 @@ export async function POST(request: Request, { params }: { params: { operationId
     });
     if (uploadedError) throw uploadedError;
     itemAccepted = true;
+    console.info('Resume upload item queued', { operationId: params.operationId, operationItemId: params.itemId });
     try {
       await operationQueue.enqueueResumeEvaluation({ operationItemId: params.itemId });
+      console.info('Resume upload item published', { operationId: params.operationId, operationItemId: params.itemId });
     } catch (dispatchError) {
       await supabaseAdmin.rpc('fail_phase1_resume_item_dispatch', {
         p_item_id: params.itemId,

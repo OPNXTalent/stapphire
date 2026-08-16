@@ -44,6 +44,12 @@ export async function processResumeEvaluationOperationItem(itemId: string): Prom
   const item = await claimItem(itemId, leaseToken);
   if (!item) return;
   if (item === 'deferred') throw new DeferredResumeOperationError('Resume evaluation concurrency is currently full.');
+  console.info('Resume evaluation item claimed', {
+    operationId: item.operationId,
+    operationItemId: item.id,
+    requisitionId: item.requisitionId,
+    attemptCount: item.attemptCount
+  });
 
   try {
     const filename = item.inputRef.originalFilename;

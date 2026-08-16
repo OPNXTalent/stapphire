@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { getResumeSourceType } from '@/lib/resumeFiles';
 
 type LocalUploadItem = { id: string; filename: string; status: 'pending' | 'uploading' | 'accepted' | 'error'; error?: string };
@@ -24,6 +24,13 @@ const UPLOAD_CONCURRENCY = 3;
 export function ResumeUploadManagerProvider({ children }: { children: ReactNode }) {
   const [batches, setBatches] = useState<LocalUploadBatch[]>([]);
 
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') console.debug('Resume upload manager mounted');
+    return () => {
+      if (process.env.NODE_ENV !== 'production') console.debug('Resume upload manager unmounted');
+    };
+  }, []);
+
   async function startUpload(requisitionId: string, files: File[]) {
     const clientBatchKey = crypto.randomUUID();
     const descriptors = files.map((file) => ({ id: crypto.randomUUID(), file }));
@@ -31,6 +38,13 @@ export function ResumeUploadManagerProvider({ children }: { children: ReactNode 
       clientBatchKey, requisitionId, operationId: null, phase: 'creating',
       items: descriptors.map(({ id, file }) => ({ id, filename: file.name, status: 'pending' }))
     }]);
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('Resume upload batch retained by shell manager', {
+        clientBatchKey,
+        requisitionId,
+        operationItemIds: descriptors.map((descriptor) => descriptor.id)
+      });
+    }
     try {
       const response = await fetch(`/api/requisitions/${requisitionId}/resume-operations`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -51,12 +65,18 @@ export function ResumeUploadManagerProvider({ children }: { children: ReactNode 
           setBatches((current) => current.map((batch) => batch.clientBatchKey === clientBatchKey
             ? { ...batch, items: batch.items.map((item) => item.id === descriptor.id ? { ...item, status: 'uploading' } : item) } : batch));
           try {
+            if (process.env.NODE_ENV !== 'production') {
+              console.debug('Resume upload item started', { clientBatchKey, operationId, operationItemId: descriptor.id });
+            }
             if (!getResumeSourceType(descriptor.file.name, descriptor.file.type)) throw new Error('Resume must be a PDF, DOCX, or TXT file.');
             const form = new FormData();
             form.append('resume', descriptor.file);
             const uploadResponse = await fetch(`/api/operations/${operationId}/items/${descriptor.id}/upload`, { method: 'POST', body: form });
             const uploadResult = await uploadResponse.json() as { error?: string };
             if (!uploadResponse.ok) throw new Error(uploadResult.error || 'Resume upload failed.');
+            if (process.env.NODE_ENV !== 'production') {
+              console.debug('Resume upload item accepted', { clientBatchKey, operationId, operationItemId: descriptor.id });
+            }
             setBatches((current) => current.map((batch) => batch.clientBatchKey === clientBatchKey
               ? { ...batch, items: batch.items.map((item) => item.id === descriptor.id ? { ...item, status: 'accepted' } : item) } : batch));
           } catch (error) {

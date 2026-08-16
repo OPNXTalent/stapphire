@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { CandidateReport } from '@/components/CandidateReport';
 import { CandidateDetailActions } from '@/components/CandidateDetailActions';
@@ -29,9 +30,9 @@ export default async function CandidatePage({ params }: { params: { id: string }
 
   return (
     <>
-      <a className="back" href={`/requisitions/${requisitionId}`}>
+      <Link className="back" href={`/requisitions/${requisitionId}`}>
         ← {position}
-      </a>
+      </Link>
       <CandidateDetailActions candidateId={candidate.id} sourceFilename={candidate.source_filename} resumeAvailable={Boolean(candidate.source_storage_path)}/>
       <CandidateReport
         candidateName={candidate.full_name}

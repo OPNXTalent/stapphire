@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 
 type OpenPanel = 'notifications' | 'app-menu' | null;
 
@@ -41,7 +42,7 @@ export function GlobalBannerControls() {
       <p>No new notifications.</p>
     </div>}
     {openPanel === 'app-menu' && <div className="banner-popover banner-app-menu" id="global-app-menu" role="menu" aria-label="App menu">
-      <a href="/archived" role="menuitem">Archived Requisitions</a>
+      <Link href="/archived" role="menuitem">Archived Requisitions</Link>
     </div>}
   </div>;
 }
