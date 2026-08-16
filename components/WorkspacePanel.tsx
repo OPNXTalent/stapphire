@@ -1,5 +1,8 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
+import { ResumeUpload } from '@/components/ResumeUpload';
+
 // Visual-only restoration of the old right-side panel shell. This is
 // deliberately NOT the old CollaborationPanel - no realtime, no
 // comments, no notes persistence, no Supabase subscriptions. It exists
@@ -15,6 +18,9 @@ export function WorkspacePanel({
   onExpand: () => void;
   onCollapse: () => void;
 }) {
+  const pathname = usePathname();
+  const requisitionId = pathname.match(/^\/requisitions\/([^/]+)/)?.[1] || null;
+
   if (collapsed) {
     return (
       <div className="pull-tab" onClick={onExpand}>
@@ -32,6 +38,7 @@ export function WorkspacePanel({
         <span className="side-tab active">Hiring Workspace</span>
       </div>
       <div className="side-content">
+        {requisitionId && <div className="workspace-resume-upload"><ResumeUpload requisitionId={requisitionId}/></div>}
         <p className="muted">Candidate notes and hiring-team activity will appear here as the workflow expands.</p>
       </div>
     </div>

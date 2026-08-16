@@ -25,7 +25,7 @@ export function RequisitionViewToggle({
   title,
   requisitionId,
   jobDescription,
-  candidateHeaderAction,
+  dnsAction,
   hiringCriteriaView,
   marketAnalysisView,
   candidatesView
@@ -33,7 +33,7 @@ export function RequisitionViewToggle({
   title: string;
   requisitionId: string;
   jobDescription: string;
-  candidateHeaderAction: ReactNode;
+  dnsAction: ReactNode;
   hiringCriteriaView: ReactNode;
   marketAnalysisView: ReactNode;
   candidatesView: ReactNode;
@@ -91,10 +91,12 @@ export function RequisitionViewToggle({
       <div className="requisition-title-row">
         <h1>{title}</h1>
         <div className="requisition-title-actions">
-          {view === 'candidates' && candidateHeaderAction}
-          <button type="button" className="req-archive-btn" onClick={archiveRequisition} disabled={archiving}>
-            {archiving ? 'Archiving…' : 'Archive requisition'}
-          </button>
+          <div className="requisition-title-action-stack">
+            <button type="button" className="req-archive-btn" onClick={archiveRequisition} disabled={archiving}>
+              {archiving ? 'Archiving…' : 'Archive requisition'}
+            </button>
+            {view === 'candidates' && dnsAction}
+          </div>
         </div>
       </div>
 

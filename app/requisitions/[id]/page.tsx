@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation';
-import { ResumeUpload } from '@/components/ResumeUpload';
 import { CandidateMatrix, type MatrixCandidate, type Disposition } from '@/components/CandidateMatrix';
 import { RequisitionViewToggle } from '@/components/RequisitionViewToggle';
 import { DNSBin, type DNSCandidate } from '@/components/DNSBin';
@@ -29,8 +28,7 @@ export default async function RequisitionPage({params}:{params:{id:string}}){
 
   const hiringCriteriaView = <HiringCriteria model={hiringCriteria} requisitionId={req.id} sourceIsStale={sourceIsNewer(req.job_description_updated_at,hiringCriteria?.generatedAt)}/>;
   const marketAnalysisView = <RequisitionIntelligence analysis={requisitionIntelligence} checkedAt={new Date()} sourceIsStale={sourceIsNewer(req.job_description_updated_at,requisitionIntelligence?.analysisGeneratedAt||requisitionIntelligence?.createdAt)}/>;
-  const candidateHeaderAction = <ResumeUpload requisitionId={req.id}/>;
-  const candidatesView = <CandidateMatrix candidates={matrixCandidates} positionTitle={req.title} requisitionId={req.id} headerAction={<DNSBin candidates={dnsCandidates}/>}/>;
+  const candidatesView = <CandidateMatrix candidates={matrixCandidates} positionTitle={req.title} requisitionId={req.id}/>;
 
-  return <RequisitionViewToggle title={req.title} requisitionId={req.id} jobDescription={req.job_description} candidateHeaderAction={candidateHeaderAction} hiringCriteriaView={hiringCriteriaView} marketAnalysisView={marketAnalysisView} candidatesView={candidatesView}/>;
+  return <RequisitionViewToggle title={req.title} requisitionId={req.id} jobDescription={req.job_description} dnsAction={<DNSBin candidates={dnsCandidates}/>} hiringCriteriaView={hiringCriteriaView} marketAnalysisView={marketAnalysisView} candidatesView={candidatesView}/>;
 }
