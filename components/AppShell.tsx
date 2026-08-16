@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { WorkspacePanel } from '@/components/WorkspacePanel';
-import { BrandGem } from '@/components/BrandGem';
+import { StapphireBrand } from '@/components/StapphireBrand';
 import { GlobalBannerControls } from '@/components/GlobalBannerControls';
 import { ResumeUploadManagerProvider } from '@/components/ResumeUploadManager';
 
@@ -16,7 +16,10 @@ export function AppShell({ requisitions, children }: { requisitions: Requisition
   return (
     <ResumeUploadManagerProvider>
       <header className="brand-bar">
-        <Link className="brand-home" href="/"><BrandGem/><span className="brand-word">Stapphire</span></Link>
+        <Link className="brand-home" href="/" aria-label="Stapphire">
+          <StapphireBrand decorative/>
+          <StapphireBrand compact decorative/>
+        </Link>
         <span className="brand-tagline">Hiring Quality Control</span>
         <span className="brand-workspace">an OPNX workspace</span>
         <GlobalBannerControls/>
