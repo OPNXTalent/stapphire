@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/resume-operations",
+      "schedule": "* * * * *"
+    }
+  ],
   "functions": {
     "app/api/queues/hiring-criteria/route.ts": {
       "maxDuration": 300,
@@ -6,6 +12,17 @@
         {
           "type": "queue/v2beta",
           "topic": "stapphire-hiring-criteria",
+          "retryAfterSeconds": 15,
+          "initialDelaySeconds": 0
+        }
+      ]
+    },
+    "app/api/queues/resume-evaluation/route.ts": {
+      "maxDuration": 300,
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "stapphire-resume-evaluation",
           "retryAfterSeconds": 15,
           "initialDelaySeconds": 0
         }

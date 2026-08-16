@@ -20,10 +20,34 @@ export type HiringCriteriaOperationMessage = {
   operationId: string;
 };
 
+export type ResumeEvaluationOperationMessage = {
+  operationItemId: string;
+};
+
+export type ResumeOperationItemSummary = {
+  id: string;
+  status: 'uploading' | 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  filename: string;
+  errorSummary: string | null;
+  candidateId: string | null;
+  evaluationId: string | null;
+  retryable: boolean;
+};
+
+export type ResumeOperationSummary = OperationSummary & {
+  items: ResumeOperationItemSummary[];
+};
+
 export function isHiringCriteriaOperationMessage(value: unknown): value is HiringCriteriaOperationMessage {
   return typeof value === 'object' && value !== null
     && typeof (value as { operationId?: unknown }).operationId === 'string'
     && (value as { operationId: string }).operationId.length > 0;
+}
+
+export function isResumeEvaluationOperationMessage(value: unknown): value is ResumeEvaluationOperationMessage {
+  return typeof value === 'object' && value !== null
+    && typeof (value as { operationItemId?: unknown }).operationItemId === 'string'
+    && (value as { operationItemId: string }).operationItemId.length > 0;
 }
 
 export function isActiveOperation(status: OperationStatus): boolean {

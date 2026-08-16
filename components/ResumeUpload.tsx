@@ -1,123 +1,143 @@
 'use client';
-import { useRef, useState } from 'react';
+
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StapphireProcessing } from '@/components/StapphireProcessing';
-
-type FileStatus = 'staged' | 'processing' | 'done' | 'error';
-type QueueItem = { file: File; status: FileStatus; message?: string };
+import { useResumeUploadManager } from '@/components/ResumeUploadManager';
+import type { ResumeOperationSummary } from '@/lib/operationTypes';
+import { isActiveOperation } from '@/lib/operationTypes';
+import { getResumeSourceType, MAX_RESUME_BATCH_SIZE, MAX_RESUME_SIZE } from '@/lib/resumeFiles';
 
 export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const processing = useRef(false);
-  const [busy, setBusy] = useState(false);
-  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const lastProgress = useRef<string | null>(null);
+  const starting = useRef(false);
+  const { batches, startUpload, dismissBatch } = useResumeUploadManager();
+  const [staged, setStaged] = useState<File[]>([]);
+  const [operations, setOperations] = useState<ResumeOperationSummary[]>([]);
+  const [retrying, setRetrying] = useState(false);
+  const localBatches = batches.filter((batch) => batch.requisitionId === requisitionId);
+  const currentLocalBatch = localBatches[localBatches.length - 1] || null;
+  const activeOperation = operations.find((operation) => isActiveOperation(operation.status)) || null;
+  const latestOperation = activeOperation || operations[0] || null;
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    async function poll() {
+      try {
+        const response = await fetch(`/api/requisitions/${requisitionId}/operations`, { cache: 'no-store' });
+        if (!response.ok) throw new Error('Unable to read resume operations.');
+        const result = await response.json() as { resumeOperations?: ResumeOperationSummary[] };
+        if (cancelled) return;
+        const next = Array.isArray(result.resumeOperations) ? result.resumeOperations : [];
+        setOperations(next);
+        const signature = next.map((operation) => `${operation.id}:${operation.progressCurrent}:${operation.status}`).join('|');
+        if (lastProgress.current !== null && signature !== lastProgress.current) router.refresh();
+        lastProgress.current = signature;
+        if (next.some((operation) => isActiveOperation(operation.status)) && !document.hidden) timer = setTimeout(poll, 2500);
+      } catch {
+        if (!cancelled && !document.hidden) timer = setTimeout(poll, 5000);
+      }
+    }
+    function resume() {
+      if (document.hidden) return;
+      if (timer) clearTimeout(timer);
+      void poll();
+    }
+    void poll();
+    window.addEventListener('focus', resume);
+    document.addEventListener('visibilitychange', resume);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('focus', resume);
+      document.removeEventListener('visibilitychange', resume);
+    };
+  }, [requisitionId, router, currentLocalBatch?.operationId, currentLocalBatch?.phase]);
 
   function addFiles(files: FileList | null) {
-    if (!files || files.length === 0) return;
-    const incoming = Array.from(files).map((file) => ({ file, status: 'staged' as const }));
-    // Skip anything already staged/queued with the same name+size - a
-    // second pick of the same file shouldn't silently duplicate it.
-    setQueue((prev) => [
-      ...prev,
-      ...incoming.filter((n) => !prev.some((p) => p.file.name === n.file.name && p.file.size === n.file.size))
-    ]);
+    if (!files?.length) return;
+    const incoming = Array.from(files).filter((file) => getResumeSourceType(file.name, file.type) && file.size > 0 && file.size <= MAX_RESUME_SIZE);
+    setStaged((current) => [...current, ...incoming.filter((file) => !current.some((existing) => existing.name === file.name && existing.size === file.size))].slice(0, MAX_RESUME_BATCH_SIZE));
     if (inputRef.current) inputRef.current.value = '';
   }
 
-  function removeStaged(index: number) {
-    setQueue((prev) => prev.filter((_, i) => i !== index));
+  function beginUpload() {
+    if (starting.current || staged.length === 0) return;
+    starting.current = true;
+    const files = [...staged];
+    setStaged([]);
+    void startUpload(requisitionId, files).finally(() => { starting.current = false; });
   }
 
-  async function upload() {
-    if (processing.current) return;
-    const toProcess = queue.map((q, i) => ({ ...q, i })).filter((q) => q.status === 'staged');
-    if (toProcess.length === 0) return;
-    processing.current = true;
-    setBusy(true);
-
-    for (let k = 0; k < toProcess.length; k++) {
-      const i = toProcess[k].i;
-      setQueue((prev) => prev.map((item, idx) => (idx === i ? { ...item, status: 'processing' } : item)));
-      try {
-        const form = new FormData();
-        form.append('resume', queue[i].file);
-        const response = await fetch(`/api/requisitions/${requisitionId}/candidates`, { method: 'POST', body: form });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Evaluation failed.');
-        setQueue((prev) => prev.map((item, idx) => (idx === i ? { ...item, status: 'done' } : item)));
-      } catch (err) {
-        setQueue((prev) =>
-          prev.map((item, idx) => (idx === i ? { ...item, status: 'error', message: err instanceof Error ? err.message : 'Evaluation failed.' } : item))
-        );
+  async function retryFailed() {
+    if (!latestOperation || retrying) return;
+    setRetrying(true);
+    try {
+      const response = await fetch(`/api/operations/${latestOperation.id}/retry`, { method: 'POST' });
+      if (!response.ok) throw new Error('Unable to retry failed resumes.');
+      const statusResponse = await fetch(`/api/requisitions/${requisitionId}/operations`, { cache: 'no-store' });
+      if (statusResponse.ok) {
+        const result = await statusResponse.json() as { resumeOperations?: ResumeOperationSummary[] };
+        setOperations(Array.isArray(result.resumeOperations) ? result.resumeOperations : []);
       }
-      // Streamed, not batched - each candidate appears in the matrix
-      // as soon as their own evaluation finishes, not after the whole
-      // upload completes.
-      router.refresh();
+    } catch {
+      alert('Unable to retry failed resume evaluations. Try again.');
+    } finally {
+      setRetrying(false);
     }
-
-    processing.current = false;
-    setBusy(false);
   }
 
-  const stagedCount = queue.filter((q) => q.status === 'staged').length;
-  const successCount = queue.filter((q) => q.status === 'done').length;
-  const errorCount = queue.filter((q) => q.status === 'error').length;
-  const complete = queue.length > 0 && !busy && queue.every((q) => q.status === 'done' || q.status === 'error');
-
-  function dismissResults() {
-    setQueue([]);
-    if (inputRef.current) inputRef.current.value = '';
-    router.refresh();
-  }
+  const localUploading = currentLocalBatch && (currentLocalBatch.phase === 'creating' || currentLocalBatch.phase === 'uploading');
+  const localAccepted = currentLocalBatch?.items.filter((item) => item.status === 'accepted').length || 0;
+  const localTotal = currentLocalBatch?.items.length || 0;
+  const failedItems = latestOperation?.items.filter((item) => item.status === 'failed') || [];
+  const retryableFailures = failedItems.some((item) => item.retryable);
 
   return (
     <div className="upload-bar">
-      <input ref={inputRef} type="file" multiple hidden accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" onChange={(e) => addFiles(e.target.files)} />
-      {queue.length > 0 && (
-        <ul className="upload-queue">
-          {queue.map((item, i) => (
-            <li key={i} className={`upload-queue-item upload-queue-${item.status}`}>
-              <span className="upload-queue-icon">
-                {item.status === 'processing' ? '…' : (
-                  { staged: '·', done: '✓', error: '✕' }[item.status]
-                )}
-              </span>
-              <span className="upload-queue-name">{item.file.name}</span>
-              {item.message && <span className="upload-queue-msg">{item.message}</span>}
-              {item.status === 'staged' && !busy && (
-                <button type="button" className="upload-remove-btn" onClick={() => removeStaged(i)} aria-label={`Remove ${item.file.name}`}>
-                  ×
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      {complete ? (
+      <input ref={inputRef} type="file" multiple hidden
+        accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+        onChange={(event) => addFiles(event.target.files)}/>
+
+      {staged.length > 0 && <ul className="upload-queue">
+        {staged.map((file, index) => <li key={`${file.name}:${file.size}`} className="upload-queue-item upload-queue-staged">
+          <span className="upload-queue-icon">·</span><span className="upload-queue-name">{file.name}</span>
+          <button type="button" className="upload-remove-btn" onClick={() => setStaged((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${file.name}`}>×</button>
+        </li>)}
+      </ul>}
+
+      {localUploading && currentLocalBatch ? (
+        <div className="upload-durable-boundary">
+          <StapphireProcessing className="processing-compact" title="Uploading résumés…" detail={`${localAccepted} of ${localTotal} safely uploaded`}/>
+          <small>Keep this browser open until upload completes. Evaluation continues independently after each file is safely stored.</small>
+        </div>
+      ) : activeOperation ? (
+        <StapphireProcessing className="processing-compact"
+          title={activeOperation.progressTotal === 1 ? 'Evaluating résumé…' : 'Evaluating résumés…'}
+          detail={`${activeOperation.progressCurrent} of ${activeOperation.progressTotal || 0} complete`}/>
+      ) : currentLocalBatch?.phase === 'accepted' ? (
         <div className="upload-complete">
-          <span className="upload-summary">
-            {successCount} {successCount === 1 ? 'résumé' : 'résumés'} {errorCount === 0 ? 'added successfully' : 'added'}
-            {errorCount > 0 && ` · ${errorCount} could not be processed`}
-          </span>
-          <button type="button" className="upload-go-btn" onClick={dismissResults}>Done</button>
+          <span className="upload-summary">{localAccepted} {localAccepted === 1 ? 'résumé' : 'résumés'} added · Evaluation continues in the background</span>
+          <button type="button" className="upload-go-btn" onClick={() => dismissBatch(currentLocalBatch.clientBatchKey)}>Done</button>
         </div>
-      ) : (
-        <div className="upload-bar-row">
-          <button type="button" className="upload-add-btn" onClick={() => inputRef.current?.click()} disabled={busy}>
-            + Add résumés
-          </button>
-          {stagedCount > 0 && !busy && (
-            <button type="button" className="upload-go-btn" onClick={upload}>
-              Upload {stagedCount}
-            </button>
-          )}
-          {busy && (
-            <StapphireProcessing className="processing-compact" title="Evaluating candidate…" detail="Comparing qualifications against the current evaluation basis"/>
-          )}
-        </div>
-      )}
+      ) : null}
+
+      {latestOperation && !activeOperation && failedItems.length > 0 && <div className="upload-complete">
+        <span className="upload-summary">{latestOperation.progressCurrent - failedItems.length} completed · {failedItems.length} need attention</span>
+        {retryableFailures && <button type="button" className="upload-go-btn" onClick={retryFailed} disabled={retrying}>{retrying ? 'Retrying…' : 'Retry failed'}</button>}
+      </div>}
+      {failedItems.length > 0 && <ul className="upload-queue">{failedItems.map((item) => <li key={item.id} className="upload-queue-item upload-queue-error">
+        <span className="upload-queue-icon">×</span><span className="upload-queue-name">{item.filename}</span>
+        {item.errorSummary && <span className="upload-queue-msg">{item.errorSummary}</span>}
+      </li>)}</ul>}
+
+      <div className="upload-bar-row">
+        <button type="button" className="upload-add-btn" onClick={() => inputRef.current?.click()} disabled={Boolean(localUploading)}>+ Add résumés</button>
+        {staged.length > 0 && !localUploading && <button type="button" className="upload-go-btn" onClick={beginUpload}>Upload {staged.length}</button>}
+      </div>
     </div>
   );
 }

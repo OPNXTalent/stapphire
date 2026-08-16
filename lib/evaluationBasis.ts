@@ -38,11 +38,15 @@ export async function resolveCurrentEvaluationBasis(requisitionId: string): Prom
   if (requisitionError) throw requisitionError;
   if (!requisition?.current_evaluation_basis_id) return null;
 
+  return resolveEvaluationBasisById(requisition.id, requisition.current_evaluation_basis_id);
+}
+
+export async function resolveEvaluationBasisById(requisitionId: string, evaluationBasisId: string): Promise<EvaluationBasis | null> {
   const { data: basis, error: basisError } = await supabaseAdmin
     .from('phase1_evaluation_bases')
     .select('id,requisition_id,basis_type,job_description_snapshot,job_description_hash,job_description_updated_at,hiring_criteria_version_id')
-    .eq('id', requisition.current_evaluation_basis_id)
-    .eq('requisition_id', requisition.id)
+    .eq('id', evaluationBasisId)
+    .eq('requisition_id', requisitionId)
     .maybeSingle();
   if (basisError) throw basisError;
   if (!basis) return null;
@@ -60,7 +64,7 @@ export async function resolveCurrentEvaluationBasis(requisitionId: string): Prom
     .from('phase1_hiring_criteria_versions')
     .select('id,requisition_id,criteria_snapshot,total_weight')
     .eq('id', basis.hiring_criteria_version_id)
-    .eq('requisition_id', requisition.id)
+    .eq('requisition_id', requisitionId)
     .single();
   if (versionError) throw versionError;
   if (!version || version.total_weight !== 100) throw new Error('Applied Hiring Criteria version is unavailable or invalid.');
