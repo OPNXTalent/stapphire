@@ -7,6 +7,8 @@ import { GATE_COOKIE, isGateCookieValid } from '@/lib/gate';
 
 export const metadata = { title: 'Stapphire', description: 'Hiring quality control' };
 
+const appearanceScript = `(function(){try{var p=localStorage.getItem('stapphire-appearance')||'system';var d=p==='dark'||(p==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light'}catch(e){document.documentElement.dataset.theme='light'}})()`;
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // The root layout wraps every route, including the gate's own login
   // page - so this fetch has to be conditional. Rendering the real
@@ -22,7 +24,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   );
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: appearanceScript }}/></head>
       <body>
         <AppShell requisitions={activeRequisitions}>{children}</AppShell>
       </body>
