@@ -43,4 +43,8 @@
 @media(max-width:700px){.hiring-criteria-heading,.criteria-unavailable{align-items:flex-start;flex-direction:column}.criteria-meter{grid-template-columns:auto auto}.criteria-meter>span:last-child{grid-column:1/-1}.criterion-item{grid-template-columns:1fr}.criterion-weight{justify-content:start}}
 .criteria-unavailable{justify-content:space-between}.criteria-unavailable>div{display:grid;gap:2px}.criteria-generate{flex:none;padding:8px 12px;border-radius:5px;background:var(--deep);color:#fff;font-size:12px}.criteria-unmapped{margin-top:9px;border:1px solid var(--line);border-radius:5px;background:var(--paper)}.criteria-unmapped summary{padding:10px 12px;color:var(--deep);font-size:11.5px;font-weight:600;cursor:pointer}.criteria-unmapped>div{display:grid;gap:3px;margin:0 12px;padding:10px 0;border-top:1px solid var(--line)}.criteria-unmapped>div span{color:var(--muted);font-size:11.5px}.criteria-unmapped>div small{color:var(--faint);font-size:10.5px}
 .brand-bar{background:#102a5c}
+.brand-bar{height:65px;background:var(--navy)}
+.stapphire-brand-wordmark{height:63px}
+.app-shell{padding-top:65px}
+.req-nav,.side-panel{top:65px}
 @media(max-width:700px){.brand-home .stapphire-brand-wordmark{display:none}.brand-home .stapphire-brand-compact{display:block}.brand-tagline{display:none}}
