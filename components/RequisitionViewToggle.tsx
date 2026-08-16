@@ -13,14 +13,12 @@ const requisitionTabs: { id: RequisitionTab; label: string }[] = [
   { id: 'market-analysis', label: 'Market Analysis' }
 ];
 
-// A mode switch, not navigation - both views' content is already
-// rendered by the server (from the same existing components, nothing
-// duplicated); this just shows/hides between them client-side. No
-// route change, no reload, no lost scroll/context.
-//
-// One button, not a tab pair - it always names where a click takes
-// you, never which view you're already in. The current view has to
-// read from the page heading/content itself, not from this control.
+// Two tabs shown side by side, matching the same visual pattern used
+// in the WorkspacePanel (Communication / Resume Upload) - not a
+// single destination-labeled button anymore. Both views' content is
+// already rendered by the server (from the same existing components,
+// nothing duplicated); this just shows/hides between them client-side.
+// No route change, no reload, no lost scroll/context.
 export function RequisitionViewToggle({
   title,
   requisitionId,
@@ -42,7 +40,6 @@ export function RequisitionViewToggle({
   const [view, setView] = useState<View>('requisition');
   const [requisitionTab, setRequisitionTab] = useState<RequisitionTab>('job-description');
   const [archiving, setArchiving] = useState(false);
-  const goingTo = view === 'requisition' ? 'candidates' : 'requisition';
   const activeRequisitionView = requisitionTab === 'hiring-criteria'
     ? hiringCriteriaView
     : requisitionTab === 'market-analysis'
@@ -77,16 +74,26 @@ export function RequisitionViewToggle({
 
   return (
     <div className={`requisition-workspace ${view === 'candidates' ? 'candidates-active' : 'requisition-active'}`}>
-      <button
-        type="button"
-        className={`view-switch-btn${view === 'candidates' ? ' candidate-back-link' : ''}`}
-        onClick={() => setView(goingTo)}
-        aria-label={goingTo === 'candidates' ? 'Switch to Candidates view' : 'Switch to Requisition view'}
-      >
-        <span key={view} className="view-switch-label">
-          {goingTo === 'candidates' ? '← Candidates' : '← Requisition'}
-        </span>
-      </button>
+      <div className="requisition-view-tabs side-tabs" role="tablist" aria-label="Workspace view">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'requisition'}
+          className={`side-tab ${view === 'requisition' ? 'active' : ''}`}
+          onClick={() => setView('requisition')}
+        >
+          Requisition
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'candidates'}
+          className={`side-tab ${view === 'candidates' ? 'active' : ''}`}
+          onClick={() => setView('candidates')}
+        >
+          Candidates
+        </button>
+      </div>
 
       <div className="requisition-title-row">
         <h1>{title}</h1>

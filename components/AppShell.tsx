@@ -21,7 +21,6 @@ export function AppShell({ requisitions, children }: { requisitions: Requisition
           <StapphireBrand compact decorative/>
         </Link>
         <span className="brand-tagline">Hiring Quality Control</span>
-        <span className="brand-workspace">an OPNX workspace</span>
         <GlobalBannerControls/>
       </header>
       <div className={`app-shell ${rightCollapsed ? 'right-collapsed' : ''}`}>
