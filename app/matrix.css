@@ -118,10 +118,13 @@
 .upload-queue-icon{font-family:var(--mono);font-weight:700;width:12px;text-align:center;flex-shrink:0;color:var(--faint)}
 .upload-queue-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .upload-queue-msg{font-family:var(--mono);font-size:10px;color:var(--red);flex-shrink:0}
+.upload-queue-status{font-family:var(--mono);font-size:10px;color:var(--muted);flex-shrink:0}
 .upload-queue-processing .upload-queue-icon{color:var(--sapphire)}
 .upload-queue-done .upload-queue-icon{color:var(--green)}
+.upload-queue-done .upload-queue-status{color:var(--green)}
 .upload-queue-error{color:var(--red)}
 .upload-queue-error .upload-queue-icon{color:var(--red)}
+.upload-operation-progress{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
 .upload-remove-btn{background:none;border:none;color:var(--faint);font-size:14px;line-height:1;padding:0 2px;cursor:pointer;flex-shrink:0}
 .upload-remove-btn:hover{color:var(--red)}
 @media(max-width:1000px){.matrix-row-head{grid-template-columns:72px minmax(140px,1.5fr) 60px repeat(4,minmax(60px,1fr)) 100px;gap:8px;padding-left:12px;padding-right:12px}}

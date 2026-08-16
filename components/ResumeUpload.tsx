@@ -13,7 +13,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const lastProgress = useRef<string | null>(null);
   const starting = useRef(false);
-  const { batches, startUpload, dismissBatch } = useResumeUploadManager();
+  const { batches, startUpload, dismissBatch, dismissedOperationIds, dismissOperation } = useResumeUploadManager();
   const [staged, setStaged] = useState<File[]>([]);
   const [operations, setOperations] = useState<ResumeOperationSummary[]>([]);
   const [retrying, setRetrying] = useState(false);
@@ -21,6 +21,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const currentLocalBatch = localBatches[localBatches.length - 1] || null;
   const activeOperation = operations.find((operation) => isActiveOperation(operation.status)) || null;
   const latestOperation = activeOperation || operations[0] || null;
+  const visibleOperation = latestOperation && !dismissedOperationIds.has(latestOperation.id) ? latestOperation : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -33,7 +34,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
         if (cancelled) return;
         const next = Array.isArray(result.resumeOperations) ? result.resumeOperations : [];
         setOperations(next);
-        const signature = next.map((operation) => `${operation.id}:${operation.progressCurrent}:${operation.status}`).join('|');
+        const signature = next.map((operation) => `${operation.id}:${operation.progressCurrent}:${operation.status}:${operation.items.map((item) => `${item.id}:${item.status}:${item.candidateId || ''}:${item.evaluationId || ''}`).join(',')}`).join('|');
         if (lastProgress.current !== null && signature !== lastProgress.current) router.refresh();
         lastProgress.current = signature;
         if (next.some((operation) => isActiveOperation(operation.status)) && !document.hidden) timer = setTimeout(poll, 2500);
@@ -93,8 +94,22 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const localUploading = currentLocalBatch && (currentLocalBatch.phase === 'creating' || currentLocalBatch.phase === 'uploading');
   const localAccepted = currentLocalBatch?.items.filter((item) => item.status === 'accepted').length || 0;
   const localTotal = currentLocalBatch?.items.length || 0;
-  const failedItems = latestOperation?.items.filter((item) => item.status === 'failed') || [];
-  const retryableFailures = failedItems.some((item) => item.retryable);
+  const visibleFailedItems = visibleOperation?.items.filter((item) => item.status === 'failed') || [];
+  const completedItems = visibleOperation?.items.filter((item) => item.status === 'completed').length || 0;
+
+  function dismissProgress() {
+    if (!visibleOperation) return;
+    dismissOperation(visibleOperation.id);
+    if (currentLocalBatch?.operationId === visibleOperation.id) dismissBatch(currentLocalBatch.clientBatchKey);
+  }
+
+  function itemPresentation(status: ResumeOperationSummary['items'][number]['status']) {
+    if (status === 'completed') return { className: 'upload-queue-done', icon: '✓', label: 'Completed' };
+    if (status === 'failed' || status === 'cancelled') return { className: 'upload-queue-error', icon: '×', label: status === 'failed' ? 'Failed' : 'Cancelled' };
+    if (status === 'processing') return { className: 'upload-queue-processing', icon: '·', label: 'Evaluating' };
+    if (status === 'queued') return { className: 'upload-queue-processing', icon: '·', label: 'Queued' };
+    return { className: 'upload-queue-processing', icon: '·', label: 'Uploading' };
+  }
 
   return (
     <div className="upload-bar">
@@ -114,25 +129,30 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
           <StapphireProcessing className="processing-compact" title="Uploading résumés…" detail={`${localAccepted} of ${localTotal} safely uploaded`}/>
           <small>Keep this browser open until upload completes. Evaluation continues independently after each file is safely stored.</small>
         </div>
-      ) : activeOperation ? (
-        <StapphireProcessing className="processing-compact"
-          title={activeOperation.progressTotal === 1 ? 'Evaluating résumé…' : 'Evaluating résumés…'}
-          detail={`${activeOperation.progressCurrent} of ${activeOperation.progressTotal || 0} complete`}/>
-      ) : currentLocalBatch?.phase === 'accepted' ? (
-        <div className="upload-complete">
-          <span className="upload-summary">{localAccepted} {localAccepted === 1 ? 'résumé' : 'résumés'} added · Evaluation continues in the background</span>
-          <button type="button" className="upload-go-btn" onClick={() => dismissBatch(currentLocalBatch.clientBatchKey)}>Done</button>
-        </div>
       ) : null}
 
-      {latestOperation && !activeOperation && failedItems.length > 0 && <div className="upload-complete">
-        <span className="upload-summary">{latestOperation.progressCurrent - failedItems.length} completed · {failedItems.length} need attention</span>
-        {retryableFailures && <button type="button" className="upload-go-btn" onClick={retryFailed} disabled={retrying}>{retrying ? 'Retrying…' : 'Retry failed'}</button>}
+      {visibleOperation && <div className="upload-operation-progress" aria-live="polite">
+        <div className="upload-complete">
+          <span className="upload-summary">
+            {isActiveOperation(visibleOperation.status)
+              ? `${completedItems} of ${visibleOperation.progressTotal || visibleOperation.items.length} complete`
+              : visibleFailedItems.length > 0
+                ? `${completedItems} completed · ${visibleFailedItems.length} need attention`
+                : `${completedItems} ${completedItems === 1 ? 'résumé' : 'résumés'} completed`}
+          </span>
+          {visibleFailedItems.some((item) => item.retryable) && <button type="button" className="upload-go-btn" onClick={retryFailed} disabled={retrying}>{retrying ? 'Retrying…' : 'Retry failed'}</button>}
+          <button type="button" className="upload-go-btn" onClick={dismissProgress}>Done</button>
+        </div>
+        <ul className="upload-queue">{visibleOperation.items.map((item) => {
+          const presentation = itemPresentation(item.status);
+          return <li key={item.id} className={`upload-queue-item ${presentation.className}`}>
+            <span className="upload-queue-icon" aria-hidden="true">{presentation.icon}</span>
+            <span className="upload-queue-name">{item.filename}</span>
+            <span className="upload-queue-status">{presentation.label}</span>
+            {item.errorSummary && <span className="upload-queue-msg">{item.errorSummary}</span>}
+          </li>;
+        })}</ul>
       </div>}
-      {failedItems.length > 0 && <ul className="upload-queue">{failedItems.map((item) => <li key={item.id} className="upload-queue-item upload-queue-error">
-        <span className="upload-queue-icon">×</span><span className="upload-queue-name">{item.filename}</span>
-        {item.errorSummary && <span className="upload-queue-msg">{item.errorSummary}</span>}
-      </li>)}</ul>}
 
       <div className="upload-bar-row">
         <button type="button" className="upload-add-btn" onClick={() => inputRef.current?.click()} disabled={Boolean(localUploading)}>+ Add résumés</button>

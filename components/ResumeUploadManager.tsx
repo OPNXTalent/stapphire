@@ -16,6 +16,8 @@ type UploadManagerValue = {
   batches: LocalUploadBatch[];
   startUpload(requisitionId: string, files: File[]): Promise<void>;
   dismissBatch(clientBatchKey: string): void;
+  dismissedOperationIds: ReadonlySet<string>;
+  dismissOperation(operationId: string): void;
 };
 
 const ResumeUploadManagerContext = createContext<UploadManagerValue | null>(null);
@@ -23,6 +25,7 @@ const UPLOAD_CONCURRENCY = 3;
 
 export function ResumeUploadManagerProvider({ children }: { children: ReactNode }) {
   const [batches, setBatches] = useState<LocalUploadBatch[]>([]);
+  const [dismissedOperationIds, setDismissedOperationIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') console.debug('Resume upload manager mounted');
@@ -97,8 +100,14 @@ export function ResumeUploadManagerProvider({ children }: { children: ReactNode 
   const value = useMemo<UploadManagerValue>(() => ({
     batches,
     startUpload,
-    dismissBatch: (clientBatchKey) => setBatches((current) => current.filter((batch) => batch.clientBatchKey !== clientBatchKey))
-  }), [batches]);
+    dismissBatch: (clientBatchKey) => setBatches((current) => current.filter((batch) => batch.clientBatchKey !== clientBatchKey)),
+    dismissedOperationIds,
+    dismissOperation: (operationId) => setDismissedOperationIds((current) => {
+      const next = new Set(current);
+      next.add(operationId);
+      return next;
+    })
+  }), [batches, dismissedOperationIds]);
   return <ResumeUploadManagerContext.Provider value={value}>{children}</ResumeUploadManagerContext.Provider>;
 }
 
