@@ -1,0 +1,15 @@
+{
+  "functions": {
+    "app/api/queues/hiring-criteria/route.ts": {
+      "maxDuration": 300,
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "stapphire-hiring-criteria",
+          "retryAfterSeconds": 15,
+          "initialDelaySeconds": 0
+        }
+      ]
+    }
+  }
+}

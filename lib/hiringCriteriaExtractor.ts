@@ -4,6 +4,7 @@ import type { HiringCriteriaCategory } from './hiringCriteria';
 import { normalizeHiringCriteriaError } from './hiringCriteriaError';
 
 const HIRING_CRITERIA_MODEL = process.env.OPENAI_HIRING_CRITERIA_MODEL || 'gpt-5.6';
+export const HIRING_CRITERIA_EXTRACTOR_VERSION = 'hiring-criteria-v1';
 const CATEGORY_TARGETS: Record<Exclude<HiringCriteriaCategory, 'other_requirements'>, number> = {
   responsibilities: 50,
   hard_skills: 25,
@@ -171,6 +172,11 @@ async function extractHiringCriteria(jobDescription: string): Promise<RawExtract
   }
 }
 
+export async function extractPreparedHiringCriteria(jobDescription: string) {
+  const extraction = await extractHiringCriteria(jobDescription);
+  return prepareItems(jobDescription, extraction);
+}
+
 async function persistExtractionFailure(requisitionId: string, message: string, modelExists: boolean): Promise<void> {
   const extractionError = message.slice(0, 1000);
   const { error: rpcError } = await supabaseAdmin.rpc('fail_phase1_hiring_criteria_extraction', {
@@ -210,8 +216,7 @@ export async function generateHiringCriteria(requisitionId: string, jobDescripti
     modelExists = true;
 
     console.info('Hiring Criteria extraction started', { requisitionId, model: HIRING_CRITERIA_MODEL });
-    const extraction = await extractHiringCriteria(jobDescription);
-    const prepared = prepareItems(jobDescription, extraction);
+    const prepared = await extractPreparedHiringCriteria(jobDescription);
     const { error } = await supabaseAdmin.rpc('complete_phase1_hiring_criteria_extraction', {
       p_requisition_id: requisitionId,
       p_items: prepared.items,

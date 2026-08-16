@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { generateHiringCriteria } from '@/lib/hiringCriteriaExtractor';
+import { HIRING_CRITERIA_EXTRACTOR_VERSION } from '@/lib/hiringCriteriaExtractor';
 import { normalizeHiringCriteriaError } from '@/lib/hiringCriteriaError';
+import { operationQueue } from '@/lib/operationQueue';
+import { markHiringCriteriaDispatchFailed } from '@/lib/operations';
 
 export const runtime = 'nodejs';
 
@@ -57,15 +59,23 @@ export async function POST(request: Request, { params }: { params: { id: string 
       return NextResponse.json({ versionId: data.versionId, basisId: data.basisId }, { status: 201 });
     }
     if (body.action === 'generate') {
-      const { data: requisition, error: requisitionError } = await supabaseAdmin
-        .from('phase1_requisitions')
-        .select('job_description')
-        .eq('id', params.id)
-        .is('archived_at', null)
-        .single();
-      if (requisitionError || !requisition) return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 });
-      await generateHiringCriteria(params.id, requisition.job_description);
-      return NextResponse.json({ generated: true }, { status: 201 });
+      const { data, error } = await supabaseAdmin.rpc('create_phase1_hiring_criteria_operation', {
+        p_requisition_id: params.id,
+        p_extractor_version: HIRING_CRITERIA_EXTRACTOR_VERSION
+      });
+      if (error) throw error;
+      if (!data || typeof data !== 'object' || typeof data.id !== 'string' || typeof data.status !== 'string') {
+        throw new Error('Hiring Criteria operation creation returned an invalid state.');
+      }
+      if (data.shouldDispatch === true) {
+        try {
+          await operationQueue.enqueueHiringCriteria({ operationId: data.id });
+        } catch (dispatchError) {
+          await markHiringCriteriaDispatchFailed(data.id, dispatchError);
+          throw dispatchError;
+        }
+      }
+      return NextResponse.json({ operation: { id: data.id, status: data.status } }, { status: 202 });
     }
     return NextResponse.json({ error: 'Invalid Hiring Criteria action.' }, { status: 400 });
   } catch (error) {

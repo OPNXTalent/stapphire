@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { HiringCriteriaCategory, HiringCriteriaModel, HiringCriterion } from '@/lib/hiringCriteria';
+import type { OperationSummary } from '@/lib/operationTypes';
+import { isActiveOperation, isTerminalOperation } from '@/lib/operationTypes';
 import { StapphireProcessing } from '@/components/StapphireProcessing';
 
 const categories: { id: HiringCriteriaCategory; label: string }[] = [
@@ -16,11 +18,14 @@ const categories: { id: HiringCriteriaCategory; label: string }[] = [
 export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: { model: HiringCriteriaModel | null; requisitionId: string; sourceIsStale?: boolean }) {
   const router = useRouter();
   const actionInFlight = useRef(false);
+  const terminalOperationSeen = useRef<string | null>(null);
+  const activeOperationSeen = useRef(false);
   const [weights, setWeights] = useState<Record<string, number>>(() => Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.draftWeight])));
   const [knockouts, setKnockouts] = useState<Record<string, boolean>>(() => Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.isKnockout])));
   const [savingId, setSavingId] = useState<string | null>(null);
   const [action, setAction] = useState<'apply' | 'reset' | 'generate' | null>(null);
   const [activeCategory, setActiveCategory] = useState<HiringCriteriaCategory | null>(null);
+  const [operation, setOperation] = useState<OperationSummary | null>(null);
   const criteria = model?.criteria || [];
   const total = criteria.reduce((sum, criterion) => sum + ((knockouts[criterion.id] ?? criterion.isKnockout) ? 0 : (weights[criterion.id] ?? criterion.draftWeight)), 0);
   const meterState = total < 100 ? 'under' : total > 100 ? 'over' : 'balanced';
@@ -32,6 +37,47 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
     setWeights(Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.draftWeight])));
     setKnockouts(Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.isKnockout])));
   }, [model]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    async function loadOperation() {
+      try {
+        const response = await fetch(`/api/requisitions/${requisitionId}/operations`, { cache: 'no-store' });
+        if (!response.ok) return;
+        const result = await response.json() as { operation?: OperationSummary | null };
+        if (cancelled) return;
+        const nextOperation = result.operation || null;
+        setOperation(nextOperation);
+        if (nextOperation && isActiveOperation(nextOperation.status)) activeOperationSeen.current = true;
+        if (nextOperation && activeOperationSeen.current && isTerminalOperation(nextOperation.status) && terminalOperationSeen.current !== nextOperation.id) {
+          terminalOperationSeen.current = nextOperation.id;
+          router.refresh();
+        }
+        if (nextOperation && isActiveOperation(nextOperation.status) && !document.hidden) timer = setTimeout(loadOperation, 2500);
+      } catch {
+        // Persisted Hiring Criteria model state remains the legacy fallback.
+        if (!cancelled && !document.hidden) timer = setTimeout(loadOperation, 5000);
+      }
+    }
+
+    function resumePolling() {
+      if (document.hidden) return;
+      if (timer) clearTimeout(timer);
+      void loadOperation();
+    }
+
+    void loadOperation();
+    window.addEventListener('focus', resumePolling);
+    document.addEventListener('visibilitychange', resumePolling);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('focus', resumePolling);
+      document.removeEventListener('visibilitychange', resumePolling);
+    };
+  }, [requisitionId, router]);
 
   async function adjustWeight(criterionId: string, delta: -1 | 1) {
     const criterion = criteria.find((item) => item.id === criterionId);
@@ -95,6 +141,29 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
         body: JSON.stringify({ action: nextAction })
       });
       if (!response.ok) throw new Error(`Unable to ${nextAction} criteria`);
+      if (nextAction === 'generate') {
+        const result = await response.json() as { operation?: { id?: unknown; status?: unknown } };
+        if (!result.operation || typeof result.operation.id !== 'string'
+          || (result.operation.status !== 'queued' && result.operation.status !== 'processing' && result.operation.status !== 'completed')) {
+          throw new Error('Unable to start Hiring Criteria generation');
+        }
+        const now = new Date().toISOString();
+        setOperation({
+          id: result.operation.id,
+          operationType: 'hiring_criteria_generation',
+          status: result.operation.status,
+          stage: result.operation.status,
+          progressCurrent: result.operation.status === 'completed' ? 1 : 0,
+          progressTotal: 1,
+          resultSummary: {},
+          errorSummary: null,
+          createdAt: now,
+          startedAt: null,
+          completedAt: result.operation.status === 'completed' ? now : null,
+          failedAt: null
+        });
+        if (result.operation.status === 'queued' || result.operation.status === 'processing') activeOperationSeen.current = true;
+      }
       if (nextAction === 'reset') {
         setWeights(Object.fromEntries(criteria.map((criterion) => [criterion.id, criterion.defaultWeight])));
         setKnockouts(Object.fromEntries(criteria.map((criterion) => [criterion.id, false])));
@@ -151,6 +220,8 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
     );
   }
 
+  const operationActive = operation ? isActiveOperation(operation.status) : false;
+
   return (
     <section className="hiring-criteria" aria-labelledby="hiring-criteria-heading">
       <div className="hiring-criteria-heading">
@@ -162,8 +233,8 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
 
       {action === 'apply' ? (
         <StapphireProcessing title="Updating Hiring Criteria…" detail="Saving the calibrated model"/>
-      ) : !ready && (action === 'generate' || model?.extractionStatus === 'pending') ? (
-        <StapphireProcessing title="Evaluating Job Description…" detail="Generating Hiring Criteria"/>
+      ) : !ready && (action === 'generate' || operationActive || model?.extractionStatus === 'pending') ? (
+        <StapphireProcessing title="Generating Hiring Criteria…"/>
       ) : !ready ? (
         <div className="criteria-unavailable">
           <div><strong>{model?.extractionStatus === 'failed' ? 'Hiring Criteria analysis could not be completed.' : 'Hiring Criteria not generated'}</strong><span>Generate a reviewable starting model from this requisition’s Job Description.</span></div>
