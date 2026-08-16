@@ -3,6 +3,8 @@ import { supabaseAdmin } from './supabaseAdmin';
 import { normalizeHiringCriteriaError } from './hiringCriteriaError';
 import type { OperationStatus, OperationSummary, ResumeOperationSummary } from './operationTypes';
 
+const STALE_RESUME_QUEUE_AGE_MS = 15 * 60 * 1000;
+
 type OperationRow = {
   id: string;
   operation_type: string;
@@ -61,10 +63,22 @@ export async function getResumeOperations(requisitionId: string): Promise<Resume
   const operationIds = operations.map((operation) => operation.id);
   const { data: items, error: itemError } = await supabaseAdmin
     .from('phase1_operation_items')
-    .select('id,operation_id,status,input_ref,candidate_id,evaluation_id,error_summary,created_at')
+    .select('id,operation_id,status,input_ref,candidate_id,evaluation_id,error_summary,created_at,available_at')
     .in('operation_id', operationIds)
     .order('created_at', { ascending: true });
   if (itemError) throw itemError;
+  const staleQueuedItems = (items || []).filter((item) =>
+    item.status === 'queued'
+    && typeof item.available_at === 'string'
+    && Date.now() - new Date(item.available_at).getTime() >= STALE_RESUME_QUEUE_AGE_MS
+  );
+  if (staleQueuedItems.length > 0) {
+    console.warn('Stale queued resume operation items detected', {
+      requisitionId,
+      thresholdMinutes: STALE_RESUME_QUEUE_AGE_MS / 60000,
+      operationItemIds: staleQueuedItems.map((item) => item.id)
+    });
+  }
   return operations.map((operation) => ({
     ...toSummary(operation as OperationRow),
     items: (items || []).filter((item) => item.operation_id === operation.id).map((item) => ({
