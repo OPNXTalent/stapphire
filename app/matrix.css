@@ -21,7 +21,7 @@
 .requisition-candidates-view .candidate-matrix{display:flex;flex:1;flex-direction:column}
 .matrix-toolbar{display:flex;flex:none;flex-direction:column;align-items:flex-start;gap:7px;margin-bottom:9px}.matrix-heading-copy{min-width:0}.matrix-heading-copy>.muted{margin:2px 0 0;font-size:12.5px}.matrix-heading-copy .matrix-header-row{justify-content:flex-start}.matrix-controls{display:flex;flex:none;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:10px 14px;margin:0}
 .matrix-selectall{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
-.matrix-bulk-disposition{width:120px;font:inherit;font-size:12.5px;font-weight:600;padding:8px 11px;border:1px solid transparent;border-radius:6px;background:none;color:var(--deep)}
+.matrix-bulk-disposition{width:160px;font:inherit;font-size:12.5px;font-weight:600;padding:8px 11px;border:1px solid transparent;border-radius:6px;background:none;color:var(--deep)}
 .matrix-bulk-disposition:hover:not(:disabled),.matrix-bulk-disposition:focus-visible{border-color:var(--sapphire-2);color:var(--sapphire);background:none;outline:none}
 .matrix-bulk-disposition:disabled{opacity:.55;color:var(--faint)}
 
