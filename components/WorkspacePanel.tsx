@@ -49,8 +49,16 @@ export function WorkspacePanel({
       </div>
       <div className="side-content">
         {!requisitionId && <p className="muted">Open a requisition to see its notes and upload resumes.</p>}
-        {requisitionId && tab === 'upload' && <ResumeUpload requisitionId={requisitionId} />}
-        {requisitionId && tab === 'teamwork' && <RequisitionNotes requisitionId={requisitionId} />}
+        {requisitionId && (
+          <>
+            <div hidden={tab !== 'upload'}>
+              <ResumeUpload requisitionId={requisitionId} />
+            </div>
+            <div hidden={tab !== 'teamwork'}>
+              <RequisitionNotes requisitionId={requisitionId} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
