@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { WorkspacePanel } from '@/components/WorkspacePanel';
 import { StapphireBrand } from '@/components/StapphireBrand';
 import { GlobalBannerControls } from '@/components/GlobalBannerControls';
+import { NotificationsButton } from '@/components/NotificationsButton';
 import { ResumeUploadManagerProvider } from '@/components/ResumeUploadManager';
 
 type RequisitionLink = { id: string; title: string };
@@ -21,6 +22,7 @@ export function AppShell({ requisitions, children }: { requisitions: Requisition
           <StapphireBrand compact decorative/>
         </Link>
         <span className="brand-tagline">Hiring Quality Control</span>
+        <NotificationsButton/>
         <GlobalBannerControls/>
       </header>
       <div className={`app-shell ${rightCollapsed ? 'right-collapsed' : ''}`}>

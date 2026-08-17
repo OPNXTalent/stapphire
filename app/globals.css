@@ -61,4 +61,5 @@
 .global-banner-controls{flex:1}
 .banner-eval-count{margin-left:auto}
 .banner-popover:not(.banner-app-menu){right:auto;left:0}
+.notifications-standalone{flex:none}
 @media(max-width:700px){.brand-home .stapphire-brand-wordmark{display:none}.brand-home .stapphire-brand-compact{display:block}.brand-tagline{display:none}}
