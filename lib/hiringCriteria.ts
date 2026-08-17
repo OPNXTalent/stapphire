@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './supabaseAdmin';
+import { supabaseAdmin } from './supabaseAdmin.ts';
 
 export const HIRING_CRITERIA_CATEGORIES = ['responsibilities', 'hard_skills', 'soft_skills', 'keywords', 'other_requirements'] as const;
 export type HiringCriteriaCategory = typeof HIRING_CRITERIA_CATEGORIES[number];

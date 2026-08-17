@@ -1,7 +1,8 @@
 import OpenAI from 'openai';
-import { supabaseAdmin } from './supabaseAdmin';
-import type { HiringCriteriaCategory } from './hiringCriteria';
-import { normalizeHiringCriteriaError } from './hiringCriteriaError';
+import { supabaseAdmin } from './supabaseAdmin.ts';
+import type { HiringCriteriaCategory } from './hiringCriteria.ts';
+import { normalizeHiringCriteriaError } from './hiringCriteriaError.ts';
+import { normalizeText, validateEvidence, cleanEvidence } from './hiringCriteriaEvidence.ts';
 
 const HIRING_CRITERIA_MODEL = process.env.OPENAI_HIRING_CRITERIA_MODEL || 'gpt-5.6';
 export const HIRING_CRITERIA_EXTRACTOR_VERSION = 'hiring-criteria-v1';
@@ -76,14 +77,6 @@ For every criterion, provide a concise rationale specific to this role and a sho
 
 Education, experience duration, licenses, physical demands, schedule, location, or other material eligibility constraints that do not fit the Big 4 belong in unmappedQualifications with JD evidence and a reason. Do not silently discard them.`;
 
-function normalizeText(value: string): string {
-  return value.replace(/\s+/g, ' ').trim().toLowerCase();
-}
-
-function cleanEvidence(value: string): string {
-  return value.trim().replace(/^["“”]+|["“”]+$/g, '').trim();
-}
-
 function allocateWeights(criteria: RawCriterion[], target: number): number[] {
   if (!criteria.length || criteria.length > target) throw new Error('Hiring Criteria category cannot be allocated safely.');
   const proposedTotal = criteria.reduce((sum, criterion) => sum + criterion.proposedWeight, 0);
@@ -96,13 +89,6 @@ function allocateWeights(criteria: RawCriterion[], target: number): number[] {
     .sort((a, b) => b.remainder - a.remainder || b.proposed - a.proposed || a.index - b.index);
   for (let index = 0; index < pointsLeft; index += 1) weights[priority[index].index] += 1;
   return weights;
-}
-
-function validateEvidence(jobDescription: string, evidence: string): void {
-  const normalizedEvidence = normalizeText(evidence);
-  if (!normalizedEvidence || !normalizeText(jobDescription).includes(normalizedEvidence)) {
-    throw new Error('Hiring Criteria evidence was not found in the Job Description.');
-  }
 }
 
 function prepareItems(jobDescription: string, extraction: RawExtraction) {
