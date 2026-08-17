@@ -91,7 +91,16 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     }
   }
 
-  const localUploading = currentLocalBatch && (currentLocalBatch.phase === 'creating' || currentLocalBatch.phase === 'uploading');
+  const localUploading = currentLocalBatch && (
+    currentLocalBatch.phase === 'creating' ||
+    currentLocalBatch.phase === 'uploading' ||
+    // Browser upload just finished, but the durable operation poll
+    // hasn't caught up yet - keep the bridge visible rather than let
+    // the progress UI drop to nothing for one poll cycle. This is the
+    // exact seam that made a working durable process look broken:
+    // local state ended before durable state was ready to take over.
+    (currentLocalBatch.phase === 'accepted' && !visibleOperation)
+  );
   const localAccepted = currentLocalBatch?.items.filter((item) => item.status === 'accepted').length || 0;
   const localTotal = currentLocalBatch?.items.length || 0;
   const visibleFailedItems = visibleOperation?.items.filter((item) => item.status === 'failed') || [];
@@ -132,6 +141,13 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
       ) : null}
 
       {visibleOperation && <div className="upload-operation-progress" aria-live="polite">
+        {isActiveOperation(visibleOperation.status) && (
+          <StapphireProcessing
+            className="processing-compact"
+            title="Evaluating résumés…"
+            detail={`${completedItems} of ${visibleOperation.progressTotal || visibleOperation.items.length} complete`}
+          />
+        )}
         <div className="upload-complete">
           <span className="upload-summary">
             {isActiveOperation(visibleOperation.status)
