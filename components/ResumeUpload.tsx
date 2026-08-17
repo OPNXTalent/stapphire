@@ -13,6 +13,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const lastProgress = useRef<string | null>(null);
   const starting = useRef(false);
+  const pollNowRef = useRef<() => void>(() => {});
   const { batches, startUpload, dismissBatch, dismissedOperationIds, dismissOperation } = useResumeUploadManager();
   const [staged, setStaged] = useState<File[]>([]);
   const [operations, setOperations] = useState<ResumeOperationSummary[]>([]);
@@ -54,6 +55,8 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     async function poll() {
+      if (cancelled) return;
+      if (timer) clearTimeout(timer);
       try {
         const response = await fetch(`/api/requisitions/${requisitionId}/operations`, { cache: 'no-store' });
         if (!response.ok) throw new Error('Unable to read resume operations.');
@@ -64,26 +67,39 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
         const signature = next.map((operation) => `${operation.id}:${operation.progressCurrent}:${operation.status}:${operation.items.map((item) => `${item.id}:${item.status}:${item.candidateId || ''}:${item.evaluationId || ''}`).join(',')}`).join('|');
         if (lastProgress.current !== null && signature !== lastProgress.current) router.refresh();
         lastProgress.current = signature;
-        if (next.some((operation) => isActiveOperation(operation.status)) && !document.hidden) timer = setTimeout(poll, 2500);
+        // Durable operation state is authoritative - keep polling as
+        // long as anything is active, regardless of tab visibility.
+        // A previous version paused polling while the tab was hidden
+        // and relied on focus/visibilitychange to resume it; that
+        // resume path is one more thing that can fail to fire. Simpler
+        // and more robust to just keep polling in the background -
+        // the interval is modest and only runs while work is active.
+        if (next.some((operation) => isActiveOperation(operation.status))) timer = setTimeout(poll, 2500);
       } catch {
-        if (!cancelled && !document.hidden) timer = setTimeout(poll, 5000);
+        if (!cancelled) timer = setTimeout(poll, 5000);
       }
     }
-    function resume() {
-      if (document.hidden) return;
-      if (timer) clearTimeout(timer);
-      void poll();
-    }
+    pollNowRef.current = () => void poll();
     void poll();
-    window.addEventListener('focus', resume);
-    document.addEventListener('visibilitychange', resume);
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
-      window.removeEventListener('focus', resume);
-      document.removeEventListener('visibilitychange', resume);
     };
-  }, [requisitionId, router, currentLocalBatch?.operationId, currentLocalBatch?.phase]);
+    // Deliberately depends only on requisitionId. The old version also
+    // depended on router, currentLocalBatch?.operationId, and
+    // currentLocalBatch?.phase - every phase transition (creating ->
+    // uploading -> accepted) tore this effect down and restarted it,
+    // which could interrupt an in-flight recursive setTimeout schedule.
+    // The loop's own lifecycle should not depend on properties that
+    // change multiple times over a single batch's life; a separate
+    // effect below kicks an immediate poll when a new operation
+    // appears instead, without touching this loop's lifecycle at all.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requisitionId]);
+
+  useEffect(() => {
+    if (currentLocalBatch?.operationId) pollNowRef.current();
+  }, [currentLocalBatch?.operationId]);
 
   function addFiles(files: FileList | null) {
     if (!files?.length) return;
