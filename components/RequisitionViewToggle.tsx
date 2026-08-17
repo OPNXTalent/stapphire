@@ -3,9 +3,7 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { RequisitionJobDescription } from '@/components/RequisitionJobDescription';
-
-type View = 'requisition' | 'candidates';
-type RequisitionTab = 'hiring-criteria' | 'market-analysis' | 'job-description';
+import { useRequisitionViewState, type RequisitionTab } from '@/components/RequisitionViewStateProvider';
 
 const requisitionTabs: { id: RequisitionTab; label: string }[] = [
   { id: 'job-description', label: 'Job Description' },
@@ -37,8 +35,9 @@ export function RequisitionViewToggle({
   candidatesView: ReactNode;
 }) {
   const router = useRouter();
-  const [view, setView] = useState<View>('requisition');
-  const [requisitionTab, setRequisitionTab] = useState<RequisitionTab>('job-description');
+  const { state, update } = useRequisitionViewState(requisitionId);
+  const view = state.view;
+  const requisitionTab = state.requisitionTab;
   const [archiving, setArchiving] = useState(false);
   const activeRequisitionView = requisitionTab === 'hiring-criteria'
     ? hiringCriteriaView
@@ -68,7 +67,7 @@ export function RequisitionViewToggle({
     else return;
     event.preventDefault();
     const nextTab = requisitionTabs[nextIndex];
-    setRequisitionTab(nextTab.id);
+    update({ requisitionTab: nextTab.id });
     requestAnimationFrame(() => document.getElementById(`requisition-tab-${nextTab.id}`)?.focus());
   }
 
@@ -80,7 +79,7 @@ export function RequisitionViewToggle({
           role="tab"
           aria-selected={view === 'requisition'}
           className={`side-tab ${view === 'requisition' ? 'active' : ''}`}
-          onClick={() => setView('requisition')}
+          onClick={() => update({ view: 'requisition' })}
         >
           Requisition
         </button>
@@ -89,7 +88,7 @@ export function RequisitionViewToggle({
           role="tab"
           aria-selected={view === 'candidates'}
           className={`side-tab ${view === 'candidates' ? 'active' : ''}`}
-          onClick={() => setView('candidates')}
+          onClick={() => update({ view: 'candidates' })}
         >
           Candidates
         </button>
@@ -109,7 +108,7 @@ export function RequisitionViewToggle({
 
       <div className="requisition-detail-view" hidden={view !== 'requisition'}>
         <div className="requisition-workspace-tabs" role="tablist" aria-label="Requisition workspace">
-          {requisitionTabs.map((tab, index) => <button key={tab.id} id={`requisition-tab-${tab.id}`} type="button" role="tab" aria-selected={requisitionTab === tab.id} aria-controls="requisition-tab-panel" tabIndex={requisitionTab === tab.id ? 0 : -1} className={requisitionTab === tab.id ? 'active' : ''} onClick={() => setRequisitionTab(tab.id)} onKeyDown={(event) => navigateTabs(event, index)}>{tab.label}</button>)}
+          {requisitionTabs.map((tab, index) => <button key={tab.id} id={`requisition-tab-${tab.id}`} type="button" role="tab" aria-selected={requisitionTab === tab.id} aria-controls="requisition-tab-panel" tabIndex={requisitionTab === tab.id ? 0 : -1} className={requisitionTab === tab.id ? 'active' : ''} onClick={() => update({ requisitionTab: tab.id })} onKeyDown={(event) => navigateTabs(event, index)}>{tab.label}</button>)}
         </div>
         <div id="requisition-tab-panel" className={`requisition-tab-panel${requisitionTab === 'job-description' ? ' job-description-panel' : ''}`} role="tabpanel" aria-labelledby={`requisition-tab-${requisitionTab}`}>{activeRequisitionView}</div>
       </div>

@@ -7,6 +7,7 @@ import { WorkspacePanel } from '@/components/WorkspacePanel';
 import { StapphireBrand } from '@/components/StapphireBrand';
 import { GlobalBannerControls } from '@/components/GlobalBannerControls';
 import { ResumeUploadManagerProvider } from '@/components/ResumeUploadManager';
+import { RequisitionViewStateProvider } from '@/components/RequisitionViewStateProvider';
 
 type RequisitionLink = { id: string; title: string };
 
@@ -15,6 +16,7 @@ export function AppShell({ requisitions, children }: { requisitions: Requisition
   const [rightCollapsed, setRightCollapsed] = useState(false);
   return (
     <ResumeUploadManagerProvider>
+    <RequisitionViewStateProvider>
       <header className="brand-bar">
         <Link className="brand-home" href="/" aria-label="Stapphire">
           <StapphireBrand decorative/>
@@ -49,6 +51,7 @@ export function AppShell({ requisitions, children }: { requisitions: Requisition
         <main className="workspace-main"><div className="workspace-content">{children}</div></main>
         <WorkspacePanel collapsed={rightCollapsed} onExpand={() => setRightCollapsed(false)} onCollapse={() => setRightCollapsed(true)}/>
       </div>
+    </RequisitionViewStateProvider>
     </ResumeUploadManagerProvider>
   );
 }
