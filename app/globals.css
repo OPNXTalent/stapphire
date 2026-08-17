@@ -47,4 +47,8 @@
 .stapphire-brand-wordmark{height:66px}
 .app-shell{padding-top:92px}
 .req-nav,.side-panel{top:92px}
+.brand-workspace{margin-left:0}
+.global-banner-controls{flex:1}
+.banner-eval-count{margin-left:auto}
+.banner-popover:not(.banner-app-menu){right:auto;left:0}
 @media(max-width:700px){.brand-home .stapphire-brand-wordmark{display:none}.brand-home .stapphire-brand-compact{display:block}.brand-tagline{display:none}}
