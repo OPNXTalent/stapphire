@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ArchivedRequisitionActions } from '@/components/ArchivedRequisitionActions';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -12,10 +13,15 @@ export default async function ArchivedRequisitionsPage() {
 
   return (
     <>
-      <div className="page-heading">
-        <span className="eyebrow">Workspace archive</span>
-        <h1>Archived Requisitions</h1>
-        <p className="muted">Restore archived work or permanently delete it and its candidate history.</p>
+      <div className="archived-header-row">
+        <div className="page-heading">
+          <span className="eyebrow">Workspace archive</span>
+          <h1>Archived Requisitions</h1>
+          <p className="muted">Restore archived work or permanently delete it and its candidate history.</p>
+        </div>
+        <Link href="/" className="archived-exit-btn" aria-label="Close archived requisitions">
+          ×
+        </Link>
       </div>
       <section className="surface req-directory">
         <div className="section-heading">

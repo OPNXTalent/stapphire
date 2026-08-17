@@ -1,14 +1,18 @@
 'use client';
 
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { ResumeUpload } from '@/components/ResumeUpload';
+import { RequisitionNotes } from '@/components/RequisitionNotes';
 
-// Visual-only restoration of the old right-side panel shell. This is
-// deliberately NOT the old CollaborationPanel - no realtime, no
-// comments, no notes persistence, no Supabase subscriptions. It exists
-// to hold the layout and establish the space for later hiring-team
-// workflow, nothing more. Collapse state is local UI state only, not
-// persisted anywhere.
+type PanelTab = 'teamwork' | 'upload';
+
+// Visual-only restoration of the old right-side panel shell, now with
+// its first real piece of hiring-team functionality: notes/teamwork,
+// toggled against resume upload. Still deliberately NOT the old
+// CollaborationPanel - no realtime, no Supabase subscriptions, no
+// per-user accounts (none exist yet). Collapse state stays local UI
+// state, not persisted.
 export function WorkspacePanel({
   collapsed,
   onExpand,
@@ -20,6 +24,7 @@ export function WorkspacePanel({
 }) {
   const pathname = usePathname();
   const requisitionId = pathname.match(/^\/requisitions\/([^/]+)/)?.[1] || null;
+  const [tab, setTab] = useState<PanelTab>('teamwork');
 
   if (collapsed) {
     return (
@@ -35,11 +40,25 @@ export function WorkspacePanel({
         ›
       </button>
       <div className="side-tabs">
-        <span className="side-tab active">Hiring Workspace</span>
+        <button type="button" className={`side-tab ${tab === 'upload' ? 'active' : ''}`} onClick={() => setTab('upload')}>
+          Resume Upload
+        </button>
+        <button type="button" className={`side-tab ${tab === 'teamwork' ? 'active' : ''}`} onClick={() => setTab('teamwork')}>
+          Teamwork
+        </button>
       </div>
       <div className="side-content">
-        {requisitionId && <div className="workspace-resume-upload"><ResumeUpload requisitionId={requisitionId}/></div>}
-        <p className="muted">Candidate notes and hiring-team activity will appear here as the workflow expands.</p>
+        {!requisitionId && <p className="muted">Open a requisition to see its notes and upload resumes.</p>}
+        {requisitionId && (
+          <>
+            <div hidden={tab !== 'upload'}>
+              <ResumeUpload requisitionId={requisitionId} />
+            </div>
+            <div hidden={tab !== 'teamwork'}>
+              <RequisitionNotes requisitionId={requisitionId} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
