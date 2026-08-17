@@ -33,6 +33,23 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const latestOperation = operationForCurrentBatch || (!currentLocalBatch ? operations[0] || null : null);
   const visibleOperation = latestOperation && !dismissedOperationIds.has(latestOperation.id) ? latestOperation : null;
 
+  // Safety net: once every file in the current batch has been safely
+  // uploaded (phase 'accepted'), the local bridge should hand off to
+  // the durable operation view as soon as it's available. If that
+  // handoff doesn't happen within a generous window - for whatever
+  // reason, including ones this specific timing isn't fully provable
+  // from static code alone - force the bridge to stop rather than let
+  // it show "Uploading..." indefinitely after uploads have genuinely
+  // finished. This does not affect durable processing itself, only
+  // this local indicator.
+  const [bridgeExpired, setBridgeExpired] = useState(false);
+  useEffect(() => {
+    setBridgeExpired(false);
+    if (currentLocalBatch?.phase !== 'accepted' || visibleOperation) return;
+    const timeout = setTimeout(() => setBridgeExpired(true), 8000);
+    return () => clearTimeout(timeout);
+  }, [currentLocalBatch?.clientBatchKey, currentLocalBatch?.phase, visibleOperation]);
+
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -109,7 +126,8 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     // the progress UI drop to nothing for one poll cycle. This is the
     // exact seam that made a working durable process look broken:
     // local state ended before durable state was ready to take over.
-    (currentLocalBatch.phase === 'accepted' && !visibleOperation)
+    // Gated on !bridgeExpired so this can never persist indefinitely.
+    (currentLocalBatch.phase === 'accepted' && !visibleOperation && !bridgeExpired)
   );
   const localAccepted = currentLocalBatch?.items.filter((item) => item.status === 'accepted').length || 0;
   const localTotal = currentLocalBatch?.items.length || 0;
