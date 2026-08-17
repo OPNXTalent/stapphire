@@ -19,8 +19,18 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const [retrying, setRetrying] = useState(false);
   const localBatches = batches.filter((batch) => batch.requisitionId === requisitionId);
   const currentLocalBatch = localBatches[localBatches.length - 1] || null;
-  const activeOperation = operations.find((operation) => isActiveOperation(operation.status)) || null;
-  const latestOperation = activeOperation || operations[0] || null;
+  // Bind explicitly to the current batch's own operation when one
+  // exists - never pick an arbitrary active operation from the array.
+  // Historical operations (from prior sessions, other batches, or
+  // stuck/unfinished work) must never be displayed as if they belong
+  // to a batch the user just started. Only when there's no local
+  // batch to bind to (e.g. after navigation/refresh) do we fall back
+  // to the newest operation overall - the list is already sorted
+  // created_at desc by the API, so operations[0] is that operation.
+  const operationForCurrentBatch = currentLocalBatch?.operationId
+    ? operations.find((operation) => operation.id === currentLocalBatch.operationId) || null
+    : null;
+  const latestOperation = operationForCurrentBatch || (!currentLocalBatch ? operations[0] || null : null);
   const visibleOperation = latestOperation && !dismissedOperationIds.has(latestOperation.id) ? latestOperation : null;
 
   useEffect(() => {
