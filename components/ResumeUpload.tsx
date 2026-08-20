@@ -147,6 +147,15 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   );
   const localAccepted = currentLocalBatch?.items.filter((item) => item.status === 'accepted').length || 0;
   const localTotal = currentLocalBatch?.items.length || 0;
+  // Distinct milestone from localUploading above: once every file in
+  // the CURRENT batch is confirmed safely stored, this stays visible
+  // as its own line even after the durable operation view takes over
+  // and evaluation begins - it does not get replaced by "Evaluating",
+  // it sits alongside it. Scoped to the current batch only (not shown
+  // once a different/historical operation is the one being displayed).
+  const showUploadConfirmed = Boolean(
+    currentLocalBatch && localTotal > 0 && localAccepted === localTotal && operationForCurrentBatch
+  );
   const visibleFailedItems = visibleOperation?.items.filter((item) => item.status === 'failed') || [];
   const completedItems = visibleOperation?.items.filter((item) => item.status === 'completed').length || 0;
 
@@ -185,6 +194,9 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
       ) : null}
 
       {visibleOperation && <div className="upload-operation-progress" aria-live="polite">
+        {showUploadConfirmed && (
+          <p className="upload-confirmed-milestone">✓ {localAccepted} of {localTotal} {localTotal === 1 ? 'résumé' : 'résumés'} successfully uploaded</p>
+        )}
         {isActiveOperation(visibleOperation.status) && (
           <StapphireProcessing
             className="processing-compact"

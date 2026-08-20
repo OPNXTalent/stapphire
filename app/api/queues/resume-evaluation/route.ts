@@ -13,7 +13,7 @@ const queueCallback = handleCallback(
     await processResumeEvaluationOperationItem(message.operationItemId);
   },
   {
-    visibilityTimeoutSeconds: 360,
+    visibilityTimeoutSeconds: 60,
     retry: (error, metadata) => {
       if (error instanceof InvalidResumeOperationMessageError) return { acknowledge: true };
       if (error instanceof DeferredResumeOperationError) return { afterSeconds: 10 };
