@@ -22,13 +22,20 @@ export function CreateRequisitionForm() {
   const [jobDescriptionError, setJobDescriptionError] = useState(false);
   const [titleError, setTitleError] = useState(false);
 
-  // Defensive last-resort safeguard only, not the primary fix: if
-  // navigation hasn't happened within a generous window after a
-  // successful save, stop blocking the form. The actual fix for the
-  // reported hang was removing a racing router.refresh() call right
-  // after router.push() below - this timer exists purely so an
-  // unrelated, unforeseen navigation failure can never leave the user
-  // permanently stuck on the processing screen with no way back.
+  // Defensive last-resort safeguard only, not the primary fix: it only
+  // ever starts AFTER the requisition is confirmed persisted (POST
+  // succeeded, id known) and router.push() has been called - never
+  // while the create request is still in flight, since resetting the
+  // form mid-request would let the user submit a second time while the
+  // first is still pending. If client-side navigation still hasn't
+  // unmounted this component within the window, it falls back to a
+  // hard navigation to the same known URL rather than re-enabling
+  // Create. The actual fix for the reported hang was removing a
+  // racing router.refresh() call right after router.push() below -
+  // this timer exists purely so an unrelated, unforeseen client-side
+  // navigation failure can never leave the user stuck on the
+  // processing screen with no way to reach the requisition that
+  // already exists.
   useEffect(() => {
     return () => {
       if (navigationSafeguard.current) clearTimeout(navigationSafeguard.current);
@@ -91,11 +98,6 @@ export function CreateRequisitionForm() {
     setTitleError(false);
     submitting.current = true;
     setBusy(true);
-    navigationSafeguard.current = setTimeout(() => {
-      submitting.current = false;
-      setBusy(false);
-      setError('This is taking longer than expected. The requisition may have been created - check the home page before trying again.');
-    }, 15000);
     try {
       const response = await fetch('/api/requisitions', {
         method: 'POST',
@@ -104,7 +106,19 @@ export function CreateRequisitionForm() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Unable to save requisition.');
-      router.push(`/requisitions/${data.id}`);
+      const destination = `/requisitions/${data.id}`;
+      router.push(destination);
+      // The requisition is now confirmed persisted (response.ok, id
+      // known) - a duplicate create is no longer a risk from here on,
+      // so the safeguard's only job is making sure the user actually
+      // lands on it. If client-side navigation hasn't unmounted this
+      // component within the window, fall back to a hard navigation to
+      // the same known URL rather than resetting the form, which would
+      // re-enable Create and risk a second requisition being created
+      // for what the user experiences as one submission.
+      navigationSafeguard.current = setTimeout(() => {
+        window.location.href = destination;
+      }, 15000);
     } catch (caught) {
       if (navigationSafeguard.current) clearTimeout(navigationSafeguard.current);
       setError(caught instanceof Error ? caught.message : 'Unable to save requisition.');
