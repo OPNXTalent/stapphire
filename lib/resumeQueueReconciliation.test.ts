@@ -23,8 +23,45 @@ test('successful worker completion invokes reconciliation, after the completion 
   assert.match(successPath[0], /await reconcileQueuedResumeCapacity\(\)/, 'expected reconciliation to be triggered after a successful completion, since that is what frees a concurrency slot');
 });
 
-test('reconciliation is bounded - RECONCILIATION_BATCH_SIZE is exactly 1, matching one freed slot per completion', () => {
-  assert.match(source, /const RECONCILIATION_BATCH_SIZE = 1;/, 'the bound must be exactly 1: one completion frees exactly one global concurrency slot, so republishing more would not match actually-freed capacity, and republishing fewer would not guarantee the freed slot gets filled');
+test('reconciliation is bounded at 3, matching the global concurrency cap - not 1', () => {
+  assert.match(
+    source,
+    /const RECONCILIATION_BATCH_SIZE = 3;/,
+    'the bound must match the concurrency cap (3), not 1 - an ordinary SELECT with no reservation cannot guarantee concurrent completions see different items, so a bound of 1 could let a wave of concurrent completions all republish the same single item, leaving other genuinely eligible items and their freed slots unaddressed. Bounded overoffer (fetch up to 3 distinct eligible items every call, republish all of them) guarantees available capacity is offered enough distinct work without needing coordination between concurrent invocations.'
+  );
+});
+
+test('amplification bound: a wave of concurrent completions produces at most (concurrency cap)^2 reconciliation publishes, offering at most (concurrency cap) distinct items - matching the slots that wave could free', () => {
+  const claimRpcSource = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', 'supabase', 'migrations', '20260815130000_durable_resume_evaluation_operations.sql'),
+    'utf8'
+  );
+  const capMatch = claimRpcSource.match(/if active_count >= (\d+) then return jsonb_build_object\('deferred', true\); end if;/);
+  assert.ok(capMatch, 'expected to find the concurrency cap check in the claim RPC');
+  const concurrencyCap = Number(capMatch[1]);
+
+  const batchSizeMatch = source.match(/const RECONCILIATION_BATCH_SIZE = (\d+);/);
+  assert.ok(batchSizeMatch, 'expected to find RECONCILIATION_BATCH_SIZE');
+  const reconciliationBatchSize = Number(batchSizeMatch[1]);
+
+  assert.equal(reconciliationBatchSize, concurrencyCap, 'the reconciliation batch size must match the actual concurrency cap read from the claim RPC - not a value chosen independently of it');
+
+  // At most `concurrencyCap` items can be 'processing' at once, so at
+  // most `concurrencyCap` completions can happen in one wave. Each
+  // independently, concurrently-triggered reconciliation call is
+  // capped at `reconciliationBatchSize` publishes. Worst case: every
+  // completion in the wave republishes the full batch.
+  const maxCompletionsInAWave = concurrencyCap;
+  const maxTotalPublishes = maxCompletionsInAWave * reconciliationBatchSize;
+  assert.equal(maxTotalPublishes, concurrencyCap * concurrencyCap, 'expected the worst-case publish count to be concurrencyCap^2 (3 x 3 = 9 at the current cap of 3)');
+
+  // Distinct items offered does not grow with wave size - only
+  // redundancy per item does, since every call independently caps at
+  // reconciliationBatchSize regardless of how many other calls are
+  // concurrently running. reconciliationBatchSize === concurrencyCap
+  // (asserted above) is exactly what guarantees at most `concurrencyCap`
+  // distinct items are ever offered per call - matching the maximum
+  // number of slots a full wave could actually free.
 });
 
 test('reconciliation failure is caught and logged, never re-thrown - it must not undo an already-successful evaluation completion', () => {

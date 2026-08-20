@@ -12,14 +12,11 @@ import { operationQueue } from './operationQueue';
 const RESUME_BUCKET = 'candidate-resumes';
 const MAX_ATTEMPTS = 3;
 const LEASE_SECONDS = 360;
-// One completion frees exactly one global concurrency slot
-// (claim_phase1_resume_operation_item caps active 'processing' items
-// at 3, globally, across all requisitions - unchanged by this fix).
-// Republishing exactly one eligible queued item per completion matches
-// the capacity that actually just became available, no more - this is
-// what bounds forward progress without amplifying the queue. See
-// reconcileQueuedResumeCapacity below for the full rationale.
-const RECONCILIATION_BATCH_SIZE = 1;
+// Bounded-overoffer batch size for capacity reconciliation, matching
+// the global concurrency cap of 3 - see the fuller rationale directly
+// above reconcileQueuedResumeCapacity below, including why this is 3
+// and not 1.
+const RECONCILIATION_BATCH_SIZE = 3;
 
 type ClaimedResumeItem = {
   id: string;
@@ -60,28 +57,51 @@ async function claimItem(itemId: string, leaseToken: string): Promise<ClaimedRes
 // waiting on redelivery timing. Vercel's own redelivery remains a
 // fallback, not the sole mechanism, alongside this.
 //
-// Bound of RECONCILIATION_BATCH_SIZE=1 is deliberate: one completion
-// frees exactly one slot, so republishing exactly one eligible item
-// matches the capacity that actually became available - no more. If
-// several completions happen concurrently, each independently triggers
-// its own reconciliation call; each finds a different eligible item,
-// since a claimed item is no longer 'queued' for a later query to see
-// - this scales with actual freed capacity, without coordination,
-// without amplifying the queue beyond what open slots warrant.
+// Bound of RECONCILIATION_BATCH_SIZE=3, matching the global
+// concurrency cap - not 1. The original assumption behind a bound of 1
+// was incorrect: concurrent completions are not guaranteed to select
+// different queued items. Each reconciliation call performs an
+// ordinary SELECT (no row lock, no reservation) before publishing, so
+// when multiple completions happen at nearly the same moment, they can
+// all see and republish the SAME single oldest eligible item, leaving
+// other genuinely eligible items - and the capacity that just freed up
+// for them - unaddressed.
+//
+// This deliberately does not try to guarantee one unique enqueue per
+// freed slot - that would require a reservation mechanism (a new
+// status, a claim-at-select-time lock, a new table), which is more
+// machinery than this warrants. Instead: bounded overoffer. Every
+// reconciliation call fetches the oldest up to 3 distinct eligible
+// items (matching the concurrency cap) and republishes ALL of them,
+// regardless of how many completions are happening concurrently.
+// Redundant republishes for the same item are harmless -
+// claim_phase1_resume_operation_item remains the sole, atomic
+// authority over who actually processes it; a duplicate message for an
+// item someone else already claimed simply defers or no-ops (see
+// classifyNullClaim), exactly like any other duplicate delivery.
+//
+// Amplification bound: with a concurrency cap of 3, a wave of 3
+// concurrent completions can each independently see the same up-to-3
+// eligible items and each republish all of them - at most 3 calls x 3
+// items = 9 reconciliation publishes total. Those 9 publishes target
+// at most 3 distinct item IDs, which is exactly the number of newly
+// available slots that wave of completions just freed. The queue does
+// not grow unbounded with wave size, because each single call is
+// capped at 3 regardless of how many completions are concurrently
+// calling it - only the redundancy per item scales with concurrent
+// completions, not the number of distinct items offered.
 //
 // claim_phase1_resume_operation_item remains the sole, atomic
 // authority over who actually gets to process an item under its own
-// row lock - a duplicate republished message for an item someone else
-// already claimed simply defers or no-ops there (see
-// classifyNullClaim), exactly like any other duplicate delivery
-// already does. No second evaluator path: reconciliation only ever
+// row lock. No second evaluator path: reconciliation only ever
 // enqueues onto the existing topic, processed by the existing worker.
 //
 // Failure here is caught and logged only, never re-thrown - this runs
 // strictly after the triggering item's own completion has already been
 // persisted successfully via complete_phase1_resume_operation_item,
 // and must never retroactively turn that already-successful evaluation
-// into a failure.
+// into a failure. Vercel's own redelivery remains a fallback, not the
+// sole mechanism, alongside this.
 async function reconcileQueuedResumeCapacity(): Promise<void> {
   try {
     const { data: activeOperations, error: operationsError } = await supabaseAdmin
