@@ -6,6 +6,7 @@ import { extractTextFromBuffer } from './extractText';
 import { evaluateResumeAgainstBasis } from './candidateEvaluation';
 import { normalizeHiringCriteriaError } from './hiringCriteriaError';
 import { isRetryableHiringCriteriaError } from './operationTypes';
+import { classifyNullClaim } from './resumeLeaseClassification';
 
 const RESUME_BUCKET = 'candidate-resumes';
 const MAX_ATTEMPTS = 3;
@@ -42,7 +43,29 @@ async function claimItem(itemId: string, leaseToken: string): Promise<ClaimedRes
 export async function processResumeEvaluationOperationItem(itemId: string): Promise<void> {
   const leaseToken = randomUUID();
   const item = await claimItem(itemId, leaseToken);
-  if (!item) return;
+  if (!item) {
+    // claim_phase1_resume_operation_item returns a plain null both for
+    // genuinely terminal/missing items (safe no-op) and for items
+    // still 'processing' under another worker's unexpired DB lease -
+    // these are indistinguishable from the RPC's return value alone.
+    // Queue visibilityTimeoutSeconds (60s) is now shorter than
+    // LEASE_SECONDS (360s), so a crashed worker's message can be
+    // redelivered well before its DB lease naturally expires.
+    // Acknowledging that redelivery as a no-op would let the queue
+    // message disappear while the DB lease is still authoritative -
+    // if the original worker crashed, nothing would ever retry this
+    // item once the lease does expire. Disambiguate directly.
+    const { data: currentItem, error: lookupError } = await supabaseAdmin
+      .from('phase1_operation_items')
+      .select('status, lease_expires_at')
+      .eq('id', itemId)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    if (classifyNullClaim(currentItem) === 'defer') {
+      throw new DeferredResumeOperationError('Resume operation item is still under an active lease.');
+    }
+    return;
+  }
   if (item === 'deferred') throw new DeferredResumeOperationError('Resume evaluation concurrency is currently full.');
   console.info('Resume evaluation item claimed', {
     operationId: item.operationId,
