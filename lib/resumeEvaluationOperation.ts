@@ -46,15 +46,17 @@ export async function processResumeEvaluationOperationItem(itemId: string): Prom
   if (!item) {
     // claim_phase1_resume_operation_item returns a plain null both for
     // genuinely terminal/missing items (safe no-op) and for items
-    // still 'processing' under another worker's unexpired DB lease -
-    // these are indistinguishable from the RPC's return value alone.
-    // Queue visibilityTimeoutSeconds (60s) is now shorter than
-    // LEASE_SECONDS (360s), so a crashed worker's message can be
-    // redelivered well before its DB lease naturally expires.
-    // Acknowledging that redelivery as a no-op would let the queue
-    // message disappear while the DB lease is still authoritative -
-    // if the original worker crashed, nothing would ever retry this
-    // item once the lease does expire. Disambiguate directly.
+    // still 'processing' (another worker's DB lease, active or
+    // recently expired). Disposition here is status-based ONLY -
+    // classifyNullClaim never compares lease_expires_at against "now"
+    // itself, since this lookup is a separate round trip after the
+    // claim RPC call and the lease could expire in that gap. Any
+    // 'processing' item defers unconditionally; the next delivery
+    // re-enters the claim RPC, which remains the sole, atomic
+    // authority for whether a lease is still active, has expired and
+    // can be reclaimed, or the item has since reached a terminal
+    // state. lease_expires_at is fetched only for potential
+    // diagnostics, never to decide acknowledgement.
     const { data: currentItem, error: lookupError } = await supabaseAdmin
       .from('phase1_operation_items')
       .select('status, lease_expires_at')
