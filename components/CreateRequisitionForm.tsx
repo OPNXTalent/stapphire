@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEvent, DragEvent, FormEvent, useRef, useState } from 'react';
+import { ChangeEvent, DragEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { detectPositionTitle } from '@/lib/detectPositionTitle';
 import { StapphireProcessing } from '@/components/StapphireProcessing';
@@ -11,6 +11,7 @@ export function CreateRequisitionForm() {
   const titleInput = useRef<HTMLInputElement>(null);
   const jobDescriptionInput = useRef<HTMLTextAreaElement>(null);
   const submitting = useRef(false);
+  const navigationSafeguard = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [title, setTitle] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [titleEdited, setTitleEdited] = useState(false);
@@ -20,6 +21,19 @@ export function CreateRequisitionForm() {
   const [error, setError] = useState('');
   const [jobDescriptionError, setJobDescriptionError] = useState(false);
   const [titleError, setTitleError] = useState(false);
+
+  // Defensive last-resort safeguard only, not the primary fix: if
+  // navigation hasn't happened within a generous window after a
+  // successful save, stop blocking the form. The actual fix for the
+  // reported hang was removing a racing router.refresh() call right
+  // after router.push() below - this timer exists purely so an
+  // unrelated, unforeseen navigation failure can never leave the user
+  // permanently stuck on the processing screen with no way back.
+  useEffect(() => {
+    return () => {
+      if (navigationSafeguard.current) clearTimeout(navigationSafeguard.current);
+    };
+  }, []);
 
   function updateJobDescription(value: string, suggestedTitle = detectPositionTitle(value)) {
     setJobDescription(value);
@@ -77,6 +91,11 @@ export function CreateRequisitionForm() {
     setTitleError(false);
     submitting.current = true;
     setBusy(true);
+    navigationSafeguard.current = setTimeout(() => {
+      submitting.current = false;
+      setBusy(false);
+      setError('This is taking longer than expected. The requisition may have been created - check the home page before trying again.');
+    }, 15000);
     try {
       const response = await fetch('/api/requisitions', {
         method: 'POST',
@@ -86,15 +105,15 @@ export function CreateRequisitionForm() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Unable to save requisition.');
       router.push(`/requisitions/${data.id}`);
-      router.refresh();
     } catch (caught) {
+      if (navigationSafeguard.current) clearTimeout(navigationSafeguard.current);
       setError(caught instanceof Error ? caught.message : 'Unable to save requisition.');
       submitting.current = false;
       setBusy(false);
     }
   }
 
-  if (busy) return <StapphireProcessing className="card create-requisition-form create-processing" title="Creating your requisition…" detail="Generating Hiring Criteria"/>;
+  if (busy) return <StapphireProcessing className="card create-requisition-form create-processing" title="Saving your requisition…" detail="Taking you to the requisition workspace"/>;
 
   return <form className="card create-requisition-form" onSubmit={submit} noValidate>
     <div className="field">
