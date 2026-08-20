@@ -105,7 +105,9 @@
 .upload-bar-row{display:flex;align-items:center;gap:10px}
 .upload-complete{display:flex;align-items:center;gap:12px}
 .upload-summary{font-size:12.5px;font-weight:600;color:var(--deep)}
-.upload-confirmed-milestone{font-size:12px;font-weight:600;color:var(--green);margin:0 0 8px}
+.upload-confirmed-milestone{margin:0 0 8px}
+.upload-confirmed-milestone p{font-size:12px;font-weight:600;color:var(--green);margin:0 0 2px}
+.upload-confirmed-milestone small{display:block;color:var(--muted);font-size:11px}
 .upload-spinner{display:inline-block;width:11px;height:11px;border-radius:50%;border:2px solid var(--sapphire-pale);border-top-color:var(--sapphire);animation:uploadSpin .65s linear infinite;flex-shrink:0}
 @keyframes uploadSpin{to{transform:rotate(360deg)}}
 .upload-progress{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--deep)}

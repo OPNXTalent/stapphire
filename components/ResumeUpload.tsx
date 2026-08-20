@@ -8,34 +8,27 @@ import type { ResumeOperationSummary } from '@/lib/operationTypes';
 import { isActiveOperation } from '@/lib/operationTypes';
 import { getResumeSourceType, MAX_RESUME_BATCH_SIZE, MAX_RESUME_SIZE } from '@/lib/resumeFiles';
 
-type ControllerPhase = 'idle' | 'checking' | 'active' | 'terminal';
+const POLL_INTERVAL_MS = 3000;
 
-// Single-flight polling controller for durable résumé-operation status.
-// There is exactly one authority for fetching this requisition's
-// current résumé operation state - no separate immediate-poll effect,
-// no overlapping requests, no generation counter (that guarded against
-// overlapping requests; this design structurally prevents them from
-// ever existing in the first place).
+// The persisted durable operation is the source of truth, not the
+// browser. Once files are confirmed uploaded, evaluation proceeds
+// server-side via the existing queue/worker architecture regardless
+// of whether this component, its polling loop, the current tab, or
+// even the browser itself stays open. This controller exists only to
+// mirror that server-side state into the UI while this view happens
+// to be mounted - it does not own evaluation progress, and losing it
+// (unmount, a failed poll, closing the tab) endangers nothing about
+// the actual work.
 //
-// State machine: idle -> checking -> active -> terminal -> idle
-//   idle: no unresolved current résumé operation. No polling.
-//   checking: a target operation is known but not yet confirmed found
-//     in the last fetch (either just discovered, or a fetch is
-//     pending/failed and we don't have a definitive read yet).
-//   active: last confirmed status is queued/processing. Poll continues
-//     at the normal interval.
-//   terminal: last confirmed status is completed/partially_completed/
-//     failed/cancelled. Polling stops.
-//
-// Single-flight guarantee: inFlightRef is true for the entire duration
-// of a request. Any trigger to check again (a new operation becoming
-// known, the interval firing, a manual wake) that arrives while a
-// request is in flight only ever sets wakeRequestedRef=true - it never
-// starts a second request. When the in-flight request's finally block
-// runs, if wakeRequestedRef is set, it immediately runs exactly one
-// more request (for whatever is currently the tracked target, which
-// may have changed while the prior request was in flight) - "request
-// again when finished", never "request A and request B racing".
+// Deliberately simple: a single self-rescheduling loop, one in-flight
+// guard, no immediate-poll trigger competing with it, no coalescing/
+// generation machinery. If a new operation becomes known while the
+// loop is between ticks, the loop's own next tick picks it up
+// naturally - accepting up to one interval of visual delay rather
+// than adding state machinery to avoid it. If a fetch is already
+// running when the interval would otherwise fire, that tick is simply
+// skipped and retried next interval - never a second concurrent
+// request.
 export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -47,58 +40,56 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const localBatches = batches.filter((batch) => batch.requisitionId === requisitionId);
   const currentLocalBatch = localBatches[localBatches.length - 1] || null;
 
-  const [phase, setPhase] = useState<ControllerPhase>('idle');
   const [trackedOperation, setTrackedOperation] = useState<ResumeOperationSummary | null>(null);
   const [pollUnavailable, setPollUnavailable] = useState(false);
 
-  const phaseRef = useRef<ControllerPhase>('idle');
-  const trackedOperationIdRef = useRef<string | null>(null);
-  const inFlightRef = useRef(false);
-  const wakeRequestedRef = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cancelledRef = useRef(false);
-  const wakeRef = useRef<(operationId: string | null, options?: { reconstruct?: boolean }) => void>(() => {});
+  // Mirrors currentLocalBatch?.operationId on every render - read by
+  // the polling loop below without the loop needing to depend on it
+  // (and therefore without tearing the loop down and restarting it
+  // every time a batch changes phase).
+  const targetOperationIdRef = useRef<string | null>(null);
+  targetOperationIdRef.current = currentLocalBatch?.operationId || null;
   const dismissedOperationIdsRef = useRef(dismissedOperationIds);
   dismissedOperationIdsRef.current = dismissedOperationIds;
-
-  function setPhaseBoth(next: ControllerPhase) {
-    phaseRef.current = next;
-    setPhase(next);
-  }
+  const restartRef = useRef<() => void>(() => {});
 
   useEffect(() => {
-    cancelledRef.current = false;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let inFlight = false;
+    let attemptedReconstruction = false;
 
-    // options.reconstruct means: we don't have an explicit target yet
-    // (no current local batch) - on the first check, discover the
-    // newest non-dismissed operation for this requisition, if any, and
-    // adopt it as the tracked target. Preserves "navigate away and
-    // back reconstructs progress" without polling indefinitely if
-    // nothing relevant is ever found - a reconstruction check that
-    // finds nothing goes idle and stays idle.
-    async function runOnce(reconstruct: boolean) {
-      if (cancelledRef.current) return;
-      const targetId = trackedOperationIdRef.current;
-      if (!targetId && !reconstruct) return;
-      if (inFlightRef.current) {
-        wakeRequestedRef.current = true;
+    async function tick() {
+      if (cancelled) return;
+      if (timer) { clearTimeout(timer); timer = null; }
+      const targetId = targetOperationIdRef.current;
+      if (!targetId && attemptedReconstruction) return; // nothing to track, already tried reconstruction once
+      if (inFlight) {
+        // Already fetching - skip this trigger, the next interval
+        // tick will simply try again with whatever is current then.
+        timer = setTimeout(() => void tick(), POLL_INTERVAL_MS);
         return;
       }
-      inFlightRef.current = true;
+      inFlight = true;
       try {
         const response = await fetch(`/api/requisitions/${requisitionId}/operations`, { cache: 'no-store' });
         if (!response.ok) throw new Error('Unable to read resume operations.');
         const result = await response.json() as { resumeOperations?: ResumeOperationSummary[] };
-        if (cancelledRef.current) return;
+        if (cancelled) return;
         const list = Array.isArray(result.resumeOperations) ? result.resumeOperations : [];
 
         let found: ResumeOperationSummary | null = null;
-        if (trackedOperationIdRef.current) {
-          found = list.find((operation) => operation.id === trackedOperationIdRef.current) || null;
-        } else if (reconstruct) {
+        if (targetId) {
+          found = list.find((operation) => operation.id === targetId) || null;
+        } else if (!attemptedReconstruction) {
+          // No current local batch (e.g. navigated here fresh) -
+          // recover the latest durable operation directly from
+          // persisted state, once, rather than polling indefinitely
+          // for something that may never appear.
+          attemptedReconstruction = true;
           const newest = list[0] || null;
           if (newest && !dismissedOperationIdsRef.current.has(newest.id)) {
-            trackedOperationIdRef.current = newest.id;
+            targetOperationIdRef.current = newest.id;
             found = newest;
           }
         }
@@ -107,72 +98,39 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
         if (found) {
           setTrackedOperation(found);
           const signature = `${found.id}:${found.progressCurrent}:${found.status}:${found.items.map((item) => `${item.id}:${item.status}:${item.candidateId || ''}:${item.evaluationId || ''}`).join(',')}`;
-          // Pure side-effect notification on signature change - never
-          // participates in polling ownership or scheduling.
+          // Pure side-effect notification on signature change - plays
+          // no role in whether/when the next poll happens.
           if (lastProgress.current !== null && signature !== lastProgress.current) router.refresh();
           lastProgress.current = signature;
-          setPhaseBoth(isActiveOperation(found.status) ? 'active' : 'terminal');
-        } else if (trackedOperationIdRef.current) {
-          // Target known but not yet visible in this fetch - stay
-          // checking, do not clear previously known state.
-          setPhaseBoth('checking');
-        } else {
-          // Reconstruction found nothing relevant to track.
-          setPhaseBoth('idle');
         }
+
+        const stillUnresolved = targetOperationIdRef.current && (!found || isActiveOperation(found.status));
+        if (!cancelled && stillUnresolved) timer = setTimeout(() => void tick(), POLL_INTERVAL_MS);
       } catch {
-        if (cancelledRef.current) return;
+        if (cancelled) return;
         // Preserve last-known trackedOperation through a transient
-        // failure - never clear it here.
+        // failure - never clear it. Keep polling for a known target;
+        // a temporary read failure must not endanger tracking work
+        // that is, itself, in no danger at all.
         setPollUnavailable(true);
+        if (targetOperationIdRef.current) timer = setTimeout(() => void tick(), POLL_INTERVAL_MS);
       } finally {
-        inFlightRef.current = false;
-        if (cancelledRef.current) return;
-        if (wakeRequestedRef.current) {
-          wakeRequestedRef.current = false;
-          void runOnce(!trackedOperationIdRef.current);
-          return;
-        }
-        if (!trackedOperationIdRef.current) {
-          setPhaseBoth('idle');
-          return;
-        }
-        // Continue polling while unresolved (checking) or active.
-        // Never reschedule once terminal - that's what stops the loop.
-        if (phaseRef.current !== 'terminal') {
-          timerRef.current = setTimeout(() => void runOnce(false), 2500);
-        }
+        inFlight = false;
       }
     }
 
-    wakeRef.current = (operationId, options) => {
-      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
-      if (!operationId) {
-        trackedOperationIdRef.current = null;
-        setTrackedOperation(null);
-        setPhaseBoth('idle');
-        if (options?.reconstruct) void runOnce(true);
-        return;
-      }
-      trackedOperationIdRef.current = operationId;
-      setPhaseBoth('checking');
-      void runOnce(false);
-    };
-
-    // Initial mount: no explicit target yet, but attempt one
-    // reconstruction check in case there's recent relevant work for
-    // this requisition to resume showing.
-    void runOnce(true);
+    restartRef.current = () => void tick();
+    void tick();
 
     return () => {
-      cancelledRef.current = true;
-      if (timerRef.current) clearTimeout(timerRef.current);
+      cancelled = true;
+      if (timer) clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requisitionId]);
 
   useEffect(() => {
-    wakeRef.current(currentLocalBatch?.operationId || null);
+    if (currentLocalBatch?.operationId) restartRef.current();
   }, [currentLocalBatch?.operationId]);
 
   function addFiles(files: FileList | null) {
@@ -196,7 +154,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     try {
       const response = await fetch(`/api/operations/${trackedOperation.id}/retry`, { method: 'POST' });
       if (!response.ok) throw new Error('Unable to retry failed resumes.');
-      wakeRef.current(trackedOperation.id);
+      restartRef.current();
     } catch {
       alert('Unable to retry failed resume evaluations. Try again.');
     } finally {
@@ -205,14 +163,20 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   }
 
   // Browser-upload phase only (ResumeUploadManager's own ownership -
-  // this controller never infers or overrides it). Anything after
-  // this is covered by the checking/active/terminal views below.
+  // this controller never infers or overrides it).
   const localUploading = Boolean(currentLocalBatch && (currentLocalBatch.phase === 'creating' || currentLocalBatch.phase === 'uploading'));
   const localAccepted = currentLocalBatch?.items.filter((item) => item.status === 'accepted').length || 0;
   const localTotal = currentLocalBatch?.items.length || 0;
   // Comes from confirmed upload persistence only - independent of
   // evaluation polling entirely.
   const showUploadConfirmed = Boolean(currentLocalBatch && localTotal > 0 && localAccepted === localTotal);
+  const trackedOperationActive = Boolean(trackedOperation && isActiveOperation(trackedOperation.status));
+  // A target is known but we have not yet confirmed its state in any
+  // fetch response - show "checking", never blank.
+  const showCheckingStatus = Boolean(
+    targetOperationIdRef.current &&
+    (!trackedOperation || trackedOperation.id !== targetOperationIdRef.current)
+  );
   const visibleFailedItems = trackedOperation?.items.filter((item) => item.status === 'failed') || [];
   const completedItems = trackedOperation?.items.filter((item) => item.status === 'completed').length || 0;
 
@@ -220,7 +184,8 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     if (!trackedOperation) return;
     dismissOperation(trackedOperation.id);
     if (currentLocalBatch?.operationId === trackedOperation.id) dismissBatch(currentLocalBatch.clientBatchKey);
-    wakeRef.current(null);
+    targetOperationIdRef.current = null;
+    setTrackedOperation(null);
   }
 
   function itemPresentation(status: ResumeOperationSummary['items'][number]['status']) {
@@ -247,25 +212,31 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
       {localUploading && currentLocalBatch ? (
         <div className="upload-durable-boundary">
           <StapphireProcessing className="processing-compact" title="Uploading résumés…" detail={`${localAccepted} of ${localTotal} safely uploaded`}/>
-          <small>Keep this browser open until upload completes. Evaluation continues independently after each file is safely stored.</small>
+          <small>Keep this browser open until upload completes.</small>
         </div>
       ) : null}
 
-      {showUploadConfirmed && phase !== 'active' && phase !== 'terminal' && (
-        <p className="upload-confirmed-milestone">✓ {localAccepted} of {localTotal} {localTotal === 1 ? 'résumé' : 'résumés'} successfully uploaded</p>
+      {showUploadConfirmed && !trackedOperation && (
+        <div className="upload-confirmed-milestone">
+          <p>✓ {localAccepted} of {localTotal} {localTotal === 1 ? 'résumé' : 'résumés'} successfully uploaded</p>
+          <small>Evaluation continues in the background. You can navigate anywhere in Stapphire - come back anytime to see progress.</small>
+        </div>
       )}
 
-      {phase === 'checking' && (
+      {showCheckingStatus && (
         <div className="upload-durable-boundary" aria-live="polite">
           <StapphireProcessing className="processing-compact" title="Checking résumé processing status…" detail={pollUnavailable ? 'Reconnecting…' : undefined}/>
         </div>
       )}
 
-      {trackedOperation && (phase === 'active' || phase === 'terminal') && <div className="upload-operation-progress" aria-live="polite">
+      {trackedOperation && !showCheckingStatus && <div className="upload-operation-progress" aria-live="polite">
         {showUploadConfirmed && (
-          <p className="upload-confirmed-milestone">✓ {localAccepted} of {localTotal} {localTotal === 1 ? 'résumé' : 'résumés'} successfully uploaded</p>
+          <div className="upload-confirmed-milestone">
+            <p>✓ {localAccepted} of {localTotal} {localTotal === 1 ? 'résumé' : 'résumés'} successfully uploaded</p>
+            {trackedOperationActive && <small>Evaluation continues in the background.</small>}
+          </div>
         )}
-        {phase === 'active' && (
+        {trackedOperationActive && (
           <StapphireProcessing
             className="processing-compact"
             title="Evaluating résumés…"
@@ -274,7 +245,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
         )}
         <div className="upload-complete">
           <span className="upload-summary">
-            {phase === 'active'
+            {trackedOperationActive
               ? `${completedItems} of ${trackedOperation.progressTotal || trackedOperation.items.length} complete`
               : visibleFailedItems.length > 0
                 ? `${completedItems} completed · ${visibleFailedItems.length} need attention`
@@ -284,7 +255,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
           {/* Done only appears once terminal - dismissing an actively
               processing operation would hide genuinely ongoing
               background progress. Dismissal belongs to terminal state. */}
-          {phase === 'terminal' && <button type="button" className="upload-go-btn" onClick={dismissProgress}>Done</button>}
+          {!trackedOperationActive && <button type="button" className="upload-go-btn" onClick={dismissProgress}>Done</button>}
         </div>
         <ul className="upload-queue">{trackedOperation.items.map((item) => {
           const presentation = itemPresentation(item.status);
