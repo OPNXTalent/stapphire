@@ -7,10 +7,19 @@ import { evaluateResumeAgainstBasis } from './candidateEvaluation';
 import { normalizeHiringCriteriaError } from './hiringCriteriaError';
 import { isRetryableHiringCriteriaError } from './operationTypes';
 import { classifyNullClaim } from './resumeLeaseClassification';
+import { operationQueue } from './operationQueue';
 
 const RESUME_BUCKET = 'candidate-resumes';
 const MAX_ATTEMPTS = 3;
 const LEASE_SECONDS = 360;
+// One completion frees exactly one global concurrency slot
+// (claim_phase1_resume_operation_item caps active 'processing' items
+// at 3, globally, across all requisitions - unchanged by this fix).
+// Republishing exactly one eligible queued item per completion matches
+// the capacity that actually just became available, no more - this is
+// what bounds forward progress without amplifying the queue. See
+// reconcileQueuedResumeCapacity below for the full rationale.
+const RECONCILIATION_BATCH_SIZE = 1;
 
 type ClaimedResumeItem = {
   id: string;
@@ -38,6 +47,69 @@ async function claimItem(itemId: string, leaseToken: string): Promise<ClaimedRes
     throw new Error('Claimed resume operation item is invalid.');
   }
   return data as ClaimedResumeItem;
+}
+
+// Vercel's own message redelivery has proven, in production, to be an
+// unbounded forward-progress mechanism for filling a freed concurrency
+// slot - eligible items sitting idle for minutes after capacity opened
+// up, well beyond the visibility timeout + retry delay this app
+// configures (see production evidence: items eligible ~03:07:30, not
+// claimed until ~03:12:34). This is a second, independent mechanism
+// that directly republishes eligible queued work through the SAME
+// existing queue topic the instant a slot frees up, rather than
+// waiting on redelivery timing. Vercel's own redelivery remains a
+// fallback, not the sole mechanism, alongside this.
+//
+// Bound of RECONCILIATION_BATCH_SIZE=1 is deliberate: one completion
+// frees exactly one slot, so republishing exactly one eligible item
+// matches the capacity that actually became available - no more. If
+// several completions happen concurrently, each independently triggers
+// its own reconciliation call; each finds a different eligible item,
+// since a claimed item is no longer 'queued' for a later query to see
+// - this scales with actual freed capacity, without coordination,
+// without amplifying the queue beyond what open slots warrant.
+//
+// claim_phase1_resume_operation_item remains the sole, atomic
+// authority over who actually gets to process an item under its own
+// row lock - a duplicate republished message for an item someone else
+// already claimed simply defers or no-ops there (see
+// classifyNullClaim), exactly like any other duplicate delivery
+// already does. No second evaluator path: reconciliation only ever
+// enqueues onto the existing topic, processed by the existing worker.
+//
+// Failure here is caught and logged only, never re-thrown - this runs
+// strictly after the triggering item's own completion has already been
+// persisted successfully via complete_phase1_resume_operation_item,
+// and must never retroactively turn that already-successful evaluation
+// into a failure.
+async function reconcileQueuedResumeCapacity(): Promise<void> {
+  try {
+    const { data: activeOperations, error: operationsError } = await supabaseAdmin
+      .from('phase1_operations')
+      .select('id')
+      .eq('operation_type', 'resume_batch_evaluation')
+      .in('status', ['queued', 'processing']);
+    if (operationsError) throw operationsError;
+    const operationIds = (activeOperations || []).map((operation) => operation.id as string);
+    if (operationIds.length === 0) return;
+
+    const { data: eligibleItems, error: itemsError } = await supabaseAdmin
+      .from('phase1_operation_items')
+      .select('id')
+      .in('operation_id', operationIds)
+      .eq('status', 'queued')
+      .lte('available_at', new Date().toISOString())
+      .order('available_at', { ascending: true })
+      .limit(RECONCILIATION_BATCH_SIZE);
+    if (itemsError) throw itemsError;
+
+    for (const eligibleItem of eligibleItems || []) {
+      await operationQueue.enqueueResumeEvaluation({ operationItemId: eligibleItem.id as string });
+      console.info('Resume evaluation capacity reconciliation republished item', { operationItemId: eligibleItem.id });
+    }
+  } catch (error) {
+    console.error('Resume evaluation capacity reconciliation failed', { error: normalizeHiringCriteriaError(error) });
+  }
 }
 
 export async function processResumeEvaluationOperationItem(itemId: string): Promise<void> {
@@ -112,6 +184,7 @@ export async function processResumeEvaluationOperationItem(itemId: string): Prom
     });
     if (completionError) throw completionError;
     console.info('Resume evaluation item completed', { operationId: item.operationId, operationItemId: item.id, requisitionId: item.requisitionId });
+    await reconcileQueuedResumeCapacity();
   } catch (error) {
     const retryable = error instanceof RetryableResumeOperationError || isRetryableHiringCriteriaError(error);
     const message = normalizeHiringCriteriaError(error);

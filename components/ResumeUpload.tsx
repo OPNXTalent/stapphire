@@ -34,49 +34,59 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const latestOperation = operationForCurrentBatch || (!currentLocalBatch ? operations[0] || null : null);
   const visibleOperation = latestOperation && !dismissedOperationIds.has(latestOperation.id) ? latestOperation : null;
 
-  // Safety net: once every file in the current batch has been safely
-  // uploaded (phase 'accepted'), the local bridge should hand off to
-  // the durable operation view as soon as it's available. If that
-  // handoff doesn't happen within a generous window - for whatever
-  // reason, including ones this specific timing isn't fully provable
-  // from static code alone - force the bridge to stop rather than let
-  // it show "Uploading..." indefinitely after uploads have genuinely
-  // finished. This does not affect durable processing itself, only
-  // this local indicator.
-  const [bridgeExpired, setBridgeExpired] = useState(false);
-  useEffect(() => {
-    setBridgeExpired(false);
-    if (currentLocalBatch?.phase !== 'accepted' || visibleOperation) return;
-    const timeout = setTimeout(() => setBridgeExpired(true), 8000);
-    return () => clearTimeout(timeout);
-  }, [currentLocalBatch?.clientBatchKey, currentLocalBatch?.phase, visibleOperation]);
-
+  // Polling: runs continuously while this component is mounted, for
+  // as long as requisitionId is stable - it does NOT stop itself based
+  // on response content (no active operations found, an empty/failed
+  // response, etc). Root cause of a prior production incident where
+  // polling silently died after its first successful poll: a manually
+  // triggered extra poll (see the effect below, fired the instant a
+  // new operation's id becomes known) could race against an
+  // already-in-flight poll dispatched on mount, before any operation
+  // existed. Both polls shared one mutable `timer` variable; whichever
+  // resolved LAST won, regardless of which was actually current - if
+  // the stale, pre-operation poll resolved after the newer one, it
+  // would clear the newer poll's correctly-scheduled timer and then
+  // (seeing no operations in its own stale result) fail to reschedule
+  // anything, permanently ending the loop while the operation was
+  // still genuinely active server-side. Fixed with a monotonic
+  // generation counter: only the most-recently-dispatched poll is
+  // ever allowed to update state or schedule the next one; any older,
+  // late-resolving poll is discarded as stale.
+  const [pollUnavailable, setPollUnavailable] = useState(false);
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let generation = 0;
     async function poll() {
       if (cancelled) return;
+      const myGeneration = ++generation;
       if (timer) clearTimeout(timer);
       try {
         const response = await fetch(`/api/requisitions/${requisitionId}/operations`, { cache: 'no-store' });
         if (!response.ok) throw new Error('Unable to read resume operations.');
         const result = await response.json() as { resumeOperations?: ResumeOperationSummary[] };
-        if (cancelled) return;
+        if (cancelled || myGeneration !== generation) return;
         const next = Array.isArray(result.resumeOperations) ? result.resumeOperations : [];
         setOperations(next);
+        setPollUnavailable(false);
         const signature = next.map((operation) => `${operation.id}:${operation.progressCurrent}:${operation.status}:${operation.items.map((item) => `${item.id}:${item.status}:${item.candidateId || ''}:${item.evaluationId || ''}`).join(',')}`).join('|');
+        // router.refresh() is a pure side effect notification here - it
+        // never gates whether the next poll happens (see the finally
+        // block below, unconditional regardless of this branch).
         if (lastProgress.current !== null && signature !== lastProgress.current) router.refresh();
         lastProgress.current = signature;
-        // Durable operation state is authoritative - keep polling as
-        // long as anything is active, regardless of tab visibility.
-        // A previous version paused polling while the tab was hidden
-        // and relied on focus/visibilitychange to resume it; that
-        // resume path is one more thing that can fail to fire. Simpler
-        // and more robust to just keep polling in the background -
-        // the interval is modest and only runs while work is active.
-        if (next.some((operation) => isActiveOperation(operation.status))) timer = setTimeout(poll, 2500);
       } catch {
-        if (!cancelled) timer = setTimeout(poll, 5000);
+        if (cancelled || myGeneration !== generation) return;
+        // Deliberately do not clear/reset `operations` here - a
+        // transient poll failure must preserve the last-known durable
+        // state, not blank the progress UI out from under the user.
+        setPollUnavailable(true);
+      } finally {
+        // Unconditional reschedule - polling never self-terminates
+        // based on response content (empty, incomplete, stale, or a
+        // failure). Only ever skipped if a newer poll has since been
+        // dispatched (this one is stale) or the component unmounted.
+        if (!cancelled && myGeneration === generation) timer = setTimeout(poll, 2500);
       }
     }
     pollNowRef.current = () => void poll();
@@ -85,15 +95,6 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-    // Deliberately depends only on requisitionId. The old version also
-    // depended on router, currentLocalBatch?.operationId, and
-    // currentLocalBatch?.phase - every phase transition (creating ->
-    // uploading -> accepted) tore this effect down and restarted it,
-    // which could interrupt an in-flight recursive setTimeout schedule.
-    // The loop's own lifecycle should not depend on properties that
-    // change multiple times over a single batch's life; a separate
-    // effect below kicks an immediate poll when a new operation
-    // appears instead, without touching this loop's lifecycle at all.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requisitionId]);
 
@@ -134,30 +135,30 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     }
   }
 
-  const localUploading = currentLocalBatch && (
-    currentLocalBatch.phase === 'creating' ||
-    currentLocalBatch.phase === 'uploading' ||
-    // Browser upload just finished, but the durable operation poll
-    // hasn't caught up yet - keep the bridge visible rather than let
-    // the progress UI drop to nothing for one poll cycle. This is the
-    // exact seam that made a working durable process look broken:
-    // local state ended before durable state was ready to take over.
-    // Gated on !bridgeExpired so this can never persist indefinitely.
-    (currentLocalBatch.phase === 'accepted' && !visibleOperation && !bridgeExpired)
-  );
+  // Browser-upload phase only. Anything after this - waiting for the
+  // durable operation to become visible, evaluation itself - is
+  // covered by the "checking status" / operation-progress views below,
+  // not by this local bridge. There is deliberately no time-based
+  // expiry here: an unresolved handoff must show SOMETHING (checking
+  // status), never silently go blank.
+  const localUploading = Boolean(currentLocalBatch && (currentLocalBatch.phase === 'creating' || currentLocalBatch.phase === 'uploading'));
   const localAccepted = currentLocalBatch?.items.filter((item) => item.status === 'accepted').length || 0;
   const localTotal = currentLocalBatch?.items.length || 0;
-  // Distinct milestone from localUploading above: once every file in
-  // the CURRENT batch is confirmed safely stored, this stays visible
-  // as its own line even after the durable operation view takes over
-  // and evaluation begins - it does not get replaced by "Evaluating",
-  // it sits alongside it. Scoped to the current batch only (not shown
-  // once a different/historical operation is the one being displayed).
-  const showUploadConfirmed = Boolean(
-    currentLocalBatch && localTotal > 0 && localAccepted === localTotal && operationForCurrentBatch
-  );
+  // Upload-confirmed milestone: derived purely from the current local
+  // batch's own accepted-upload count. Does not depend on
+  // operationForCurrentBatch or the latest poll having succeeded -
+  // this must remain visible even while durable status is still being
+  // resolved (checking) or temporarily unavailable (poll failure).
+  const showUploadConfirmed = Boolean(currentLocalBatch && localTotal > 0 && localAccepted === localTotal);
+  // Once the current batch has a known operationId, a processing shell
+  // stays visible until that specific operation is confirmed terminal
+  // or the user dismisses it - never disappearing merely because a
+  // poll hasn't caught up yet or is currently failing.
+  const currentOperationDismissed = Boolean(currentLocalBatch?.operationId && dismissedOperationIds.has(currentLocalBatch.operationId));
+  const showCheckingStatus = Boolean(currentLocalBatch?.operationId && !operationForCurrentBatch && !currentOperationDismissed);
   const visibleFailedItems = visibleOperation?.items.filter((item) => item.status === 'failed') || [];
   const completedItems = visibleOperation?.items.filter((item) => item.status === 'completed').length || 0;
+  const visibleOperationActive = Boolean(visibleOperation && isActiveOperation(visibleOperation.status));
 
   function dismissProgress() {
     if (!visibleOperation) return;
@@ -193,11 +194,21 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
         </div>
       ) : null}
 
+      {showUploadConfirmed && !visibleOperation && (
+        <p className="upload-confirmed-milestone">✓ {localAccepted} of {localTotal} {localTotal === 1 ? 'résumé' : 'résumés'} successfully uploaded</p>
+      )}
+
+      {showCheckingStatus && (
+        <div className="upload-durable-boundary" aria-live="polite">
+          <StapphireProcessing className="processing-compact" title="Checking résumé processing status…" detail={pollUnavailable ? 'Reconnecting…' : undefined}/>
+        </div>
+      )}
+
       {visibleOperation && <div className="upload-operation-progress" aria-live="polite">
         {showUploadConfirmed && (
           <p className="upload-confirmed-milestone">✓ {localAccepted} of {localTotal} {localTotal === 1 ? 'résumé' : 'résumés'} successfully uploaded</p>
         )}
-        {isActiveOperation(visibleOperation.status) && (
+        {visibleOperationActive && (
           <StapphireProcessing
             className="processing-compact"
             title="Evaluating résumés…"
@@ -206,14 +217,18 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
         )}
         <div className="upload-complete">
           <span className="upload-summary">
-            {isActiveOperation(visibleOperation.status)
+            {visibleOperationActive
               ? `${completedItems} of ${visibleOperation.progressTotal || visibleOperation.items.length} complete`
               : visibleFailedItems.length > 0
                 ? `${completedItems} completed · ${visibleFailedItems.length} need attention`
                 : `${completedItems} ${completedItems === 1 ? 'résumé' : 'résumés'} completed`}
           </span>
           {visibleFailedItems.some((item) => item.retryable) && <button type="button" className="upload-go-btn" onClick={retryFailed} disabled={retrying}>{retrying ? 'Retrying…' : 'Retry failed'}</button>}
-          <button type="button" className="upload-go-btn" onClick={dismissProgress}>Done</button>
+          {/* Done only appears once the operation is confirmed terminal -
+              dismissing an actively processing operation would hide its
+              progress UI while work is still genuinely ongoing in the
+              background. Dismissal belongs to terminal state only. */}
+          {!visibleOperationActive && <button type="button" className="upload-go-btn" onClick={dismissProgress}>Done</button>}
         </div>
         <ul className="upload-queue">{visibleOperation.items.map((item) => {
           const presentation = itemPresentation(item.status);
@@ -227,7 +242,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
       </div>}
 
       <div className="upload-bar-row">
-        <button type="button" className="upload-add-btn" onClick={() => inputRef.current?.click()} disabled={Boolean(localUploading)}>+ Add résumés</button>
+        <button type="button" className="upload-add-btn" onClick={() => inputRef.current?.click()} disabled={localUploading}>+ Add résumés</button>
         {staged.length > 0 && !localUploading && <button type="button" className="upload-go-btn" onClick={beginUpload}>Upload {staged.length}</button>}
       </div>
     </div>
