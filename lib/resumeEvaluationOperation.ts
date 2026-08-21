@@ -225,6 +225,10 @@ export async function processResumeEvaluationOperationItem(itemId: string): Prom
       terminal: nextStatus !== 'queued',
       error: message
     });
-    if (nextStatus === 'queued' && item.attemptCount < MAX_ATTEMPTS) throw new RetryableResumeOperationError(message);
+    if (nextStatus === 'queued') {
+      if (item.attemptCount < MAX_ATTEMPTS) throw new RetryableResumeOperationError(message);
+      return;
+    }
+    await reconcileQueuedResumeCapacity();
   }
 }

@@ -23,6 +23,38 @@ test('successful worker completion invokes reconciliation, after the completion 
   assert.match(successPath[0], /await reconcileQueuedResumeCapacity\(\)/, 'expected reconciliation to be triggered after a successful completion, since that is what frees a concurrency slot');
 });
 
+test('terminal worker failure invokes reconciliation after the terminal result is persisted', () => {
+  const failurePath = source.match(/const \{ data: nextStatus[\s\S]*?\n  \}\n\}/);
+  assert.ok(failurePath, 'expected to find the failure path following fail_or_retry_phase1_resume_operation_item');
+  const persistenceIndex = failurePath[0].indexOf("if (persistenceError) throw persistenceError;");
+  const reconciliationIndex = failurePath[0].lastIndexOf('await reconcileQueuedResumeCapacity();');
+  assert.ok(persistenceIndex >= 0, 'expected persisted failure handling');
+  assert.ok(reconciliationIndex > persistenceIndex, 'terminal failure reconciliation must run only after the terminal result has been persisted');
+});
+
+test('retry requeue exits through the existing retry behavior and does not execute terminal-failure reconciliation', () => {
+  const queuedBranch = source.match(/if \(nextStatus === 'queued'\) \{([\s\S]*?)\n    \}/);
+  assert.ok(queuedBranch, 'expected an explicit queued-status branch');
+  assert.match(queuedBranch[1], /throw new RetryableResumeOperationError\(message\)/, 'queued retryable work must preserve the existing queue retry signal');
+  assert.match(queuedBranch[1], /return;/, 'queued work that does not throw must still exit before terminal reconciliation');
+  assert.doesNotMatch(queuedBranch[1], /reconcileQueuedResumeCapacity/, 'queued work must never execute terminal-failure reconciliation');
+
+  const queuedBranchIndex = queuedBranch.index ?? -1;
+  const terminalCall = source.indexOf('await reconcileQueuedResumeCapacity();', queuedBranchIndex + queuedBranch[0].length);
+  assert.ok(terminalCall > queuedBranchIndex + queuedBranch[0].length, 'terminal reconciliation must be positioned after the queued branch exits');
+});
+
+test('terminal-failure reconciliation remains non-fatal after persistence', () => {
+  const reconciliation = source.match(/async function reconcileQueuedResumeCapacity\(\): Promise<void> \{([\s\S]*?)\n\}/);
+  assert.ok(reconciliation, 'expected the existing reconciliation helper');
+  const catchBlock = reconciliation[1].match(/\} catch \(error\) \{([\s\S]*?)\n  \}/);
+  assert.ok(catchBlock, 'expected reconciliation to contain its own catch boundary');
+  assert.doesNotMatch(catchBlock[1], /throw/, 'reconciliation failure must be swallowed after a terminal failure was already persisted');
+
+  const terminalPath = source.match(/if \(nextStatus === 'queued'\) \{[\s\S]*?return;\n    \}\n    await reconcileQueuedResumeCapacity\(\);/);
+  assert.ok(terminalPath, 'terminal reconciliation must use the non-throwing helper only after the queued path has exited');
+});
+
 test('reconciliation is bounded at 3, matching the global concurrency cap - not 1', () => {
   assert.match(
     source,
