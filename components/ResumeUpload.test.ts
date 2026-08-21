@@ -62,10 +62,27 @@ test('router.refresh() is a pure side effect and plays no role in scheduling the
   assert.doesNotMatch(betweenRefreshAndSchedule, /if \(!cancelled/, 'the reschedule condition must not be gated behind router.refresh() having run');
 });
 
-test('upload confirmation is derived from local batch state only, independent of the durable operation entirely', () => {
+test('upload confirmation is superseded by durable per-item uploaded state, not local batch state alone', () => {
   const match = source.match(/const showUploadConfirmed = [\s\S]*?;/);
   assert.ok(match);
-  assert.doesNotMatch(match[0], /trackedOperation/, 'upload confirmation must come from confirmed upload persistence only, never from the polling controller\'s state');
+  assert.match(match[0], /allItemsDurablyUploaded/, 'upload confirmation must be derivable from durable, server-confirmed per-item uploaded state - not local batch state alone - so it can render even while local upload promises remain unresolved');
+});
+
+test('durable upload confirmation does not require the local batch to exist or resolve at all', () => {
+  const match = source.match(/const allItemsDurablyUploaded = [\s\S]*?;/);
+  assert.ok(match, 'expected to find allItemsDurablyUploaded');
+  assert.doesNotMatch(match[0], /currentLocalBatch/, 'durable upload confirmation must be computed from trackedOperation alone, never gated on local batch state - it must render correctly even when currentLocalBatch is null (e.g. after navigation) as long as the durable operation confirms every item uploaded');
+});
+
+test('the local uploading bridge is forcibly suppressed once durable state confirms uploads are done or the operation is terminal - server truth supersedes local phase unconditionally', () => {
+  const match = source.match(/const localUploading = Boolean\(([\s\S]*?)\n  \);/);
+  assert.ok(match, 'expected to find localUploading');
+  assert.match(match[1], /!allItemsDurablyUploaded/, 'expected local uploading state to be suppressed once durable state confirms all items uploaded');
+  assert.match(match[1], /!trackedOperationTerminal/, 'expected local uploading state to be suppressed once the durable operation is terminal, regardless of local phase');
+});
+
+test('the durable per-item uploaded field is read into the render logic, not just fetched and ignored', () => {
+  assert.match(source, /item\.uploaded/, 'expected the durable uploaded field to actually be used in a render-affecting computation');
 });
 
 test('the required "safe to leave" messaging is present once upload is confirmed', () => {

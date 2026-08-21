@@ -162,14 +162,42 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     }
   }
 
+  // Local ResumeUploadManager.phase describes transient browser
+  // transfer activity only - it must never contradict persisted
+  // server truth. Once the durable operation confirms every item is
+  // uploaded, or has reached a terminal state at all, that supersedes
+  // local phase unconditionally - regardless of whether local upload
+  // promises have all settled yet.
+  const durableUploadedCount = trackedOperation ? trackedOperation.items.filter((item) => item.uploaded).length : 0;
+  const durableItemTotal = trackedOperation?.items.length || 0;
+  const allItemsDurablyUploaded = Boolean(trackedOperation && durableItemTotal > 0 && durableUploadedCount === durableItemTotal);
+  const trackedOperationTerminal = Boolean(trackedOperation && !isActiveOperation(trackedOperation.status));
+
   // Browser-upload phase only (ResumeUploadManager's own ownership -
-  // this controller never infers or overrides it).
-  const localUploading = Boolean(currentLocalBatch && (currentLocalBatch.phase === 'creating' || currentLocalBatch.phase === 'uploading'));
+  // this controller never infers that state itself), but forcibly
+  // suppressed the moment durable state says uploading is already
+  // done or the operation is already terminal - server truth wins,
+  // unconditionally, over a possibly-stale local phase.
+  const localUploading = Boolean(
+    currentLocalBatch &&
+    (currentLocalBatch.phase === 'creating' || currentLocalBatch.phase === 'uploading') &&
+    !allItemsDurablyUploaded &&
+    !trackedOperationTerminal
+  );
   const localAccepted = currentLocalBatch?.items.filter((item) => item.status === 'accepted').length || 0;
   const localTotal = currentLocalBatch?.items.length || 0;
-  // Comes from confirmed upload persistence only - independent of
-  // evaluation polling entirely.
-  const showUploadConfirmed = Boolean(currentLocalBatch && localTotal > 0 && localAccepted === localTotal);
+  // Prefer durable, server-confirmed counts once a tracked operation
+  // exists - more authoritative than local, possibly-unresolved
+  // browser state. Falls back to local counts only before any
+  // operation is known yet.
+  const uploadConfirmedCount = trackedOperation ? durableUploadedCount : localAccepted;
+  const uploadConfirmedTotal = trackedOperation ? durableItemTotal : localTotal;
+  // Confirmed either by durable per-item uploaded state (supersedes
+  // local entirely, regardless of unresolved browser upload promises)
+  // or, absent any tracked operation yet, by local accepted count.
+  const showUploadConfirmed = Boolean(
+    allItemsDurablyUploaded || (!trackedOperation && currentLocalBatch && localTotal > 0 && localAccepted === localTotal)
+  );
   const trackedOperationActive = Boolean(trackedOperation && isActiveOperation(trackedOperation.status));
   // A target is known but we have not yet confirmed its state in any
   // fetch response - show "checking", never blank.
@@ -218,7 +246,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
 
       {showUploadConfirmed && !trackedOperation && (
         <div className="upload-confirmed-milestone">
-          <p>✓ {localAccepted} of {localTotal} {localTotal === 1 ? 'résumé' : 'résumés'} successfully uploaded</p>
+          <p>✓ {uploadConfirmedCount} of {uploadConfirmedTotal} {uploadConfirmedTotal === 1 ? 'résumé' : 'résumés'} successfully uploaded</p>
           <small>Evaluation continues in the background. You can navigate anywhere in Stapphire - come back anytime to see progress.</small>
         </div>
       )}
@@ -232,7 +260,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
       {trackedOperation && !showCheckingStatus && <div className="upload-operation-progress" aria-live="polite">
         {showUploadConfirmed && (
           <div className="upload-confirmed-milestone">
-            <p>✓ {localAccepted} of {localTotal} {localTotal === 1 ? 'résumé' : 'résumés'} successfully uploaded</p>
+            <p>✓ {uploadConfirmedCount} of {uploadConfirmedTotal} {uploadConfirmedTotal === 1 ? 'résumé' : 'résumés'} successfully uploaded</p>
             {trackedOperationActive && <small>Evaluation continues in the background.</small>}
           </div>
         )}

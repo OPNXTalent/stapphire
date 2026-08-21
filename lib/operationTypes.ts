@@ -32,6 +32,7 @@ export type ResumeOperationItemSummary = {
   candidateId: string | null;
   evaluationId: string | null;
   retryable: boolean;
+  uploaded: boolean;
 };
 
 export type ResumeOperationSummary = OperationSummary & {

@@ -88,7 +88,8 @@ export async function getResumeOperations(requisitionId: string): Promise<Resume
       errorSummary: item.error_summary,
       candidateId: item.candidate_id,
       evaluationId: item.evaluation_id,
-      retryable: item.input_ref?.uploaded === true && typeof item.input_ref?.contentHash === 'string'
+      retryable: item.input_ref?.uploaded === true && typeof item.input_ref?.contentHash === 'string',
+      uploaded: item.input_ref?.uploaded === true
     }))
   })) as ResumeOperationSummary[];
 }

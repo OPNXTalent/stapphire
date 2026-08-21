@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   isActiveOperation,
   isHiringCriteriaOperationMessage,
@@ -36,4 +37,20 @@ test('operation status classification distinguishes active and terminal states',
   for (const status of ['completed', 'partially_completed', 'failed', 'cancelled'] as const) {
     assert.equal(isTerminalOperation(status), true);
   }
+});
+
+test('ResumeOperationItemSummary exposes durable per-item uploaded state', () => {
+  const source = readFileSync(new URL('./operationTypes.ts', import.meta.url), 'utf8');
+  const typeMatch = source.match(/export type ResumeOperationItemSummary = \{([\s\S]*?)\n\};/);
+  assert.ok(typeMatch, 'expected to find ResumeOperationItemSummary');
+  assert.match(typeMatch[1], /uploaded: boolean;/, 'expected the durable uploaded field to be part of the type sent to the client - required so the UI can supersede local browser upload state with server-confirmed truth');
+});
+
+test('getResumeOperations actually populates the uploaded field from persisted input_ref state, not just the type declaring it', () => {
+  const source = readFileSync(new URL('./operations.ts', import.meta.url), 'utf8');
+  assert.match(
+    source,
+    /uploaded: item\.input_ref\?\.uploaded === true/,
+    'expected the serialized item to expose uploaded straight from the persisted input_ref.uploaded flag - the same field already used internally for retryable, now also exposed directly'
+  );
 });
