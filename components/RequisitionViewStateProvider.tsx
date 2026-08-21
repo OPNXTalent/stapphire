@@ -16,7 +16,7 @@ type RequisitionViewState = {
 const DEFAULT_STATE: RequisitionViewState = {
   view: 'requisition',
   requisitionTab: 'job-description',
-  panelTab: 'teamwork'
+  panelTab: 'upload'
 };
 
 const VIEW_VALUES: RequisitionView[] = ['requisition', 'candidates'];
