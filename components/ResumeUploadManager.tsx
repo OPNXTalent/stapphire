@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { getResumeSourceType } from '@/lib/resumeFiles';
+import { addDismissedResumeOperationId, loadDismissedResumeOperationIds } from '@/lib/resumeOperationDismissals';
 
 type LocalUploadItem = { id: string; filename: string; status: 'pending' | 'uploading' | 'accepted' | 'error'; error?: string };
 export type LocalUploadBatch = {
@@ -23,9 +24,20 @@ type UploadManagerValue = {
 const ResumeUploadManagerContext = createContext<UploadManagerValue | null>(null);
 const UPLOAD_CONCURRENCY = 3;
 
+function browserStorage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function ResumeUploadManagerProvider({ children }: { children: ReactNode }) {
   const [batches, setBatches] = useState<LocalUploadBatch[]>([]);
-  const [dismissedOperationIds, setDismissedOperationIds] = useState<Set<string>>(() => new Set());
+  const [dismissedOperationIds, setDismissedOperationIds] = useState<Set<string>>(() =>
+    loadDismissedResumeOperationIds(browserStorage())
+  );
 
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') console.debug('Resume upload manager mounted');
@@ -102,11 +114,9 @@ export function ResumeUploadManagerProvider({ children }: { children: ReactNode 
     startUpload,
     dismissBatch: (clientBatchKey) => setBatches((current) => current.filter((batch) => batch.clientBatchKey !== clientBatchKey)),
     dismissedOperationIds,
-    dismissOperation: (operationId) => setDismissedOperationIds((current) => {
-      const next = new Set(current);
-      next.add(operationId);
-      return next;
-    })
+    dismissOperation: (operationId) => setDismissedOperationIds((current) =>
+      addDismissedResumeOperationId(current, operationId, browserStorage())
+    )
   }), [batches, dismissedOperationIds]);
   return <ResumeUploadManagerContext.Provider value={value}>{children}</ResumeUploadManagerContext.Provider>;
 }
