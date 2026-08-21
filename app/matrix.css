@@ -115,6 +115,10 @@
 .upload-add-btn:hover{border-color:var(--sapphire-2);color:var(--sapphire);background:none}
 .upload-go-btn{background:var(--deep);color:#fff;border:none;border-radius:6px;font:inherit;font-weight:600;font-size:12.5px;padding:8px 14px;cursor:pointer}
 .upload-go-btn:hover{background:var(--sapphire)}
+.upload-retry-action{appearance:none;background:none;border:0;border-radius:2px;color:var(--sapphire);font:inherit;font-weight:600;font-size:12.5px;padding:0;cursor:pointer}
+.upload-retry-action:hover{text-decoration:underline}
+.upload-retry-action:focus-visible{outline:2px solid var(--sapphire);outline-offset:3px}
+.upload-retry-action:disabled{opacity:.55;cursor:default;text-decoration:none}
 .upload-go-btn:disabled,.upload-add-btn:disabled{opacity:.55;cursor:default}
 .upload-queue{list-style:none;margin:0 0 8px;padding:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;max-width:420px}
 .upload-queue-item{display:flex;align-items:center;gap:9px;padding:6px 10px;font-size:12px;border-bottom:1px solid var(--line)}

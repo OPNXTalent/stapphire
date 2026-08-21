@@ -351,11 +351,11 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
                 ? `${completedItems} completed · ${visibleFailedItems.length} need attention`
                 : `${completedItems} ${completedItems === 1 ? 'résumé' : 'résumés'} completed`}
           </span>
-          {visibleFailedItems.some((item) => item.retryable) && <button type="button" className="upload-go-btn" onClick={retryFailed} disabled={retrying}>{retrying ? 'Retrying…' : 'Retry failed'}</button>}
           {/* Done only appears once terminal - dismissing an actively
               processing operation would hide genuinely ongoing
               background progress. Dismissal belongs to terminal state. */}
           {!trackedOperationActive && <button type="button" className="upload-go-btn" onClick={dismissProgress}>Done</button>}
+          {visibleFailedItems.some((item) => item.retryable) && <button type="button" className="upload-retry-action" onClick={retryFailed} disabled={retrying}>{retrying ? 'Retrying…' : 'Retry'}</button>}
         </div>
         <ul className="upload-queue">{trackedOperation.items.map((item) => {
           const presentation = itemPresentation(item.status);
