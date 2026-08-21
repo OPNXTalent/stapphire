@@ -35,6 +35,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!data || typeof data !== 'object' || typeof data.id !== 'string' || !Array.isArray(data.items)) {
       throw new Error('Resume operation creation returned an invalid state.');
     }
+    console.info('Resume operation created', {
+      requisitionId: params.id,
+      clientBatchKey,
+      createdOperationId: data.id
+    });
     return NextResponse.json({ operation: data }, { status: 201 });
   } catch (error) {
     console.error('Resume operation creation failed', { requisitionId: params.id, error: normalizeHiringCriteriaError(error) });

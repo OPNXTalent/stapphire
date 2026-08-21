@@ -60,6 +60,22 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const dismissedOperationIdsRef = useRef(dismissedOperationIds);
   dismissedOperationIdsRef.current = dismissedOperationIds;
   const restartRef = useRef<() => void>(() => {});
+  const pollSequenceRef = useRef(0);
+  // Diagnostic mirror only. Polling authority and rendering decisions
+  // continue to use their existing state/refs directly; no production
+  // decision may depend on this snapshot.
+  const diagnosticRenderRef = useRef({
+    clientBatchKey: currentLocalBatch?.clientBatchKey || null,
+    localOperationId,
+    localPhase: currentLocalBatch?.phase || null,
+    trackedOperationId: trackedOperation?.id || null
+  });
+  diagnosticRenderRef.current = {
+    clientBatchKey: currentLocalBatch?.clientBatchKey || null,
+    localOperationId,
+    localPhase: currentLocalBatch?.phase || null,
+    trackedOperationId: trackedOperation?.id || null
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -80,7 +96,21 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
       }
       inFlight = true;
       try {
-        const response = await fetch(`/api/requisitions/${requisitionId}/operations`, { cache: 'no-store' });
+        const pollSequence = ++pollSequenceRef.current;
+        const diagnostic = diagnosticRenderRef.current;
+        const response = await fetch(`/api/requisitions/${requisitionId}/operations`, {
+          cache: 'no-store',
+          headers: {
+            'x-stapphire-poll-sequence': String(pollSequence),
+            'x-stapphire-client-batch-key': diagnostic.clientBatchKey || '',
+            'x-stapphire-local-operation-id': diagnostic.localOperationId || '',
+            'x-stapphire-local-phase': diagnostic.localPhase || '',
+            'x-stapphire-target-operation-id': targetOperationIdRef.current || '',
+            'x-stapphire-target-context-operation-id': targetContextRef.current?.localOperationId || '',
+            'x-stapphire-tracked-operation-id': diagnostic.trackedOperationId || '',
+            'x-stapphire-attempted-reconstruction': String(attemptedReconstruction)
+          }
+        });
         if (!response.ok) throw new Error('Unable to read resume operations.');
         const result = await response.json() as { resumeOperations?: ResumeOperationSummary[] };
         if (cancelled) return;

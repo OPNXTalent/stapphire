@@ -6,7 +6,12 @@ import { normalizeHiringCriteriaError } from '@/lib/hiringCriteriaError';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+function diagnosticHeader(request: Request, name: string): string | null {
+  const value = request.headers.get(name);
+  return value && value.length <= 200 ? value : null;
+}
+
+export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
     const [operation, resumeOperations] = await Promise.all([
       getLatestHiringCriteriaOperation(params.id),
@@ -24,6 +29,22 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     if (resumeOperations.length > 0 || operation) {
       revalidatePath(`/requisitions/${params.id}`);
     }
+    const returnedOperationIds = resumeOperations.map((resumeOperation) => resumeOperation.id);
+    const targetOperationId = diagnosticHeader(request, 'x-stapphire-target-operation-id');
+    console.info('Resume operation identity poll', {
+      requisitionId: params.id,
+      pollSequence: diagnosticHeader(request, 'x-stapphire-poll-sequence'),
+      clientBatchKey: diagnosticHeader(request, 'x-stapphire-client-batch-key'),
+      localOperationId: diagnosticHeader(request, 'x-stapphire-local-operation-id'),
+      localPhase: diagnosticHeader(request, 'x-stapphire-local-phase'),
+      targetOperationId,
+      targetContextOperationId: diagnosticHeader(request, 'x-stapphire-target-context-operation-id'),
+      trackedOperationId: diagnosticHeader(request, 'x-stapphire-tracked-operation-id'),
+      attemptedReconstruction: diagnosticHeader(request, 'x-stapphire-attempted-reconstruction'),
+      returnedOperationIds,
+      newestReturnedOperationId: returnedOperationIds[0] || null,
+      targetPresentInResponse: Boolean(targetOperationId && returnedOperationIds.includes(targetOperationId))
+    });
     return NextResponse.json({ operation, resumeOperations }, {
       headers: { 'Cache-Control': 'private, no-store, max-age=0' }
     });
