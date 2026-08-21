@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { StapphireProcessing } from '@/components/StapphireProcessing';
 import { useResumeUploadManager } from '@/components/ResumeUploadManager';
 import type { ResumeOperationSummary } from '@/lib/operationTypes';
 import { isActiveOperation } from '@/lib/operationTypes';
 import { getResumeSourceType, MAX_RESUME_BATCH_SIZE, MAX_RESUME_SIZE } from '@/lib/resumeFiles';
 import { resolveTrackedOperationAuthority } from '@/lib/resumeUploadAuthority';
+import { dispatchResumeOperationTerminal, resolveTerminalObservation } from '@/lib/resumeTerminalSync';
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -31,10 +31,9 @@ const POLL_INTERVAL_MS = 3000;
 // skipped and retried next interval - never a second concurrent
 // request.
 export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
-  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const lastProgress = useRef<string | null>(null);
   const starting = useRef(false);
+  const terminalNotificationOperationIdsRef = useRef<Set<string>>(new Set());
   const { batches, startUpload, dismissBatch, dismissedOperationIds, dismissOperation } = useResumeUploadManager();
   const [staged, setStaged] = useState<File[]>([]);
   const [retrying, setRetrying] = useState(false);
@@ -49,7 +48,15 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   // (and therefore without tearing the loop down and restarting it
   // every time a batch changes phase).
   const targetOperationIdRef = useRef<string | null>(null);
-  targetOperationIdRef.current = currentLocalBatch?.operationId || null;
+  const localOperationId = currentLocalBatch?.operationId || null;
+  const targetContextRef = useRef<{ requisitionId: string; localOperationId: string | null } | null>(null);
+  const targetContext = targetContextRef.current;
+  if (!targetContext || targetContext.requisitionId !== requisitionId || targetContext.localOperationId !== localOperationId) {
+    targetOperationIdRef.current = localOperationId && terminalNotificationOperationIdsRef.current.has(localOperationId)
+      ? null
+      : localOperationId;
+    targetContextRef.current = { requisitionId, localOperationId };
+  }
   const dismissedOperationIdsRef = useRef(dismissedOperationIds);
   dismissedOperationIdsRef.current = dismissedOperationIds;
   const restartRef = useRef<() => void>(() => {});
@@ -98,11 +105,20 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
         setPollUnavailable(false);
         if (found) {
           setTrackedOperation(found);
-          const signature = `${found.id}:${found.progressCurrent}:${found.status}:${found.items.map((item) => `${item.id}:${item.status}:${item.candidateId || ''}:${item.evaluationId || ''}`).join(',')}`;
-          // Pure side-effect notification on signature change - plays
-          // no role in whether/when the next poll happens.
-          if (lastProgress.current !== null && signature !== lastProgress.current) router.refresh();
-          lastProgress.current = signature;
+          const observation = resolveTerminalObservation(
+            found.status,
+            terminalNotificationOperationIdsRef.current.has(found.id)
+          );
+          if (!observation.active) {
+            // Terminal durable state owns the UI immediately. Clear the
+            // polling target before React renders the terminal result so
+            // no later trigger can restart polling for this operation.
+            targetOperationIdRef.current = null;
+            if (observation.notifyTerminal) {
+              terminalNotificationOperationIdsRef.current.add(found.id);
+              dispatchResumeOperationTerminal(window, { requisitionId, operationId: found.id });
+            }
+          }
         }
 
         const stillUnresolved = targetOperationIdRef.current && (!found || isActiveOperation(found.status));
@@ -131,7 +147,10 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   }, [requisitionId]);
 
   useEffect(() => {
-    if (currentLocalBatch?.operationId) restartRef.current();
+    const operationId = currentLocalBatch?.operationId;
+    if (!operationId || terminalNotificationOperationIdsRef.current.has(operationId)) return;
+    targetOperationIdRef.current = operationId;
+    restartRef.current();
   }, [currentLocalBatch?.operationId]);
 
   function addFiles(files: FileList | null) {
@@ -155,6 +174,8 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     try {
       const response = await fetch(`/api/operations/${trackedOperation.id}/retry`, { method: 'POST' });
       if (!response.ok) throw new Error('Unable to retry failed resumes.');
+      terminalNotificationOperationIdsRef.current.delete(trackedOperation.id);
+      targetOperationIdRef.current = trackedOperation.id;
       restartRef.current();
     } catch {
       alert('Unable to retry failed resume evaluations. Try again.');

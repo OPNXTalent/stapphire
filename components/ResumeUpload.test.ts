@@ -49,17 +49,22 @@ test('on mount with no known local batch, one reconstruction attempt recovers th
   assert.match(source, /if \(!targetId && attemptedReconstruction\) return;/, 'expected polling to stop once reconstruction has been tried and found nothing, rather than continuing to poll indefinitely merely because the page remains open');
 });
 
-test('router.refresh() is a pure side effect and plays no role in scheduling the next poll', () => {
+test('terminal notification is independent of the polling reschedule decision', () => {
   const tickMatch = source.match(/async function tick\(\) \{([\s\S]*?)\n    \}\n/);
   assert.ok(tickMatch);
-  const refreshIndex = tickMatch[1].indexOf('router.refresh()');
+  const notificationIndex = tickMatch[1].indexOf('dispatchResumeOperationTerminal');
   const scheduleIndex = tickMatch[1].indexOf('stillUnresolved');
-  assert.ok(refreshIndex >= 0 && scheduleIndex >= 0);
-  // The scheduling decision (stillUnresolved -> setTimeout) does not
-  // read anything set by the refresh call - they are independent
-  // statements in sequence, not conditionally linked.
-  const betweenRefreshAndSchedule = tickMatch[1].slice(refreshIndex, scheduleIndex);
-  assert.doesNotMatch(betweenRefreshAndSchedule, /if \(!cancelled/, 'the reschedule condition must not be gated behind router.refresh() having run');
+  assert.ok(notificationIndex >= 0 && scheduleIndex >= 0);
+  assert.ok(notificationIndex < scheduleIndex, 'terminal notification must occur before the independent scheduling decision');
+  assert.match(tickMatch[1], /targetOperationIdRef\.current = null/, 'terminal state must clear the polling target before rendering');
+});
+
+test('manual retry deliberately reopens tracking for the same formerly-terminal operation', () => {
+  const retryMatch = source.match(/async function retryFailed\(\) \{([\s\S]*?)\n  \}/);
+  assert.ok(retryMatch);
+  assert.match(retryMatch[1], /terminalNotificationOperationIdsRef\.current\.delete\(trackedOperation\.id\)/);
+  assert.match(retryMatch[1], /targetOperationIdRef\.current = trackedOperation\.id/);
+  assert.match(retryMatch[1], /restartRef\.current\(\)/);
 });
 
 test('upload confirmation is superseded by durable per-item uploaded state, not local batch state alone', () => {

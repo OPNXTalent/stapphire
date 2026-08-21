@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { RequisitionJobDescription } from '@/components/RequisitionJobDescription';
 import { useRequisitionViewState, type RequisitionTab } from '@/components/RequisitionViewStateProvider';
+import { subscribeToResumeOperationTerminal } from '@/lib/resumeTerminalSync';
 
 const requisitionTabs: { id: RequisitionTab; label: string }[] = [
   { id: 'job-description', label: 'Job Description' },
@@ -39,6 +40,15 @@ export function RequisitionViewToggle({
   const view = state.view;
   const requisitionTab = state.requisitionTab;
   const [archiving, setArchiving] = useState(false);
+
+  // ResumeUpload lives in the shared WorkspacePanel, outside this
+  // route's Server Component subtree. A terminal operation therefore
+  // notifies the page-owned client boundary, which performs exactly
+  // one refresh of the current requisition data. This is the refresh
+  // that supplies CandidateMatrix with newly persisted candidates.
+  useEffect(() => {
+    return subscribeToResumeOperationTerminal(window, requisitionId, () => router.refresh());
+  }, [requisitionId, router]);
   const activeRequisitionView = requisitionTab === 'hiring-criteria'
     ? hiringCriteriaView
     : requisitionTab === 'market-analysis'
