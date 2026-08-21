@@ -4,6 +4,10 @@
 // for storage (e.g. saving the original resume) without reading the
 // upload twice.
 
+export function sanitizeExtractedText(text: string): string {
+  return text.replaceAll('\0', '');
+}
+
 export async function extractTextFromBuffer(
   buffer: Buffer,
   filename: string,
@@ -14,7 +18,7 @@ export async function extractTextFromBuffer(
   if (mimeType === 'application/pdf' || name.endsWith('.pdf')) {
     const pdfParse = (await import('pdf-parse')).default;
     const parsed = await pdfParse(buffer);
-    return parsed.text;
+    return sanitizeExtractedText(parsed.text);
   }
 
   if (
@@ -27,7 +31,7 @@ export async function extractTextFromBuffer(
     // parses the document structure.
     const mammoth = await import('mammoth');
     const result = await mammoth.extractRawText({ buffer });
-    return result.value;
+    return sanitizeExtractedText(result.value);
   }
 
   // Legacy .doc (pre-2007 binary format) isn't supported by mammoth or
@@ -39,5 +43,5 @@ export async function extractTextFromBuffer(
   }
 
   // Plain text and anything else: treat as UTF-8 text.
-  return buffer.toString('utf-8');
+  return sanitizeExtractedText(buffer.toString('utf-8'));
 }
