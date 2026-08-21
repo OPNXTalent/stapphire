@@ -7,6 +7,7 @@ import { useResumeUploadManager } from '@/components/ResumeUploadManager';
 import type { ResumeOperationSummary } from '@/lib/operationTypes';
 import { isActiveOperation } from '@/lib/operationTypes';
 import { getResumeSourceType, MAX_RESUME_BATCH_SIZE, MAX_RESUME_SIZE } from '@/lib/resumeFiles';
+import { resolveTrackedOperationAuthority } from '@/lib/resumeUploadAuthority';
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -162,22 +163,31 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     }
   }
 
-  // Local ResumeUploadManager.phase describes transient browser
-  // transfer activity only - it must never contradict persisted
-  // server truth. Once the durable operation confirms every item is
-  // uploaded, or has reached a terminal state at all, that supersedes
-  // local phase unconditionally - regardless of whether local upload
-  // promises have all settled yet.
-  const durableUploadedCount = trackedOperation ? trackedOperation.items.filter((item) => item.uploaded).length : 0;
-  const durableItemTotal = trackedOperation?.items.length || 0;
-  const allItemsDurablyUploaded = Boolean(trackedOperation && durableItemTotal > 0 && durableUploadedCount === durableItemTotal);
-  const trackedOperationTerminal = Boolean(trackedOperation && !isActiveOperation(trackedOperation.status));
+  // Durable state may only supersede or confirm the CURRENT local
+  // batch's state when it is PROVEN to represent that exact batch -
+  // the batch already has an operationId, and trackedOperation is
+  // confirmed to be tracking that same operation. Before a batch has
+  // an operationId, there is no durable operation that can be proven
+  // to represent it yet, so local creating/uploading state remains
+  // authoritative regardless of anything trackedOperation currently
+  // holds - which could be a retained, unrelated OLDER operation (e.g.
+  // a prior batch's now-terminal operation), and must never suppress
+  // or provide confirmation counts for a brand new, unrelated batch.
+  const trackedOperationAuthority = resolveTrackedOperationAuthority(currentLocalBatch, trackedOperation);
+  const trackedOperationMatchesCurrentBatch = trackedOperationAuthority.matchesCurrentBatch;
+  const trackedOperationAuthoritative = trackedOperationAuthority.authoritative;
+
+  const durableUploadedCount = trackedOperationAuthoritative && trackedOperation ? trackedOperation.items.filter((item) => item.uploaded).length : 0;
+  const durableItemTotal = trackedOperationAuthoritative && trackedOperation ? trackedOperation.items.length : 0;
+  const allItemsDurablyUploaded = Boolean(trackedOperationAuthoritative && trackedOperation && durableItemTotal > 0 && durableUploadedCount === durableItemTotal);
+  const trackedOperationTerminal = Boolean(trackedOperationAuthoritative && trackedOperation && !isActiveOperation(trackedOperation.status));
 
   // Browser-upload phase only (ResumeUploadManager's own ownership -
   // this controller never infers that state itself), but forcibly
-  // suppressed the moment durable state says uploading is already
-  // done or the operation is already terminal - server truth wins,
-  // unconditionally, over a possibly-stale local phase.
+  // suppressed once durable state PROVEN to belong to this exact batch
+  // says uploading is already done or the operation is already
+  // terminal - server truth wins, unconditionally, over a possibly-
+  // stale local phase, but only once that identity is established.
   const localUploading = Boolean(
     currentLocalBatch &&
     (currentLocalBatch.phase === 'creating' || currentLocalBatch.phase === 'uploading') &&
@@ -186,17 +196,19 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   );
   const localAccepted = currentLocalBatch?.items.filter((item) => item.status === 'accepted').length || 0;
   const localTotal = currentLocalBatch?.items.length || 0;
-  // Prefer durable, server-confirmed counts once a tracked operation
-  // exists - more authoritative than local, possibly-unresolved
-  // browser state. Falls back to local counts only before any
-  // operation is known yet.
-  const uploadConfirmedCount = trackedOperation ? durableUploadedCount : localAccepted;
-  const uploadConfirmedTotal = trackedOperation ? durableItemTotal : localTotal;
-  // Confirmed either by durable per-item uploaded state (supersedes
-  // local entirely, regardless of unresolved browser upload promises)
-  // or, absent any tracked operation yet, by local accepted count.
+  // Prefer durable, server-confirmed counts whenever trackedOperation
+  // is authoritative - more authoritative than local, possibly-
+  // unresolved browser state. Falls back to local counts whenever a
+  // local batch exists but trackedOperation doesn't (yet, or ever)
+  // match it.
+  const uploadConfirmedCount = trackedOperationAuthoritative && trackedOperation ? durableUploadedCount : localAccepted;
+  const uploadConfirmedTotal = trackedOperationAuthoritative && trackedOperation ? durableItemTotal : localTotal;
+  // Confirmed either by durable per-item uploaded state for the
+  // authoritative operation (supersedes local entirely, regardless of
+  // unresolved browser upload promises) or, absent that, by local
+  // accepted count for a batch trackedOperation doesn't yet match.
   const showUploadConfirmed = Boolean(
-    allItemsDurablyUploaded || (!trackedOperation && currentLocalBatch && localTotal > 0 && localAccepted === localTotal)
+    allItemsDurablyUploaded || (!(trackedOperationAuthoritative && trackedOperation) && currentLocalBatch && localTotal > 0 && localAccepted === localTotal)
   );
   const trackedOperationActive = Boolean(trackedOperation && isActiveOperation(trackedOperation.status));
   // A target is known but we have not yet confirmed its state in any
@@ -204,6 +216,15 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const showCheckingStatus = Boolean(
     targetOperationIdRef.current &&
     (!trackedOperation || trackedOperation.id !== targetOperationIdRef.current)
+  );
+  // The full operation-progress view (per-item list, Done, Retry) may
+  // only show trackedOperation's data when it's authoritative right
+  // now - otherwise a retained, unrelated older operation (e.g. a
+  // just-completed prior batch) could keep rendering its own stale
+  // progress/Done button while a brand new, non-matching batch is
+  // uploading.
+  const showTrackedOperationView = Boolean(
+    trackedOperation && !showCheckingStatus && trackedOperationAuthoritative
   );
   const visibleFailedItems = trackedOperation?.items.filter((item) => item.status === 'failed') || [];
   const completedItems = trackedOperation?.items.filter((item) => item.status === 'completed').length || 0;
@@ -257,7 +278,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
         </div>
       )}
 
-      {trackedOperation && !showCheckingStatus && <div className="upload-operation-progress" aria-live="polite">
+      {showTrackedOperationView && trackedOperation && <div className="upload-operation-progress" aria-live="polite">
         {showUploadConfirmed && (
           <div className="upload-confirmed-milestone">
             <p>✓ {uploadConfirmedCount} of {uploadConfirmedTotal} {uploadConfirmedTotal === 1 ? 'résumé' : 'résumés'} successfully uploaded</p>

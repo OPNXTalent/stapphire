@@ -68,10 +68,20 @@ test('upload confirmation is superseded by durable per-item uploaded state, not 
   assert.match(match[0], /allItemsDurablyUploaded/, 'upload confirmation must be derivable from durable, server-confirmed per-item uploaded state - not local batch state alone - so it can render even while local upload promises remain unresolved');
 });
 
-test('durable upload confirmation does not require the local batch to exist or resolve at all', () => {
+test('durable upload confirmation is scoped through the extracted authority resolver, not derived from trackedOperation independent of batch identity', () => {
   const match = source.match(/const allItemsDurablyUploaded = [\s\S]*?;/);
   assert.ok(match, 'expected to find allItemsDurablyUploaded');
-  assert.doesNotMatch(match[0], /currentLocalBatch/, 'durable upload confirmation must be computed from trackedOperation alone, never gated on local batch state - it must render correctly even when currentLocalBatch is null (e.g. after navigation) as long as the durable operation confirms every item uploaded');
+  assert.match(match[0], /trackedOperationAuthoritative/, 'durable confirmation must be gated on the operation being proven authoritative for the current context (matches the current batch, or there is no local batch to conflict with) - never computed from trackedOperation alone, which could be a retained, unrelated older operation');
+});
+
+test('resolveTrackedOperationAuthority is imported from the extracted, independently-tested authority module, not reimplemented inline', () => {
+  assert.match(source, /import \{ resolveTrackedOperationAuthority \} from '@\/lib\/resumeUploadAuthority';/, 'expected the identity/scoping logic to be imported from lib/resumeUploadAuthority.ts, which has its own direct behavioral tests, rather than duplicated inline where it could drift');
+});
+
+test('the full operation-progress view (with its Done button) is also scoped by authority, not shown for a retained older operation while an unrelated new batch is uploading', () => {
+  const match = source.match(/const showTrackedOperationView = Boolean\(([\s\S]*?)\n  \);/);
+  assert.ok(match, 'expected to find showTrackedOperationView');
+  assert.match(match[1], /trackedOperationAuthoritative/, 'the full progress/Done view must respect the same authority scoping - otherwise a stale, terminal older operation could keep showing its own Done button while a brand new batch is still uploading');
 });
 
 test('the local uploading bridge is forcibly suppressed once durable state confirms uploads are done or the operation is terminal - server truth supersedes local phase unconditionally', () => {
