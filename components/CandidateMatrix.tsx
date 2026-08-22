@@ -21,6 +21,8 @@ export type MatrixCandidate = {
   hardSkills: number | null;
   softSkills: number | null;
   keywords: number | null;
+  otherRequirements: number | null;
+  knockout: boolean;
   assessment: unknown;
   disposition: Disposition | null;
 };
@@ -179,6 +181,7 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
     return (
       <div
         className={`matrix-row-head ${disposition || ''} ${extraClass} ${draggedId === candidate.id ? 'dragging' : ''} ${dropTargetId === candidate.id ? 'drop-target' : ''}`}
+        style={{ gridTemplateColumns: '80px minmax(200px,1.6fr) 86px repeat(5,minmax(68px,1fr)) 100px' }}
         role="button"
         tabIndex={0}
         aria-expanded={isOpen}
@@ -244,19 +247,22 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
         </span>
         <span className="matrix-row-name">{candidate.name}</span>
         <span className="facet-cell matrix-row-match">
-          <span className="score-num">{candidate.match === null ? '—' : `${candidate.match}%`}</span>
-          <span className={`facet-mini ${facetTier(candidate.match)}`} />
+          <span className="score-num" style={candidate.knockout ? { color: 'var(--red)' } : undefined}>
+            {candidate.knockout ? 'Knockout' : candidate.match === null ? '—' : `${candidate.match.toFixed(1)}%`}
+          </span>
+          {!candidate.knockout && <span className={`facet-mini ${facetTier(candidate.match)}`} />}
         </span>
-        <span className="matrix-big4" aria-label="Big 4 category assessments">
+        <span className="matrix-big4" aria-label="Big 5 category assessments">
           {([
             ['Responsibilities', candidate.responsibilities],
             ['Hard Skills', candidate.hardSkills],
             ['Soft Skills', candidate.softSkills],
-            ['Keywords', candidate.keywords]
+            ['Keywords', candidate.keywords],
+            ['Other Requirements', candidate.otherRequirements]
           ] as const).map(([label, score]) => (
-            <span className="matrix-assessment" key={label} title={`${label}: ${categoryAssessment(score)}`}>
+            <span className="matrix-assessment" key={label} title={`${label}: ${score === null ? '—' : `${score}%`} (${categoryAssessment(score)})`}>
               <span className="matrix-assessment-label">{label}</span>
-              <span className="matrix-assessment-value">{categoryAssessment(score)}</span>
+              <span className="matrix-assessment-value">{score === null ? '—' : `${score}%`}</span>
             </span>
           ))}
         </span>
