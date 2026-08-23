@@ -130,7 +130,7 @@ export function CandidateReport({
         <table className="weighted-alignment-table criteria-category-rollups">
           <thead><tr><th>Category</th><th>Applied Weight</th><th>Score</th></tr></thead>
           <tbody>
-            {([['responsibilities','Job Responsibilities'],['hard_skills','Hard Skills'],['soft_skills','Soft Skills'],['keywords','Keywords & Terminology'],['other_requirements','Other Requirements']] as const).map(([key,label])=><tr key={key}><td>{label}</td><td className="numeric">{number(a.categoryWeights[key]) ?? 0}%</td><td className="numeric">{number(a.categoryRollups[key]) === null ? '—' : `${number(a.categoryRollups[key])}%`}</td></tr>)}
+            {([['responsibilities','Duties'],['hard_skills','Hard Skills'],['soft_skills','Soft Skills'],['keywords','Keywords'],['other_requirements','Other']] as const).map(([key,label])=><tr key={key}><td>{label}</td><td className="numeric">{number(a.categoryWeights[key]) ?? 0}%</td><td className="numeric">{number(a.categoryRollups[key]) === null ? '—' : `${number(a.categoryRollups[key])}%`}</td></tr>)}
             <tr><td><strong>Match</strong></td><td className="numeric"><strong>100%</strong></td><td className="numeric"><strong>{overallMatch}%</strong></td></tr>
           </tbody>
         </table>
@@ -150,7 +150,7 @@ export function CandidateReport({
         </thead>
         <tbody>
           <tr>
-            <td>Job Responsibilities</td>
+            <td>Duties</td>
             <td className="numeric">50%</td>
             <td className="numeric">{responsibilities}%</td>
           </tr>
@@ -165,7 +165,7 @@ export function CandidateReport({
             <td className="numeric">{softSkills}%</td>
           </tr>
           <tr>
-            <td>Keywords &amp; Terminology</td>
+            <td>Keywords</td>
             <td className="numeric">10%</td>
             <td className="numeric">{keywords}%</td>
           </tr>
