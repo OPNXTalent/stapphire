@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { CandidateFilesPanel } from '@/components/CandidateFilesPanel';
+import { CandidateTeamworkPanel } from '@/components/CandidateTeamworkPanel';
 import { InterviewQuestionBankPanel } from '@/components/InterviewQuestionBankPanel';
 import { ResumeUpload } from '@/components/ResumeUpload';
 import { RequisitionNotes } from '@/components/RequisitionNotes';
@@ -33,12 +34,16 @@ export function WorkspacePanel({
   const { state, update } = useRequisitionViewState(requisitionId || '');
   const tab = state.panelTab;
   const [candidate, setCandidate] = useState<CandidateFilesSelection | null>(null);
+  const [candidatePanelTab, setCandidatePanelTab] = useState<'files' | 'teamwork'>('files');
   const [interviewContext, setInterviewContext] = useState<InterviewWorkspaceFocusDetail | null>(null);
 
   useEffect(() => {
     function focusCandidate(event: Event) {
       const detail = (event as CustomEvent<CandidateFilesSelection>).detail;
-      if (detail?.id) setCandidate(detail);
+      if (detail?.id) {
+        setCandidate(detail);
+        setCandidatePanelTab('files');
+      }
     }
 
     function clearCandidate(event: Event) {
@@ -69,6 +74,7 @@ export function WorkspacePanel({
 
   useEffect(() => {
     setCandidate(null);
+    setCandidatePanelTab('files');
     setInterviewContext(null);
   }, [pathname]);
 
@@ -84,7 +90,7 @@ export function WorkspacePanel({
   if (collapsed) {
     return (
       <div className="pull-tab" onClick={onExpand}>
-        {showQuestionBank ? 'Question Bank' : 'Hiring Workspace'}
+        {showQuestionBank ? 'Question Bank' : showCandidateFiles ? (candidatePanelTab === 'teamwork' ? 'Teamwork' : 'Candidate Files') : 'Hiring Workspace'}
       </div>
     );
   }
@@ -101,7 +107,19 @@ export function WorkspacePanel({
           initialPositionTitle={interviewContext?.positionTitle}
         />
       ) : showCandidateFiles && candidate ? (
-        <CandidateFilesPanel candidate={candidate} />
+        <>
+          <div className="side-tabs">
+            <button type="button" className={`side-tab ${candidatePanelTab === 'files' ? 'active' : ''}`} onClick={() => setCandidatePanelTab('files')}>
+              Candidate Files
+            </button>
+            <button type="button" className={`side-tab ${candidatePanelTab === 'teamwork' ? 'active' : ''}`} onClick={() => setCandidatePanelTab('teamwork')}>
+              Teamwork
+            </button>
+          </div>
+          <div className="side-content" style={{ padding: 0 }}>
+            {candidatePanelTab === 'files' ? <CandidateFilesPanel candidate={candidate} /> : <CandidateTeamworkPanel candidate={candidate} />}
+          </div>
+        </>
       ) : (
         <>
           <div className="side-tabs">
