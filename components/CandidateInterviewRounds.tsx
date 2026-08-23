@@ -12,6 +12,12 @@ type AggregateRow = {
   average: number;
 };
 
+type ParticipantAssessment = {
+  contributor: string;
+  recommendation: 'Proceed' | 'Decline' | 'Undecided - Need more information';
+  comments: string;
+};
+
 type InterviewRound = {
   id: StageId;
   title: string;
@@ -19,6 +25,7 @@ type InterviewRound = {
   submitted: number;
   overall: number | null;
   rows: AggregateRow[];
+  assessments: ParticipantAssessment[];
 };
 
 const PHONE_SCREEN_SAMPLE: AggregateRow[] = [
@@ -26,6 +33,24 @@ const PHONE_SCREEN_SAMPLE: AggregateRow[] = [
   { area: 'Job Knowledge', timesRated: 6, average: 4.17 },
   { area: 'Problem Solving', timesRated: 6, average: 3.83 },
   { area: 'Interpersonal Skills', timesRated: 3, average: 4.67 }
+];
+
+const PHONE_SCREEN_ASSESSMENTS: ParticipantAssessment[] = [
+  {
+    contributor: 'Participant 1',
+    recommendation: 'Proceed',
+    comments: 'Strong communicator with relevant experience and clear examples throughout the interview.'
+  },
+  {
+    contributor: 'Participant 2',
+    recommendation: 'Proceed',
+    comments: 'Demonstrated solid job knowledge and handled the problem-solving questions well.'
+  },
+  {
+    contributor: 'Participant 3',
+    recommendation: 'Undecided - Need more information',
+    comments: 'Good overall conversation. I would like more detail about the candidate’s experience with financial reporting before making a final recommendation.'
+  }
 ];
 
 export function CandidateInterviewRounds({
@@ -47,7 +72,8 @@ export function CandidateInterviewRounds({
       participants: 3,
       submitted: 3,
       overall: 4.21,
-      rows: PHONE_SCREEN_SAMPLE
+      rows: PHONE_SCREEN_SAMPLE,
+      assessments: PHONE_SCREEN_ASSESSMENTS
     },
     {
       id: 'round-1',
@@ -55,7 +81,8 @@ export function CandidateInterviewRounds({
       participants: 0,
       submitted: 0,
       overall: null,
-      rows: []
+      rows: [],
+      assessments: []
     },
     {
       id: 'round-2',
@@ -63,7 +90,8 @@ export function CandidateInterviewRounds({
       participants: 0,
       submitted: 0,
       overall: null,
-      rows: []
+      rows: [],
+      assessments: []
     }
   ], [positionTitle]);
 
@@ -148,6 +176,23 @@ export function CandidateInterviewRounds({
               <span>Overall Interview Average</span>
               <strong>★ {round.overall?.toFixed(2)} / 5</strong>
             </div>
+
+            {round.assessments.length > 0 && (
+              <section className={styles.participantAssessments} aria-label="Participant interview assessments">
+                <h3>Participant Assessments</h3>
+                <div className={styles.assessmentList}>
+                  {round.assessments.map((assessment) => (
+                    <article className={styles.assessment} key={assessment.contributor}>
+                      <div className={styles.assessmentHeader}>
+                        <strong>{assessment.contributor}</strong>
+                        <span>{assessment.recommendation}</span>
+                      </div>
+                      <p>{assessment.comments}</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
           </>
         ) : (
           <div className={styles.empty}>
