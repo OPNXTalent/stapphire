@@ -106,21 +106,31 @@ export function CandidateInterviewRounds({
 
   function renderInterviewBar(round: InterviewRound, selected = false) {
     return (
-      <button
-        key={round.id}
-        type="button"
-        className={`${styles.bar} ${selected ? styles.selectedBar : ''}`}
-        onClick={() => setView(selected ? null : round.id)}
-        aria-expanded={selected}
-      >
-        <span>{round.title}</span>
-        <span className={styles.meta}>
-          <span>{round.participants} Participants</span>
-          <span>•</span>
-          <span>{round.submitted} Submitted</span>
-          {round.overall !== null && <><span>•</span><strong>★ {round.overall.toFixed(2)}</strong></>}
-        </span>
-      </button>
+      <div key={round.id} className={`${styles.bar} ${selected ? styles.selectedBar : ''}`}>
+        <a
+          className={styles.interviewTitleLink}
+          href={interviewUrl(round.id)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Open ${round.title} participant form`}
+        >
+          {round.title}
+        </a>
+        <button
+          type="button"
+          className={styles.resultToggle}
+          onClick={() => setView(selected ? null : round.id)}
+          aria-expanded={selected}
+          aria-label={`${selected ? 'Collapse' : 'View'} ${round.title} results`}
+        >
+          <span className={styles.meta}>
+            <span>{round.participants} Participants</span>
+            <span>•</span>
+            <span>{round.submitted} Submitted</span>
+            {round.overall !== null && <><span>•</span><strong>★ {round.overall.toFixed(2)}</strong></>}
+          </span>
+        </button>
+      </div>
     );
   }
 
@@ -151,9 +161,6 @@ export function CandidateInterviewRounds({
   return (
     <section className={styles.records}>
       {renderInterviewBar(round, true)}
-      <div className={styles.interviewActions}>
-        <a href={interviewUrl(round.id)} target="_blank" rel="noreferrer">Invite Participant</a>
-      </div>
       <div className={styles.aggregateCanvas}>
         {round.rows.length ? (
           <>
@@ -197,7 +204,7 @@ export function CandidateInterviewRounds({
         ) : (
           <div className={styles.empty}>
             <strong>No submitted scores yet.</strong>
-            <span>Invite a participant to begin this interview stage.</span>
+            <span>Open the interview title to share the participant form.</span>
           </div>
         )}
       </div>
