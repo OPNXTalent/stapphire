@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { CandidateFilesPanel } from '@/components/CandidateFilesPanel';
+import { InterviewQuestionBankPanel } from '@/components/InterviewQuestionBankPanel';
 import { ResumeUpload } from '@/components/ResumeUpload';
 import { RequisitionNotes } from '@/components/RequisitionNotes';
 import { useRequisitionViewState } from '@/components/RequisitionViewStateProvider';
@@ -23,6 +24,7 @@ export function WorkspacePanel({
 }) {
   const pathname = usePathname();
   const requisitionId = pathname.match(/^\/requisitions\/([^/]+)/)?.[1] || null;
+  const isInterviewBuilder = /^\/requisitions\/[^/]+\/interviews\/builder\/?$/.test(pathname);
   const { state, update } = useRequisitionViewState(requisitionId || '');
   const tab = state.panelTab;
   const [candidate, setCandidate] = useState<CandidateFilesSelection | null>(null);
@@ -53,7 +55,7 @@ export function WorkspacePanel({
   if (collapsed) {
     return (
       <div className="pull-tab" onClick={onExpand}>
-        Hiring Workspace
+        {isInterviewBuilder ? 'Question Bank' : 'Hiring Workspace'}
       </div>
     );
   }
@@ -66,7 +68,9 @@ export function WorkspacePanel({
         ›
       </button>
 
-      {showCandidateFiles && candidate ? (
+      {isInterviewBuilder ? (
+        <InterviewQuestionBankPanel />
+      ) : showCandidateFiles && candidate ? (
         <CandidateFilesPanel candidate={candidate} />
       ) : (
         <>
