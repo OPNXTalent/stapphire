@@ -112,8 +112,7 @@ export function ParticipantInterviewPreview({
               >
                 <span className={styles.questionNumber}>Q{index + 1}</span>
                 <span className={styles.questionText}>{question.text}</span>
-                <span className={styles.questionMeta}>{question.areas.length} Area{question.areas.length === 1 ? '' : 's'} · {progress.label}</span>
-                <span className={styles.chevron} aria-hidden="true">⌄</span>
+                <span className={styles.questionMeta}>{progress.label}</span>
               </button>
 
               {isExpanded && (
