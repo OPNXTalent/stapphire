@@ -20,4 +20,9 @@
 .question button{width:100%;padding:6px 8px;border:1px solid var(--line-strong);background:transparent;color:var(--sapphire);font-size:10.5px;font-weight:700}
 .question button:hover:not(:disabled){border-color:var(--sapphire);background:var(--sapphire-pale)}
 .question button:disabled{color:var(--muted);opacity:.8}
+.wildcard{border-style:dashed;border-color:var(--sapphire-2);background:var(--sapphire-pale);cursor:default}
+.wildcard:active{cursor:default}
+.wildcardIcon{display:flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--sapphire-2);border-radius:50%;color:var(--sapphire);font:700 13px/1 var(--mono)}
+.wildcardCopy{display:block;margin-top:3px;color:var(--muted);font-size:10.5px;line-height:1.35}
+.wildcard button{margin-top:9px;background:#fff}
 .footer{padding:9px 12px 12px;border-top:1px solid var(--line);color:var(--faint);font-size:10.5px;line-height:1.35}
