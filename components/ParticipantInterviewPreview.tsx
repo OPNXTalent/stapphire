@@ -20,12 +20,20 @@ export function ParticipantInterviewPreview({
   const [comments, setComments] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [shareStatus, setShareStatus] = useState('');
+  const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(questions[0]?.id ?? null);
 
   const ratingCount = questions.reduce((sum, question) => sum + question.areas.length, 0);
   const completedCount = Object.keys(ratings).length;
 
   function setRating(questionId: string, area: string, value: number) {
     setRatings((current) => ({ ...current, [`${questionId}:${area}`]: value }));
+  }
+
+  function questionProgress(questionId: string, areas: string[]) {
+    const rated = areas.filter((area) => ratings[`${questionId}:${area}`]).length;
+    if (rated === 0) return { rated, label: 'Not Rated' };
+    if (rated === areas.length) return { rated, label: 'Complete' };
+    return { rated, label: 'In Progress' };
   }
 
   async function shareInterview() {
@@ -90,43 +98,60 @@ export function ParticipantInterviewPreview({
       </header>
 
       <main className={styles.form}>
-        {questions.map((question, index) => (
-          <section className={styles.question} key={question.id}>
-            <div className={styles.questionHeader}>
-              <span>Q{index + 1}</span>
-              <h2>{question.text}</h2>
-            </div>
-            <div className={styles.ratingTable}>
-              <div className={`${styles.ratingRow} ${styles.tableHead}`}>
-                <span>Area of Evaluation</span>
-                <span>Rating</span>
-              </div>
-              {question.areas.map((area) => {
-                const key = `${question.id}:${area}`;
-                const selected = ratings[key] || 0;
-                return (
-                  <div className={styles.ratingRow} key={area}>
-                    <span>{area}</span>
-                    <span className={styles.stars} role="radiogroup" aria-label={`${area} rating`}>
-                      {[1,2,3,4,5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          role="radio"
-                          aria-checked={selected === star}
-                          aria-label={`${star} star${star === 1 ? '' : 's'}`}
-                          onClick={() => setRating(question.id, area, star)}
-                        >
-                          {star <= selected ? '★' : '☆'}
-                        </button>
-                      ))}
-                    </span>
+        {questions.map((question, index) => {
+          const isExpanded = expandedQuestionId === question.id;
+          const progress = questionProgress(question.id, question.areas);
+          return (
+            <section className={`${styles.question} ${isExpanded ? styles.questionExpanded : ''}`} key={question.id}>
+              <button
+                type="button"
+                className={styles.questionToggle}
+                aria-expanded={isExpanded}
+                aria-controls={`question-${question.id}`}
+                onClick={() => setExpandedQuestionId(isExpanded ? null : question.id)}
+              >
+                <span className={styles.questionNumber}>Q{index + 1}</span>
+                <span className={styles.questionText}>{question.text}</span>
+                <span className={styles.questionMeta}>{question.areas.length} Area{question.areas.length === 1 ? '' : 's'} · {progress.label}</span>
+                <span className={styles.chevron} aria-hidden="true">⌄</span>
+              </button>
+
+              {isExpanded && (
+                <div className={styles.questionBody} id={`question-${question.id}`}>
+                  <div className={styles.ratingTable}>
+                    <div className={`${styles.ratingRow} ${styles.tableHead}`}>
+                      <span>Area of Evaluation</span>
+                      <span>Rating</span>
+                    </div>
+                    {question.areas.map((area) => {
+                      const key = `${question.id}:${area}`;
+                      const selected = ratings[key] || 0;
+                      return (
+                        <div className={styles.ratingRow} key={area}>
+                          <span>{area}</span>
+                          <span className={styles.stars} role="radiogroup" aria-label={`${area} rating`}>
+                            {[1,2,3,4,5].map((star) => (
+                              <button
+                                key={star}
+                                type="button"
+                                role="radio"
+                                aria-checked={selected === star}
+                                aria-label={`${star} star${star === 1 ? '' : 's'}`}
+                                onClick={() => setRating(question.id, area, star)}
+                              >
+                                {star <= selected ? '★' : '☆'}
+                              </button>
+                            ))}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
 
         <section className={styles.comments}>
           <label htmlFor="overall-comments">Overall comments <span>Optional</span></label>
