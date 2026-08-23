@@ -5,6 +5,14 @@
 .matrix-selected-detail>.matrix-row.expanded{display:flex;height:100%;min-height:0;margin-bottom:0}
 .matrix-selected-detail>.matrix-row.expanded>.matrix-row-body{display:flex;flex:1;min-height:0;flex-direction:column;padding-bottom:0}
 
+/* Hiring Criteria actions live as quiet text controls inside the Total Weight banner. */
+.criteria-meter{grid-template-columns:auto auto minmax(0,1fr) auto}
+.criteria-meter-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-left:14px;white-space:nowrap}
+.criteria-meter-actions button{padding:0;border:0;border-radius:0;background:transparent;color:currentColor;font-size:12px;font-weight:700;line-height:1.2}
+.criteria-meter-actions button:hover:not(:disabled){background:transparent;text-decoration:underline;text-underline-offset:3px}
+.criteria-meter-actions button:focus-visible{outline:1px solid currentColor;outline-offset:3px}
+.criteria-meter-actions button:disabled{background:transparent;opacity:.4;cursor:default}
+
 /* The evaluation is subordinate content inside the candidate record, not a second page heading. */
 .matrix-row-body .evaluation{font-size:12px}
 .matrix-row-body .hero h1{font-size:22px;line-height:1.18}
@@ -36,4 +44,14 @@
   .requisition-tab-panel>.hiring-criteria>.criteria-category-focused{display:flex;flex:1;min-height:0;flex-direction:column;overflow:hidden}
   .requisition-tab-panel>.hiring-criteria>.criteria-category-focused>.criteria-category-select{position:relative;z-index:2;flex:none;background:var(--paper);overflow-anchor:none}
   .requisition-tab-panel>.hiring-criteria>.criteria-category-focused>.criteria-category-detail{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable}
+
+  /* Interviews use the selected round banner as the final fixed element.
+     The interview editor beneath it owns the only vertical scrollbar. */
+  .requisition-tab-panel:has(>section[data-interview-plan="selected"]){display:flex;overflow:hidden;scrollbar-gutter:auto}
+  .requisition-tab-panel>section[data-interview-plan="selected"]{flex:1;min-height:0;overflow:hidden}
+}
+
+@media(max-width:700px){
+  .criteria-meter{grid-template-columns:auto auto 1fr}
+  .criteria-meter-actions{grid-column:1/-1;justify-self:end;margin:4px 0 0}
 }
