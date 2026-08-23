@@ -56,7 +56,6 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
   const [dispositions, setDispositions] = useState<Record<string, Disposition | null>>(() =>
     Object.fromEntries(candidates.map((c) => [c.id, c.disposition]))
   );
-  const [savingId, setSavingId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -115,29 +114,8 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
     if (index >= 0 && target) void moveCandidate(id, target.id);
   }
 
-  // Sets disposition for exactly one candidate - the per-row dropdown.
-  async function updateDisposition(id: string, value: string) {
-    const next = (value || null) as Disposition | null;
-    const previous = dispositions[id];
-    setDispositions((prev) => ({ ...prev, [id]: next }));
-    setSavingId(id);
-    try {
-      const res = await fetch(`/api/candidates/${id}/disposition`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ disposition: next ?? '' })
-      });
-      if (!res.ok) throw new Error('Failed to save');
-      if (next === 'delete') router.refresh();
-    } catch {
-      setDispositions((prev) => ({ ...prev, [id]: previous }));
-    } finally {
-      setSavingId(null);
-    }
-  }
-
-  // Sets the same disposition across every currently-selected candidate
-  // at once - the bulk dropdown, driven by the checkboxes.
+  // Status changes are selection-driven: choose one or more candidates,
+  // then apply the disposition once from the toolbar.
   async function applyDispositionToSelected(value: string) {
     if (!value || selectedIds.size === 0) return;
     const next = value as Disposition;
@@ -177,10 +155,11 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
   // contexts can never visually drift apart.
   function renderBanner(candidate: MatrixCandidate, isOpen: boolean, rank: number, extraClass = ''): ReactNode {
     const disposition = dispositions[candidate.id];
+    const dispositionLabel = disposition ? DISPOSITION_LABEL[disposition] : 'No status';
     return (
       <div
         className={`matrix-row-head ${disposition || ''} ${extraClass} ${draggedId === candidate.id ? 'dragging' : ''} ${dropTargetId === candidate.id ? 'drop-target' : ''}`}
-        style={{ gridTemplateColumns: '80px minmax(200px,1.6fr) 86px repeat(5,minmax(68px,1fr)) 100px' }}
+        style={{ gridTemplateColumns: '80px minmax(190px,1.7fr) 78px repeat(5,minmax(70px,1fr))' }}
         role="button"
         tabIndex={0}
         aria-expanded={isOpen}
@@ -244,7 +223,27 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
             aria-label={`Select ${candidate.name}`}
           />
         </span>
-        <span className="matrix-row-name">{candidate.name}</span>
+        <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
+          <span className="matrix-row-name" style={{ width: '100%' }}>{candidate.name}</span>
+          <span
+            aria-label={`Status: ${dispositionLabel}`}
+            style={{
+              maxWidth: '100%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              color: 'var(--muted)',
+              fontFamily: 'var(--mono)',
+              fontSize: '9px',
+              fontWeight: 700,
+              letterSpacing: '.04em',
+              lineHeight: 1.1,
+              textTransform: 'uppercase'
+            }}
+          >
+            {dispositionLabel}
+          </span>
+        </span>
         <span className="facet-cell matrix-row-match">
           <span className="score-num">{candidate.match === null ? '—' : `${candidate.match}%`}</span>
           <span className={`facet-mini ${facetTier(candidate.match)}`} />
@@ -263,19 +262,6 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
             </span>
           ))}
         </span>
-        <select
-          className={`disposition-select ${disposition || ''}`}
-          value={disposition || ''}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => updateDisposition(candidate.id, e.target.value)}
-          disabled={savingId === candidate.id}
-        >
-          <option value="">Status</option>
-          <option value="screen">{DISPOSITION_LABEL.screen}</option>
-          <option value="interview">{DISPOSITION_LABEL.interview}</option>
-          <option value="hire">{DISPOSITION_LABEL.hire}</option>
-          <option value="delete">{DISPOSITION_LABEL.delete}</option>
-        </select>
       </div>
     );
   }
