@@ -6,10 +6,15 @@
 .matrix-selected-detail>.matrix-row.expanded>.matrix-row-body{display:flex;flex:1;min-height:0;flex-direction:column;padding-bottom:0}
 
 /* The evaluation is subordinate content inside the candidate record, not a second page heading. */
-.matrix-row-body .hero h1{font-size:24px;line-height:1.18}
-.matrix-row-body .hero .match{font-size:26px;line-height:1.12}
-.matrix-row-body .evaluation h2{font-size:17px;margin-top:24px;margin-bottom:9px}
-.matrix-row-body .evaluation h3{font-size:14px;margin-top:20px}
+.matrix-row-body .evaluation{font-size:12px}
+.matrix-row-body .hero h1{font-size:22px;line-height:1.18}
+.matrix-row-body .hero .match{font-size:24px;line-height:1.12}
+.matrix-row-body .evaluation h2{font-size:15px;margin-top:24px;margin-bottom:9px}
+.matrix-row-body .evaluation h3{font-size:12px;margin-top:20px}
+.matrix-row-body .evaluation .prose{font-size:12px}
+.matrix-row-body .evaluation .hero .muted{font-size:8px}
+.matrix-row-body .evaluation .evaluation-date{font-size:9.5px}
+.matrix-row-body .evaluation th{font-size:9px}
 
 @media(min-width:861px){
   html:has(.requisition-workspace.candidates-active),body:has(.requisition-workspace.candidates-active){overflow:hidden;scrollbar-gutter:auto}
