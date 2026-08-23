@@ -95,7 +95,9 @@ export function InterviewPlan({
   }, [selectedRound, positionTitle]);
 
   useEffect(() => {
-    return () => window.dispatchEvent(new CustomEvent(INTERVIEW_WORKSPACE_CLEAR_EVENT));
+    return () => {
+      window.dispatchEvent(new CustomEvent(INTERVIEW_WORKSPACE_CLEAR_EVENT));
+    };
   }, []);
 
   useEffect(() => {
