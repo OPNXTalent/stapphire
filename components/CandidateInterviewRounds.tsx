@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { buildQuestionBank } from '@/lib/interviewQuestionBank';
 import styles from './CandidateInterviewRounds.module.css';
 
@@ -122,32 +122,49 @@ export function CandidateInterviewRounds({
     return `/interview/preview/${stage}?${params.toString()}`;
   }
 
+  function toggleRound(round: InterviewRound, selected: boolean) {
+    setView(selected ? null : round.id);
+  }
+
+  function handleBarKeyDown(event: KeyboardEvent<HTMLDivElement>, round: InterviewRound, selected: boolean) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggleRound(round, selected);
+    }
+  }
+
+  function stopLinkToggle(event: MouseEvent<HTMLAnchorElement>) {
+    event.stopPropagation();
+  }
+
   function renderInterviewBar(round: InterviewRound, selected = false) {
     return (
-      <div key={round.id} className={`${styles.bar} ${selected ? styles.selectedBar : ''}`}>
+      <div
+        key={round.id}
+        className={`${styles.bar} ${selected ? styles.selectedBar : ''}`}
+        role="button"
+        tabIndex={0}
+        aria-expanded={selected}
+        aria-label={`${selected ? 'Collapse' : 'View'} ${round.title} results`}
+        onClick={() => toggleRound(round, selected)}
+        onKeyDown={(event) => handleBarKeyDown(event, round, selected)}
+      >
         <a
           className={styles.interviewTitleLink}
           href={interviewUrl(round.id)}
           target="_blank"
           rel="noreferrer"
           aria-label={`Open ${round.title} participant form`}
+          onClick={stopLinkToggle}
         >
           {round.title}
         </a>
-        <button
-          type="button"
-          className={styles.resultToggle}
-          onClick={() => setView(selected ? null : round.id)}
-          aria-expanded={selected}
-          aria-label={`${selected ? 'Collapse' : 'View'} ${round.title} results`}
-        >
-          <span className={styles.meta}>
-            <span>{round.participants} Participants</span>
-            <span>•</span>
-            <span>{round.submitted} Submitted</span>
-            {round.overall !== null && <><span>•</span><strong>★ {round.overall.toFixed(2)}</strong></>}
-          </span>
-        </button>
+        <span className={styles.meta}>
+          <span>{round.participants} Participants</span>
+          <span>•</span>
+          <span>{round.submitted} Submitted</span>
+          {round.overall !== null && <><span>•</span><strong>★ {round.overall.toFixed(2)}</strong></>}
+        </span>
       </div>
     );
   }
