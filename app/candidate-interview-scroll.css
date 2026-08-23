@@ -1,5 +1,5 @@
-/* Candidate detail viewport behavior.
-   Keep the requisition/candidate context and selected interview banner fixed;
+/* Requisition and candidate detail viewport behavior.
+   Keep workspace context and the selected content banner fixed;
    only the content below the selected banner owns vertical scrolling. */
 .matrix-selected-detail{overflow:hidden}
 .matrix-selected-detail>.matrix-row.expanded{display:flex;height:100%;min-height:0;margin-bottom:0}
@@ -17,7 +17,24 @@
 .matrix-row-body .evaluation th{font-size:9px}
 
 @media(min-width:861px){
-  html:has(.requisition-workspace.candidates-active),body:has(.requisition-workspace.candidates-active){overflow:hidden;scrollbar-gutter:auto}
-  .workspace-content:has(.requisition-workspace.candidates-active){height:calc(100dvh - 56px);padding-top:22px;padding-bottom:18px;overflow:hidden}
-  .requisition-workspace.candidates-active>.requisition-view-tabs,.requisition-workspace.candidates-active>.requisition-title-row{flex:none}
+  html:has(.requisition-workspace.candidates-active),body:has(.requisition-workspace.candidates-active),
+  html:has(.requisition-workspace.requisition-active),body:has(.requisition-workspace.requisition-active){overflow:hidden;scrollbar-gutter:auto}
+
+  .workspace-content:has(.requisition-workspace.candidates-active),
+  .workspace-content:has(.requisition-workspace.requisition-active){height:calc(100dvh - 56px);padding-top:22px;padding-bottom:18px;overflow:hidden}
+
+  .requisition-workspace.candidates-active>.requisition-view-tabs,.requisition-workspace.candidates-active>.requisition-title-row,
+  .requisition-workspace.requisition-active>.requisition-view-tabs,.requisition-workspace.requisition-active>.requisition-title-row{flex:none}
+
+  /* Hiring Criteria mirrors the Candidate detail viewport: all context through
+     the selected category banner stays fixed; only the rows below it scroll. */
+  .requisition-tab-panel:has(>.hiring-criteria){display:flex;overflow:hidden;scrollbar-gutter:auto}
+  .requisition-tab-panel>.hiring-criteria{display:flex;flex:1;min-height:0;flex-direction:column;overflow:hidden;margin-bottom:0!important}
+  .requisition-tab-panel>.hiring-criteria>.hiring-criteria-heading,
+  .requisition-tab-panel>.hiring-criteria>.criteria-treatment-help,
+  .requisition-tab-panel>.hiring-criteria>.criteria-meter{flex:none}
+  .requisition-tab-panel>.hiring-criteria>.criteria-category-focused{display:flex;flex:1;min-height:0;flex-direction:column;overflow:hidden}
+  .requisition-tab-panel>.hiring-criteria>.criteria-category-focused>.criteria-category-select{flex:none}
+  .requisition-tab-panel>.hiring-criteria>.criteria-category-focused>.criteria-category-detail{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}
+  .requisition-tab-panel>.hiring-criteria>.criteria-active-note{flex:none;margin-bottom:0}
 }
