@@ -19,12 +19,39 @@ export function ParticipantInterviewPreview({
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [comments, setComments] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [shareStatus, setShareStatus] = useState('');
 
   const ratingCount = questions.reduce((sum, question) => sum + question.areas.length, 0);
   const completedCount = Object.keys(ratings).length;
 
   function setRating(questionId: string, area: string, value: number) {
     setRatings((current) => ({ ...current, [`${questionId}:${area}`]: value }));
+  }
+
+  async function shareInterview() {
+    const url = window.location.href;
+    const title = `${stageLabel} — ${positionTitle}`;
+    const text = `You're invited to participate in the ${stageLabel} for ${candidateName}.`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text, url });
+        setShareStatus('Shared');
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShareStatus('Link copied');
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      try {
+        await navigator.clipboard.writeText(url);
+        setShareStatus('Link copied');
+      } catch {
+        setShareStatus('Unable to share');
+      }
+    }
+
+    window.setTimeout(() => setShareStatus(''), 2200);
   }
 
   if (submitted) {
@@ -44,7 +71,16 @@ export function ParticipantInterviewPreview({
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <div className={styles.brand}><StapphireBrand decorative /></div>
+        <div className={styles.headerTop}>
+          <div className={styles.brand}><StapphireBrand decorative /></div>
+          <div className={styles.shareWrap}>
+            <button type="button" className={styles.shareButton} onClick={shareInterview} aria-label="Share interview invitation">
+              <span aria-hidden="true">↗</span>
+              Share
+            </button>
+            {shareStatus && <span className={styles.shareStatus} role="status">{shareStatus}</span>}
+          </div>
+        </div>
         <span className={styles.preview}>PRE-PRODUCTION PARTICIPANT FORM</span>
         <h1>{stageLabel} — {positionTitle}</h1>
         <div className={styles.context}>
