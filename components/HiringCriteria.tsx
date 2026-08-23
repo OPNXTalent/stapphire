@@ -31,7 +31,6 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
   const meterState = total < 100 ? 'under' : total > 100 ? 'over' : 'balanced';
   const meterCopy = total < 100 ? `${100 - total} points remain to allocate` : total > 100 ? `${total - 100} points must be removed` : 'Balanced';
   const ready = model?.extractionStatus === 'ready' && criteria.length > 0;
-  const changedFromDefault = criteria.some((criterion) => (weights[criterion.id] ?? criterion.draftWeight) !== criterion.defaultWeight || (knockouts[criterion.id] ?? criterion.isKnockout));
 
   useEffect(() => {
     setWeights(Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.draftWeight])));
@@ -231,7 +230,6 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
     <section className="hiring-criteria" aria-labelledby="hiring-criteria-heading">
       <div className="hiring-criteria-heading">
         <div><span className="eyebrow">Hiring calibration</span><h2 id="hiring-criteria-heading">Hiring Criteria</h2></div>
-        {ready && <div className="criteria-actions"><button type="button" className="criteria-reset" onClick={() => runAction('reset')} disabled={!changedFromDefault || action !== null || savingId !== null}>Reset</button><button type="button" className="criteria-apply" onClick={() => runAction('apply')} disabled={total !== 100 || action !== null || savingId !== null}>{action === 'apply' ? 'Updating…' : 'Update'}</button></div>}
       </div>
 
       {sourceIsStale&&<div className="source-stale-notice">Job Description has changed since these Hiring Criteria were generated.</div>}
@@ -261,7 +259,6 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
           ) : (
             <div className="criteria-category-list">{categories.map((category) => renderCategorySelection(category, false))}</div>
           )}
-          <p className="criteria-active-note">{model.latestAppliedVersionId ? 'Draft changes do not affect the latest applied version or Candidate Match.' : 'No applied version yet. Review or calibrate this draft, then apply it at exactly 100%.'}</p>
         </>
       )}
     </section>
