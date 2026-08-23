@@ -14,6 +14,11 @@ type RequisitionLink = { id: string; title: string };
 export function AppShell({ requisitions, children }: { requisitions: RequisitionLink[]; children: React.ReactNode }) {
   const pathname = usePathname();
   const [rightCollapsed, setRightCollapsed] = useState(false);
+
+  if (pathname.startsWith('/interview/preview/')) {
+    return <>{children}</>;
+  }
+
   return (
     <ResumeUploadManagerProvider>
     <RequisitionViewStateProvider>
