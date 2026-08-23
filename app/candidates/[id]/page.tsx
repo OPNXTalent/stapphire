@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { CandidateReport } from '@/components/CandidateReport';
 import { CandidateDetailActions } from '@/components/CandidateDetailActions';
+import { InterviewEvaluationSummaryPreview } from '@/components/InterviewEvaluationSummaryPreview';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,6 +46,7 @@ export default async function CandidatePage({ params }: { params: { id: string }
         assessment={e.assessment}
         evaluationDate={e.created_at}
       />
+      <InterviewEvaluationSummaryPreview candidateName={candidate.full_name} />
     </>
   );
 }
