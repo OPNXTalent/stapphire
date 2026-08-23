@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
-import { InterviewScorecardPreview } from '@/components/InterviewScorecardPreview';
 import {
   AREAS_OF_EVALUATION,
   buildQuestionBank,
@@ -19,6 +18,7 @@ import {
 import styles from './InterviewBuilder.module.css';
 
 type Question = { id: string; sourceId?: string; text: string; areas: string[] };
+type RatingState = Record<string, number>;
 
 function id() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
@@ -40,6 +40,10 @@ function parseBankQuestion(event: DragEvent<HTMLElement>): BankQuestion | null {
   }
 }
 
+function ratingKey(questionId: string, area: string) {
+  return `${questionId}::${area}`;
+}
+
 export function InterviewBuilder({ positionTitle, hasJobDescription }: { positionTitle: string; hasJobDescription: boolean }) {
   const bank = useMemo(() => buildQuestionBank(positionTitle), [positionTitle]);
   const initialQuestions = bank.filter((question) => question.stage === 'phone-screen').slice(0, 3).map(cloneFromBank);
@@ -47,12 +51,11 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
   const [title, setTitle] = useState(`Phone Screen — ${positionTitle}`);
   const [questions, setQuestions] = useState<Question[]>(() => initialQuestions);
   const [openAreaId, setOpenAreaId] = useState<string | null>(null);
-  const [previewId, setPreviewId] = useState<string | null>(null);
   const [draggedQuestionId, setDraggedQuestionId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [ratings, setRatings] = useState<RatingState>({});
 
   const stageConfig = INTERVIEW_STAGES.find((item) => item.id === stage)!;
-  const previewQuestion = questions.find((question) => question.id === previewId) || questions[0] || null;
   const coveredAreas = useMemo(() => new Set(questions.flatMap((question) => question.areas)).size, [questions]);
   const usedSourceIds = useMemo(() => new Set(questions.map((question) => question.sourceId).filter(Boolean) as string[]), [questions]);
 
@@ -94,16 +97,27 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
     setQuestions((current) => current.map((question) => {
       if (question.id !== questionId) return question;
       const selected = question.areas.includes(area);
-      if (selected) return { ...question, areas: question.areas.filter((item) => item !== area) };
+      if (selected) {
+        setRatings((currentRatings) => {
+          const next = { ...currentRatings };
+          delete next[ratingKey(questionId, area)];
+          return next;
+        });
+        return { ...question, areas: question.areas.filter((item) => item !== area) };
+      }
       if (question.areas.length >= 4) return question;
       return { ...question, areas: [...question.areas, area] };
     }));
   }
 
+  function setAreaRating(questionId: string, area: string, rating: number) {
+    setRatings((current) => ({ ...current, [ratingKey(questionId, area)]: rating }));
+  }
+
   function addManualQuestion() {
     const next: Question = { id: id(), text: 'Add a new interview question…', areas: [] };
     setQuestions((current) => [...current, next]);
-    setPreviewId(next.id);
+    setOpenAreaId(next.id);
   }
 
   function addBankQuestion(source: BankQuestion, targetId?: string) {
@@ -121,7 +135,7 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
 
   function removeQuestion(questionId: string) {
     setQuestions((current) => current.filter((question) => question.id !== questionId));
-    if (previewId === questionId) setPreviewId(null);
+    setRatings((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${questionId}::`))));
     if (openAreaId === questionId) setOpenAreaId(null);
   }
 
@@ -192,7 +206,7 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
           <div className={styles.metrics} aria-label="Interview metrics">
             <span className={styles.metric}>{questions.length} Questions</span>
             <span className={styles.metric}>{coveredAreas} Areas Evaluated</span>
-            <span className={styles.metric}>1–5 Star Rating</span>
+            <span className={styles.metric}>1–5 Stars per Area</span>
           </div>
         </div>
 
@@ -202,8 +216,7 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
             return (
               <div
                 key={question.id}
-                className={`${styles.questionCard} ${previewQuestion?.id === question.id ? styles.active : ''} ${dropTargetId === question.id ? styles.dropTarget : ''}`}
-                onClick={() => setPreviewId(question.id)}
+                className={`${styles.questionCard} ${dropTargetId === question.id ? styles.dropTarget : ''}`}
                 onDragOver={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
@@ -216,7 +229,6 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
                   draggable
                   title="Drag to reorder"
                   aria-label={`Drag question ${index + 1} to reorder`}
-                  onClick={(event) => event.stopPropagation()}
                   onDragStart={(event) => startQuestionDrag(event, question.id)}
                   onDragEnd={() => { setDraggedQuestionId(null); setDropTargetId(null); }}
                 >⠿</span>
@@ -228,13 +240,12 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
                       className={styles.questionInput}
                       value={question.text}
                       aria-label={`Question ${index + 1}`}
-                      onClick={(event) => event.stopPropagation()}
                       onChange={(event) => updateQuestion(question.id, { text: event.target.value })}
                     />
-                    <button type="button" className={styles.removeQuestion} aria-label={`Remove question ${index + 1}`} onClick={(event) => { event.stopPropagation(); removeQuestion(question.id); }}>×</button>
+                    <button type="button" className={styles.removeQuestion} aria-label={`Remove question ${index + 1}`} onClick={() => removeQuestion(question.id)}>×</button>
                   </div>
 
-                  <div className={styles.areaRow} onClick={(event) => event.stopPropagation()}>
+                  <div className={styles.areaRow}>
                     <button type="button" className={styles.areaMenuButton} aria-expanded={openAreaId === question.id} onClick={() => setOpenAreaId(openAreaId === question.id ? null : question.id)}>
                       Areas of Evaluation ({question.areas.length}) ▾
                     </button>
@@ -257,7 +268,39 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
                       </div>
                     )}
                   </div>
-                  <div className={styles.areaHint}>Suggested Areas of Evaluation come with generated questions. Keep or adjust up to four.</div>
+
+                  <div className={styles.scoringBlock}>
+                    <div className={styles.scoringHeader}>
+                      <span>Area of Evaluation</span>
+                      <span>Rating</span>
+                    </div>
+                    {question.areas.length ? question.areas.map((area) => {
+                      const selectedRating = ratings[ratingKey(question.id, area)] || 0;
+                      return (
+                        <div className={styles.scoringRow} key={area}>
+                          <span className={styles.scoringArea}>{area}</span>
+                          <span className={styles.scoringStars} role="radiogroup" aria-label={`${area} rating for question ${index + 1}`}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <button
+                                key={star}
+                                type="button"
+                                className={`${styles.scoreStar} ${star <= selectedRating ? styles.scoreStarSelected : ''}`}
+                                role="radio"
+                                aria-checked={selectedRating === star}
+                                aria-label={`${star} star${star === 1 ? '' : 's'}`}
+                                title={`${star} of 5`}
+                                onClick={() => setAreaRating(question.id, area, star)}
+                              >
+                                {star <= selectedRating ? '★' : '☆'}
+                              </button>
+                            ))}
+                          </span>
+                        </div>
+                      );
+                    }) : (
+                      <div className={styles.scoringEmpty}>Select one or more Areas of Evaluation for this question.</div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -270,10 +313,8 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
         </div>
       </div>
 
-      <InterviewScorecardPreview question={previewQuestion} />
-
       <div className={styles.footer}>
-        <span className={styles.footerNote}>Pre-production UI only. Question Bank generation, persistence, invitations, and scoring storage are not wired yet.</span>
+        <span className={styles.footerNote}>Pre-production UI only. Stars demonstrate the participant form; ratings are not persisted yet.</span>
         <button type="button" className={styles.saveButton} disabled title="Saving will be enabled with interview persistence.">Save Interview</button>
       </div>
     </div>
