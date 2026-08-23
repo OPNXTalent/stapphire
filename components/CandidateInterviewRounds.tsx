@@ -127,6 +127,7 @@ export function CandidateInterviewRounds({
   }
 
   function handleBarKeyDown(event: KeyboardEvent<HTMLDivElement>, round: InterviewRound, selected: boolean) {
+    if (event.target !== event.currentTarget) return;
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       toggleRound(round, selected);
