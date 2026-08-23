@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CandidateNoteStream } from '@/components/CandidateNoteStream';
 import type { CandidateFilesSelection } from '@/lib/candidateFilesEvents';
 import styles from './CandidateFilesPanel.module.css';
 
@@ -49,6 +50,19 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
             ) : (
               <p className={styles.empty}>Resume unavailable.</p>
             )}
+          </div>
+        </details>
+
+        <details className={styles.folder}>
+          <summary>Notes</summary>
+          <div className={styles.folderBody}>
+            <CandidateNoteStream
+              candidateId={candidate.id}
+              endpoint={`/api/candidates/${candidate.id}/private-notes`}
+              emptyCopy="No private recruiter notes yet."
+              placeholder="Add a private recruiter note…"
+              privacyCopy="Recruiter-only notes. These are separate from Teamwork and are not shown to Hiring Leaders."
+            />
           </div>
         </details>
 
