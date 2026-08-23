@@ -211,7 +211,6 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
   }
 
   function renderCategorySelection(category: { id: HiringCriteriaCategory; label: string }, active: boolean) {
-    const count = categoryCriteria(category.id).length;
     return (
       <button
         type="button"
@@ -221,7 +220,7 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
         onClick={() => setActiveCategory(active ? null : category.id)}
       >
         <span>{category.label}</span>
-        <strong>{count} {count === 1 ? 'criterion' : 'criteria'} • {categoryTotal(category.id)}%</strong>
+        <strong>{categoryTotal(category.id)}%</strong>
       </button>
     );
   }
