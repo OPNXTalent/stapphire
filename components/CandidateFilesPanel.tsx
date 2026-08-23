@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { printStapphireDocument } from '@/lib/printDocument';
 import type { CandidateFilesSelection } from '@/lib/candidateFilesEvents';
 import styles from './CandidateFilesPanel.module.css';
 
@@ -50,23 +49,6 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
             ) : (
               <p className={styles.empty}>Resume unavailable.</p>
             )}
-          </div>
-        </details>
-
-        <details className={styles.folder} open>
-          <summary>Evaluation</summary>
-          <div className={styles.folderBody}>
-            <button type="button" className={styles.fileRow} onClick={() => printStapphireDocument('candidate-evaluation')}>
-              <span className={styles.fileName}>Candidate Evaluation</span>
-              <span className={styles.fileAction}>Print</span>
-            </button>
-          </div>
-        </details>
-
-        <details className={styles.folder} open>
-          <summary>Interviews</summary>
-          <div className={styles.folderBody}>
-            <p className={styles.empty}>Submitted interview forms will file here automatically.</p>
           </div>
         </details>
 
