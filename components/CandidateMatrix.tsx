@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { CandidateReport } from '@/components/CandidateReport';
 import { CandidateDetailActions } from '@/components/CandidateDetailActions';
-import { InterviewEvaluationSummaryPreview } from '@/components/InterviewEvaluationSummaryPreview';
+import { CandidateInterviewRounds } from '@/components/CandidateInterviewRounds';
 
 export type Disposition = 'screen' | 'interview' | 'hire' | 'delete';
 
@@ -308,20 +308,24 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
             <div className="matrix-row expanded">
               <div className="matrix-row-body">
                 {expandedCandidate.match !== null ? (
-                  <>
-                    <CandidateReport
-                      candidateName={expandedCandidate.name}
-                      positionTitle={positionTitle}
-                      overallMatch={expandedCandidate.match}
-                      responsibilities={expandedCandidate.responsibilities}
-                      hardSkills={expandedCandidate.hardSkills}
-                      softSkills={expandedCandidate.softSkills}
-                      keywords={expandedCandidate.keywords}
-                      assessment={expandedCandidate.assessment}
-                      evaluationDate={expandedCandidate.evaluationDate}
-                    />
-                    <InterviewEvaluationSummaryPreview candidateName={expandedCandidate.name} />
-                  </>
+                  <CandidateInterviewRounds
+                    candidateId={expandedCandidate.id}
+                    candidateName={expandedCandidate.name}
+                    positionTitle={positionTitle}
+                    evaluationContent={
+                      <CandidateReport
+                        candidateName={expandedCandidate.name}
+                        positionTitle={positionTitle}
+                        overallMatch={expandedCandidate.match}
+                        responsibilities={expandedCandidate.responsibilities}
+                        hardSkills={expandedCandidate.hardSkills}
+                        softSkills={expandedCandidate.softSkills}
+                        keywords={expandedCandidate.keywords}
+                        assessment={expandedCandidate.assessment}
+                        evaluationDate={expandedCandidate.evaluationDate}
+                      />
+                    }
+                  />
                 ) : (
                   <p className="muted">No evaluation available for this candidate yet.</p>
                 )}
