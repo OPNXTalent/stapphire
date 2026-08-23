@@ -51,6 +51,7 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
   const [title, setTitle] = useState(`Phone Screen — ${positionTitle}`);
   const [questions, setQuestions] = useState<Question[]>(() => initialQuestions);
   const [openAreaId, setOpenAreaId] = useState<string | null>(null);
+  const [customAreaDrafts, setCustomAreaDrafts] = useState<Record<string, string>>({});
   const [draggedQuestionId, setDraggedQuestionId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [ratings, setRatings] = useState<RatingState>({});
@@ -110,20 +111,31 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
     }));
   }
 
+  function addCustomArea(questionId: string) {
+    const area = (customAreaDrafts[questionId] || '').trim();
+    if (!area) return;
+    setQuestions((current) => current.map((question) => {
+      if (question.id !== questionId || question.areas.length >= 4) return question;
+      if (question.areas.some((item) => item.toLocaleLowerCase() === area.toLocaleLowerCase())) return question;
+      return { ...question, areas: [...question.areas, area] };
+    }));
+    setCustomAreaDrafts((current) => ({ ...current, [questionId]: '' }));
+  }
+
   function setAreaRating(questionId: string, area: string, rating: number) {
     setRatings((current) => ({ ...current, [ratingKey(questionId, area)]: rating }));
   }
 
   function addManualQuestion() {
-    const next: Question = { id: id(), text: 'Add a new interview question…', areas: [] };
+    const next: Question = { id: id(), text: '', areas: [] };
     setQuestions((current) => [...current, next]);
     setOpenAreaId(next.id);
   }
 
   function addBankQuestion(source: BankQuestion, targetId?: string) {
+    const next = cloneFromBank(source);
     setQuestions((current) => {
       if (current.some((question) => question.sourceId === source.id)) return current;
-      const next = cloneFromBank(source);
       if (!targetId) return [...current, next];
       const targetIndex = current.findIndex((question) => question.id === targetId);
       if (targetIndex < 0) return [...current, next];
@@ -131,11 +143,17 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
       result.splice(targetIndex, 0, next);
       return result;
     });
+    if (source.id.startsWith('custom-')) setOpenAreaId(next.id);
   }
 
   function removeQuestion(questionId: string) {
     setQuestions((current) => current.filter((question) => question.id !== questionId));
     setRatings((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${questionId}::`))));
+    setCustomAreaDrafts((current) => {
+      const next = { ...current };
+      delete next[questionId];
+      return next;
+    });
     if (openAreaId === questionId) setOpenAreaId(null);
   }
 
@@ -213,6 +231,7 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
         <div className={styles.questionList} onDragOver={(event) => event.preventDefault()} onDrop={dropAtEnd}>
           {questions.map((question, index) => {
             const maxed = question.areas.length >= 4;
+            const customAreaDraft = customAreaDrafts[question.id] || '';
             return (
               <div
                 key={question.id}
@@ -239,6 +258,7 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
                     <input
                       className={styles.questionInput}
                       value={question.text}
+                      placeholder="Type your interview question…"
                       aria-label={`Question ${index + 1}`}
                       onChange={(event) => updateQuestion(question.id, { text: event.target.value })}
                     />
@@ -255,6 +275,23 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
 
                     {openAreaId === question.id && (
                       <div className={styles.areaMenu} role="group" aria-label={`Areas of Evaluation for question ${index + 1}`}>
+                        <div className={styles.customAreaCreator}>
+                          <input
+                            value={customAreaDraft}
+                            disabled={maxed}
+                            placeholder={maxed ? 'Maximum 4 areas' : 'Create a custom area…'}
+                            aria-label={`Create custom Area of Evaluation for question ${index + 1}`}
+                            onChange={(event) => setCustomAreaDrafts((current) => ({ ...current, [question.id]: event.target.value }))}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') {
+                                event.preventDefault();
+                                addCustomArea(question.id);
+                              }
+                            }}
+                          />
+                          <button type="button" disabled={maxed || !customAreaDraft.trim()} onClick={() => addCustomArea(question.id)}>+ Add</button>
+                        </div>
+                        <div className={styles.areaMenuLabel}>Standard Areas</div>
                         {AREAS_OF_EVALUATION.map((area) => {
                           const checked = question.areas.includes(area);
                           const disabled = maxed && !checked;
@@ -298,7 +335,7 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
                         </div>
                       );
                     }) : (
-                      <div className={styles.scoringEmpty}>Select one or more Areas of Evaluation for this question.</div>
+                      <div className={styles.scoringEmpty}>Select a standard Area of Evaluation or create your own.</div>
                     )}
                   </div>
                 </div>
@@ -309,7 +346,7 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
         </div>
 
         <div className={styles.questionActions}>
-          <button type="button" className={styles.addQuestion} onClick={addManualQuestion}>+ Add Manual Question</button>
+          <button type="button" className={styles.addQuestion} onClick={addManualQuestion}>+ Add Blank Question</button>
         </div>
       </div>
 
