@@ -52,6 +52,10 @@ function parseBankQuestion(event: DragEvent<HTMLElement>): BankQuestion | null {
   }
 }
 
+function ratingKey(questionId: string, area: string) {
+  return `${questionId}::${area}`;
+}
+
 export function InterviewPlan({
   requisitionId,
   positionTitle,
@@ -76,6 +80,7 @@ export function InterviewPlan({
   const [openAreaId, setOpenAreaId] = useState<string | null>(null);
   const [draggedQuestionId, setDraggedQuestionId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [ratings, setRatings] = useState<Record<string, number>>({});
 
   const selectedRound = rounds.find((round) => round.id === selectedRoundId) || null;
   const questions = selectedRound ? questionsByRound[selectedRound.id] || [] : [];
@@ -316,6 +321,38 @@ export function InterviewPlan({
                       </div>
                     )}
                   </div>
+
+                  {question.areas.length > 0 && (
+                    <div className={styles.scoringTable} role="table" aria-label={`Question ${index + 1} scoring`}>
+                      <div className={`${styles.scoringRow} ${styles.scoringHeader}`} role="row">
+                        <span role="columnheader">Area of Evaluation</span>
+                        <span role="columnheader">Rating</span>
+                      </div>
+                      {question.areas.map((area) => {
+                        const key = ratingKey(question.id, area);
+                        const value = ratings[key] || 0;
+                        return (
+                          <div className={styles.scoringRow} role="row" key={area}>
+                            <span className={styles.scoringArea} role="cell">{area}</span>
+                            <span className={styles.starGroup} role="cell" aria-label={`${area} rating`}>
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                  type="button"
+                                  key={star}
+                                  className={`${styles.star} ${value >= star ? styles.starSelected : ''}`}
+                                  onClick={() => setRatings((current) => ({ ...current, [key]: star }))}
+                                  aria-label={`Rate ${area} ${star} out of 5`}
+                                  aria-pressed={value === star}
+                                >
+                                  {value >= star ? '★' : '☆'}
+                                </button>
+                              ))}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             );
