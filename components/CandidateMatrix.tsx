@@ -250,7 +250,7 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
         </span>
         <span className="matrix-big4" aria-label="Big 5 category assessments">
           {([
-            ['Responsibilities', candidate.responsibilities],
+            ['Duties', candidate.responsibilities],
             ['Hard Skills', candidate.hardSkills],
             ['Soft Skills', candidate.softSkills],
             ['Keywords', candidate.keywords],
