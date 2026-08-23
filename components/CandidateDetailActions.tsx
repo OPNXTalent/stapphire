@@ -1,11 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { printStapphireDocument } from '@/lib/printDocument';
+import { CANDIDATE_FILES_CLEAR_EVENT, CANDIDATE_FILES_FOCUS_EVENT } from '@/lib/candidateFilesEvents';
 
 export function CandidateDetailActions({ candidateId, sourceFilename, resumeAvailable }: { candidateId: string; sourceFilename: string; resumeAvailable: boolean }) {
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const candidateName = document.querySelector('.matrix-selected-banner .matrix-row-name')?.textContent?.trim() || 'Candidate';
+    window.dispatchEvent(new CustomEvent(CANDIDATE_FILES_FOCUS_EVENT, {
+      detail: { id: candidateId, name: candidateName, sourceFilename, resumeAvailable }
+    }));
+
+    return () => {
+      window.dispatchEvent(new CustomEvent(CANDIDATE_FILES_CLEAR_EVENT, { detail: { id: candidateId } }));
+    };
+  }, [candidateId, sourceFilename, resumeAvailable]);
 
   async function downloadResume() {
     if (downloading) return;
