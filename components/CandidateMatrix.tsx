@@ -250,13 +250,13 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
         </span>
         <span className="matrix-big4" aria-label="Big 5 category assessments">
           {([
-            ['Duties', candidate.responsibilities],
-            ['Hard Skills', candidate.hardSkills],
-            ['Soft Skills', candidate.softSkills],
-            ['Keywords', candidate.keywords],
-            ['Other Requirements', candidate.otherRequirements]
-          ] as const).map(([label, score]) => (
-            <span className="matrix-assessment" key={label} title={`${label}: ${score === null ? '—' : `${score}%`} (${categoryAssessment(score)})`}>
+            ['Duties', 'Job Responsibilities', candidate.responsibilities],
+            ['Hard Skills', 'Hard Skills', candidate.hardSkills],
+            ['Soft Skills', 'Soft Skills', candidate.softSkills],
+            ['Keywords', 'Keywords', candidate.keywords],
+            ['Other', 'Other Requirements', candidate.otherRequirements]
+          ] as const).map(([label, fullLabel, score]) => (
+            <span className="matrix-assessment" key={fullLabel} title={`${fullLabel}: ${score === null ? '—' : `${score}%`} (${categoryAssessment(score)})`}>
               <span className="matrix-assessment-label">{label}</span>
               <span className="matrix-assessment-value">{score === null ? '—' : `${score}%`}</span>
             </span>
