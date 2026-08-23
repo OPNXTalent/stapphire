@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
-import { buildQuestionBank, INTERVIEW_STAGES, type InterviewStageId } from '@/lib/interviewQuestionBank';
+import { buildQuestionBank, INTERVIEW_STAGES, type BankQuestion, type InterviewStageId } from '@/lib/interviewQuestionBank';
 import {
   INTERVIEW_BANK_ADD_EVENT,
   INTERVIEW_BANK_DRAG_MIME,
@@ -11,6 +11,11 @@ import {
   type InterviewBuilderContextDetail
 } from '@/lib/interviewQuestionBankEvents';
 import styles from './InterviewQuestionBankPanel.module.css';
+
+function customQuestionId(stage: InterviewStageId) {
+  const suffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+  return `custom-${stage}-${suffix}`;
+}
 
 export function InterviewQuestionBankPanel({
   initialStage = 'phone-screen',
@@ -54,6 +59,16 @@ export function InterviewQuestionBankPanel({
     window.dispatchEvent(new CustomEvent(INTERVIEW_BANK_ADD_EVENT, { detail: { question } }));
   }
 
+  function addCustomQuestion() {
+    const question: BankQuestion = {
+      id: customQuestionId(stage),
+      stage,
+      text: '',
+      areas: []
+    };
+    window.dispatchEvent(new CustomEvent(INTERVIEW_BANK_ADD_EVENT, { detail: { question } }));
+  }
+
   function startDrag(event: DragEvent<HTMLDivElement>, question: (typeof questions)[number]) {
     if (usedIds.has(question.id)) {
       event.preventDefault();
@@ -88,6 +103,17 @@ export function InterviewQuestionBankPanel({
       </div>
 
       <div className={styles.list}>
+        <div className={`${styles.question} ${styles.wildcard}`}>
+          <div className={styles.questionTop}>
+            <span className={styles.wildcardIcon} aria-hidden="true">＋</span>
+            <div>
+              <p>Blank Question</p>
+              <span className={styles.wildcardCopy}>Write your own question and choose or create its Areas of Evaluation.</span>
+            </div>
+          </div>
+          <button type="button" onClick={addCustomQuestion}>+ Add Blank Question</button>
+        </div>
+
         {questions.map((question) => {
           const used = usedIds.has(question.id);
           return (
@@ -112,7 +138,7 @@ export function InterviewQuestionBankPanel({
         })}
       </div>
 
-      <div className={styles.footer}>Drag a question into the interview or use + Add.</div>
+      <div className={styles.footer}>Add a blank question, drag a generated question into the interview, or use + Add.</div>
     </div>
   );
 }
