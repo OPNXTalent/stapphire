@@ -5,6 +5,12 @@
 .matrix-selected-detail>.matrix-row.expanded{display:flex;height:100%;min-height:0;margin-bottom:0}
 .matrix-selected-detail>.matrix-row.expanded>.matrix-row-body{display:flex;flex:1;min-height:0;flex-direction:column;padding-bottom:0}
 
+/* The evaluation is subordinate content inside the candidate record, not a second page heading. */
+.matrix-row-body .hero h1{font-size:24px;line-height:1.18}
+.matrix-row-body .hero .match{font-size:26px;line-height:1.12}
+.matrix-row-body .evaluation h2{font-size:17px;margin-top:24px;margin-bottom:9px}
+.matrix-row-body .evaluation h3{font-size:14px;margin-top:20px}
+
 @media(min-width:861px){
   html:has(.requisition-workspace.candidates-active),body:has(.requisition-workspace.candidates-active){overflow:hidden;scrollbar-gutter:auto}
   .workspace-content:has(.requisition-workspace.candidates-active){height:calc(100dvh - 56px);padding-top:22px;padding-bottom:18px;overflow:hidden}
