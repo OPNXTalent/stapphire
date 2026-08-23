@@ -12,6 +12,11 @@ import {
   CANDIDATE_FILES_FOCUS_EVENT,
   type CandidateFilesSelection
 } from '@/lib/candidateFilesEvents';
+import {
+  INTERVIEW_WORKSPACE_CLEAR_EVENT,
+  INTERVIEW_WORKSPACE_FOCUS_EVENT,
+  type InterviewWorkspaceFocusDetail
+} from '@/lib/interviewQuestionBankEvents';
 
 export function WorkspacePanel({
   collapsed,
@@ -28,6 +33,7 @@ export function WorkspacePanel({
   const { state, update } = useRequisitionViewState(requisitionId || '');
   const tab = state.panelTab;
   const [candidate, setCandidate] = useState<CandidateFilesSelection | null>(null);
+  const [interviewContext, setInterviewContext] = useState<InterviewWorkspaceFocusDetail | null>(null);
 
   useEffect(() => {
     function focusCandidate(event: Event) {
@@ -40,27 +46,48 @@ export function WorkspacePanel({
       setCandidate((current) => !detail?.id || current?.id === detail.id ? null : current);
     }
 
+    function focusInterview(event: Event) {
+      const detail = (event as CustomEvent<InterviewWorkspaceFocusDetail>).detail;
+      if (detail?.stage && detail?.positionTitle) setInterviewContext(detail);
+    }
+
+    function clearInterview() {
+      setInterviewContext(null);
+    }
+
     window.addEventListener(CANDIDATE_FILES_FOCUS_EVENT, focusCandidate);
     window.addEventListener(CANDIDATE_FILES_CLEAR_EVENT, clearCandidate);
+    window.addEventListener(INTERVIEW_WORKSPACE_FOCUS_EVENT, focusInterview);
+    window.addEventListener(INTERVIEW_WORKSPACE_CLEAR_EVENT, clearInterview);
     return () => {
       window.removeEventListener(CANDIDATE_FILES_FOCUS_EVENT, focusCandidate);
       window.removeEventListener(CANDIDATE_FILES_CLEAR_EVENT, clearCandidate);
+      window.removeEventListener(INTERVIEW_WORKSPACE_FOCUS_EVENT, focusInterview);
+      window.removeEventListener(INTERVIEW_WORKSPACE_CLEAR_EVENT, clearInterview);
     };
   }, []);
 
   useEffect(() => {
     setCandidate(null);
+    setInterviewContext(null);
   }, [pathname]);
+
+  const showCandidateFiles = Boolean(requisitionId && state.view === 'candidates' && candidate);
+  const showInterviewBank = Boolean(
+    requisitionId &&
+    state.view === 'requisition' &&
+    state.requisitionTab === 'interviews' &&
+    interviewContext
+  );
+  const showQuestionBank = isInterviewBuilder || showInterviewBank;
 
   if (collapsed) {
     return (
       <div className="pull-tab" onClick={onExpand}>
-        {isInterviewBuilder ? 'Question Bank' : 'Hiring Workspace'}
+        {showQuestionBank ? 'Question Bank' : 'Hiring Workspace'}
       </div>
     );
   }
-
-  const showCandidateFiles = Boolean(requisitionId && state.view === 'candidates' && candidate);
 
   return (
     <div className="side-panel">
@@ -68,8 +95,11 @@ export function WorkspacePanel({
         ›
       </button>
 
-      {isInterviewBuilder ? (
-        <InterviewQuestionBankPanel />
+      {showQuestionBank ? (
+        <InterviewQuestionBankPanel
+          initialStage={interviewContext?.stage}
+          initialPositionTitle={interviewContext?.positionTitle}
+        />
       ) : showCandidateFiles && candidate ? (
         <CandidateFilesPanel candidate={candidate} />
       ) : (
