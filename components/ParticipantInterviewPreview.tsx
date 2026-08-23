@@ -5,6 +5,8 @@ import { buildQuestionBank, INTERVIEW_STAGES, type InterviewStageId } from '@/li
 import { StapphireBrand } from '@/components/StapphireBrand';
 import styles from './ParticipantInterviewPreview.module.css';
 
+type InterviewRecommendation = '' | 'Proceed' | 'Decline' | 'Undecided - Need more information';
+
 export function ParticipantInterviewPreview({
   stage,
   candidateName,
@@ -18,12 +20,15 @@ export function ParticipantInterviewPreview({
   const stageLabel = INTERVIEW_STAGES.find((item) => item.id === stage)?.label || 'Interview';
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [comments, setComments] = useState('');
+  const [recommendation, setRecommendation] = useState<InterviewRecommendation>('');
   const [submitted, setSubmitted] = useState(false);
   const [shareStatus, setShareStatus] = useState('');
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(questions[0]?.id ?? null);
 
   const ratingCount = questions.reduce((sum, question) => sum + question.areas.length, 0);
   const completedCount = Object.keys(ratings).length;
+  const assessmentComplete = comments.trim().length > 0 && recommendation !== '';
+  const canSubmit = completedCount === ratingCount && assessmentComplete;
 
   function setRating(questionId: string, area: string, value: number) {
     setRatings((current) => ({ ...current, [`${questionId}:${area}`]: value }));
@@ -152,14 +157,42 @@ export function ParticipantInterviewPreview({
           );
         })}
 
-        <section className={styles.comments}>
-          <label htmlFor="overall-comments">Overall comments <span>Optional</span></label>
-          <textarea id="overall-comments" value={comments} onChange={(event) => setComments(event.target.value)} placeholder="Add any final observations about the candidate…" />
+        <section className={styles.assessment} aria-labelledby="interview-assessment-heading">
+          <div className={styles.assessmentHeader}>
+            <h2 id="interview-assessment-heading">Interview Assessment</h2>
+            <span>Required</span>
+          </div>
+
+          <div className={styles.assessmentField}>
+            <label htmlFor="overall-comments">Overall Comments</label>
+            <textarea
+              id="overall-comments"
+              required
+              value={comments}
+              onChange={(event) => setComments(event.target.value)}
+              placeholder="Add your overall observations about the candidate…"
+            />
+          </div>
+
+          <div className={styles.assessmentField}>
+            <label htmlFor="recommendation">Recommendation</label>
+            <select
+              id="recommendation"
+              required
+              value={recommendation}
+              onChange={(event) => setRecommendation(event.target.value as InterviewRecommendation)}
+            >
+              <option value="">Select recommendation</option>
+              <option value="Proceed">Proceed</option>
+              <option value="Decline">Decline</option>
+              <option value="Undecided - Need more information">Undecided - Need more information</option>
+            </select>
+          </div>
         </section>
 
         <div className={styles.submitRow}>
-          <span>{completedCount} of {ratingCount} ratings completed</span>
-          <button type="button" disabled={completedCount !== ratingCount} onClick={() => setSubmitted(true)}>Submit Interview</button>
+          <span>{canSubmit ? 'Interview assessment complete' : 'Complete all ratings, comments, and recommendation'}</span>
+          <button type="button" disabled={!canSubmit} onClick={() => setSubmitted(true)}>Submit Interview</button>
         </div>
       </main>
     </div>
