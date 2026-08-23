@@ -228,9 +228,20 @@ export function InterviewPlan({
     );
   }
 
+  function renderHeading() {
+    return (
+      <div className={styles.interviewHeading}>
+        <span className="eyebrow">Interview planning</span>
+        <h2>Interviews</h2>
+        <p>Build each interview round and define how candidates will be evaluated.</p>
+      </div>
+    );
+  }
+
   if (!selectedRound) {
     return (
       <section className={styles.plan} data-requisition-id={requisitionId}>
+        {renderHeading()}
         <div className={styles.roundList}>
           {rounds.map((round) => <div key={round.id}>{renderRoundBar(round)}</div>)}
         </div>
@@ -240,6 +251,7 @@ export function InterviewPlan({
 
   return (
     <section className={styles.plan} data-requisition-id={requisitionId} data-interview-plan="selected">
+      {renderHeading()}
       <div className={styles.selectedRound}>
         {renderRoundBar(selectedRound, true)}
 
