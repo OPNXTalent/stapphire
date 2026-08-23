@@ -34,7 +34,6 @@
   .requisition-tab-panel>.hiring-criteria>.criteria-treatment-help,
   .requisition-tab-panel>.hiring-criteria>.criteria-meter{flex:none}
   .requisition-tab-panel>.hiring-criteria>.criteria-category-focused{display:flex;flex:1;min-height:0;flex-direction:column;overflow:hidden}
-  .requisition-tab-panel>.hiring-criteria>.criteria-category-focused>.criteria-category-select{flex:none}
-  .requisition-tab-panel>.hiring-criteria>.criteria-category-focused>.criteria-category-detail{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}
-  .requisition-tab-panel>.hiring-criteria>.criteria-active-note{flex:none;margin-bottom:0}
+  .requisition-tab-panel>.hiring-criteria>.criteria-category-focused>.criteria-category-select{position:relative;z-index:2;flex:none;background:var(--paper);overflow-anchor:none}
+  .requisition-tab-panel>.hiring-criteria>.criteria-category-focused>.criteria-category-detail{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable}
 }
