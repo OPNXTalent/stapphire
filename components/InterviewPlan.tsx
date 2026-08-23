@@ -239,128 +239,125 @@ export function InterviewPlan({
   }
 
   return (
-    <section className={styles.plan} data-requisition-id={requisitionId}>
+    <section className={styles.plan} data-requisition-id={requisitionId} data-interview-plan="selected">
       <div className={styles.selectedRound}>
         {renderRoundBar(selectedRound, true)}
 
-        <div className={styles.roundActions}>
-          <button type="button" disabled title="Participant invitations will be enabled when interview persistence is wired.">Invite Participant</button>
-          <button type="button" disabled title="Printing will be enabled with the participant interview form.">Print Evaluation</button>
-        </div>
-
-        <div className={styles.editor} onDragOver={(event) => event.preventDefault()} onDrop={dropAtEnd}>
-          {questions.map((question, index) => {
-            const maxed = question.areas.length >= 4;
-            return (
-              <div
-                key={question.id}
-                className={`${styles.questionCard} ${dropTargetId === question.id ? styles.dropTarget : ''}`}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  if (draggedQuestionId !== question.id || event.dataTransfer.types.includes(INTERVIEW_BANK_DRAG_MIME)) {
-                    setDropTargetId(question.id);
-                  }
-                }}
-                onDrop={(event) => dropOnQuestion(event, question.id)}
-              >
-                <span
-                  className={styles.dragHandle}
-                  draggable
-                  title="Drag to reorder"
-                  onDragStart={(event) => {
-                    event.dataTransfer.effectAllowed = 'move';
-                    event.dataTransfer.setData('text/plain', question.id);
-                    setDraggedQuestionId(question.id);
+        <div className={styles.roundContent}>
+          <div className={styles.editor} onDragOver={(event) => event.preventDefault()} onDrop={dropAtEnd}>
+            {questions.map((question, index) => {
+              const maxed = question.areas.length >= 4;
+              return (
+                <div
+                  key={question.id}
+                  className={`${styles.questionCard} ${dropTargetId === question.id ? styles.dropTarget : ''}`}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (draggedQuestionId !== question.id || event.dataTransfer.types.includes(INTERVIEW_BANK_DRAG_MIME)) {
+                      setDropTargetId(question.id);
+                    }
                   }}
-                  onDragEnd={() => {
-                    setDraggedQuestionId(null);
-                    setDropTargetId(null);
-                  }}
-                >⠿</span>
+                  onDrop={(event) => dropOnQuestion(event, question.id)}
+                >
+                  <span
+                    className={styles.dragHandle}
+                    draggable
+                    title="Drag to reorder"
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = 'move';
+                      event.dataTransfer.setData('text/plain', question.id);
+                      setDraggedQuestionId(question.id);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedQuestionId(null);
+                      setDropTargetId(null);
+                    }}
+                  >⠿</span>
 
-                <div className={styles.questionMain}>
-                  <div className={styles.questionTop}>
-                    <span className={styles.questionNumber}>Q{index + 1}</span>
-                    <input
-                      value={question.text}
-                      aria-label={`Question ${index + 1}`}
-                      onChange={(event) => updateQuestion(question.id, { text: event.target.value })}
-                    />
-                    <button type="button" className={styles.removeQuestion} onClick={() => removeQuestion(question.id)} aria-label={`Remove question ${index + 1}`}>×</button>
-                  </div>
+                  <div className={styles.questionMain}>
+                    <div className={styles.questionTop}>
+                      <span className={styles.questionNumber}>Q{index + 1}</span>
+                      <input
+                        value={question.text}
+                        aria-label={`Question ${index + 1}`}
+                        onChange={(event) => updateQuestion(question.id, { text: event.target.value })}
+                      />
+                      <button type="button" className={styles.removeQuestion} onClick={() => removeQuestion(question.id)} aria-label={`Remove question ${index + 1}`}>×</button>
+                    </div>
 
-                  <div className={styles.areaLine}>
-                    <button
-                      type="button"
-                      className={styles.areaButton}
-                      onClick={() => setOpenAreaId(openAreaId === question.id ? null : question.id)}
-                      aria-expanded={openAreaId === question.id}
-                    >
-                      Areas of Evaluation ({question.areas.length}) ▾
-                    </button>
-                    {question.areas.map((area) => (
-                      <span className={styles.areaChip} key={area}>{area}<button type="button" onClick={() => toggleArea(question.id, area)} aria-label={`Remove ${area}`}>×</button></span>
-                    ))}
-                    {openAreaId === question.id && (
-                      <div className={styles.areaMenu}>
-                        {AREAS_OF_EVALUATION.map((area) => {
-                          const checked = question.areas.includes(area);
+                    <div className={styles.areaLine}>
+                      <button
+                        type="button"
+                        className={styles.areaButton}
+                        onClick={() => setOpenAreaId(openAreaId === question.id ? null : question.id)}
+                        aria-expanded={openAreaId === question.id}
+                      >
+                        Areas of Evaluation ({question.areas.length}) ▾
+                      </button>
+                      {question.areas.map((area) => (
+                        <span className={styles.areaChip} key={area}>{area}<button type="button" onClick={() => toggleArea(question.id, area)} aria-label={`Remove ${area}`}>×</button></span>
+                      ))}
+                      {openAreaId === question.id && (
+                        <div className={styles.areaMenu}>
+                          {AREAS_OF_EVALUATION.map((area) => {
+                            const checked = question.areas.includes(area);
+                            return (
+                              <label className={styles.areaOption} key={area}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={maxed && !checked}
+                                  onChange={() => toggleArea(question.id, area)}
+                                />
+                                <span>{area}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {question.areas.length > 0 && (
+                      <div className={styles.scoringTable} role="table" aria-label={`Question ${index + 1} scoring`}>
+                        <div className={`${styles.scoringRow} ${styles.scoringHeader}`} role="row">
+                          <span role="columnheader">Area of Evaluation</span>
+                          <span role="columnheader">Rating</span>
+                        </div>
+                        {question.areas.map((area) => {
+                          const key = ratingKey(question.id, area);
+                          const value = ratings[key] || 0;
                           return (
-                            <label className={styles.areaOption} key={area}>
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                disabled={maxed && !checked}
-                                onChange={() => toggleArea(question.id, area)}
-                              />
-                              <span>{area}</span>
-                            </label>
+                            <div className={styles.scoringRow} role="row" key={area}>
+                              <span className={styles.scoringArea} role="cell">{area}</span>
+                              <span className={styles.starGroup} role="cell" aria-label={`${area} rating`}>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <button
+                                    type="button"
+                                    key={star}
+                                    className={`${styles.star} ${value >= star ? styles.starSelected : ''}`}
+                                    onClick={() => setRatings((current) => ({ ...current, [key]: star }))}
+                                    aria-label={`Rate ${area} ${star} out of 5`}
+                                    aria-pressed={value === star}
+                                  >
+                                    {value >= star ? '★' : '☆'}
+                                  </button>
+                                ))}
+                              </span>
+                            </div>
                           );
                         })}
                       </div>
                     )}
                   </div>
-
-                  {question.areas.length > 0 && (
-                    <div className={styles.scoringTable} role="table" aria-label={`Question ${index + 1} scoring`}>
-                      <div className={`${styles.scoringRow} ${styles.scoringHeader}`} role="row">
-                        <span role="columnheader">Area of Evaluation</span>
-                        <span role="columnheader">Rating</span>
-                      </div>
-                      {question.areas.map((area) => {
-                        const key = ratingKey(question.id, area);
-                        const value = ratings[key] || 0;
-                        return (
-                          <div className={styles.scoringRow} role="row" key={area}>
-                            <span className={styles.scoringArea} role="cell">{area}</span>
-                            <span className={styles.starGroup} role="cell" aria-label={`${area} rating`}>
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <button
-                                  type="button"
-                                  key={star}
-                                  className={`${styles.star} ${value >= star ? styles.starSelected : ''}`}
-                                  onClick={() => setRatings((current) => ({ ...current, [key]: star }))}
-                                  aria-label={`Rate ${area} ${star} out of 5`}
-                                  aria-pressed={value === star}
-                                >
-                                  {value >= star ? '★' : '☆'}
-                                </button>
-                              ))}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
-              </div>
-            );
-          })}
-          <div className={styles.dropEnd}>Drop a Question Bank item here</div>
-        </div>
+              );
+            })}
+            <div className={styles.dropEnd}>Drop a Question Bank item here</div>
+          </div>
 
-        <button type="button" className={styles.addManual} onClick={addManualQuestion}>+ Add Manual Question</button>
+          <button type="button" className={styles.addManual} onClick={addManualQuestion}>+ Add Manual Question</button>
+        </div>
       </div>
     </section>
   );
