@@ -31,6 +31,7 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
   const meterState = total < 100 ? 'under' : total > 100 ? 'over' : 'balanced';
   const meterCopy = total < 100 ? `${100 - total} points remain to allocate` : total > 100 ? `${total - 100} points must be removed` : 'Balanced';
   const ready = model?.extractionStatus === 'ready' && criteria.length > 0;
+  const changedFromDefault = criteria.some((criterion) => (weights[criterion.id] ?? criterion.draftWeight) !== criterion.defaultWeight || (knockouts[criterion.id] ?? criterion.isKnockout));
 
   useEffect(() => {
     setWeights(Object.fromEntries((model?.criteria || []).map((criterion) => [criterion.id, criterion.draftWeight])));
@@ -246,7 +247,15 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
       ) : (
         <>
           <p className="criteria-treatment-help">Choose whether each criterion contributes to Match or must be satisfied.</p>
-          <div className={`criteria-meter ${meterState}`} role="status" aria-live="polite"><span>Total Weight</span><strong>{total}%</strong><span>{meterCopy}</span></div>
+          <div className={`criteria-meter ${meterState}`} aria-live="polite">
+            <span>Total Weight</span>
+            <strong>{total}%</strong>
+            <span>{meterCopy}</span>
+            <div className="criteria-meter-actions" aria-label="Hiring Criteria actions">
+              <button type="button" onClick={() => runAction('reset')} disabled={!changedFromDefault || action !== null || savingId !== null}>{action === 'reset' ? 'Resetting…' : 'Reset'}</button>
+              <button type="button" onClick={() => runAction('apply')} disabled={total !== 100 || action !== null || savingId !== null}>Update</button>
+            </div>
+          </div>
           {activeCategory ? (
             <div className="criteria-category-focused">
               {renderCategorySelection(categories.find((category) => category.id === activeCategory)!, true)}
