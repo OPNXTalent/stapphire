@@ -113,7 +113,7 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
 
   async function applyDispositionToSelected(value: string) {
     if (!value || selectedIds.size === 0) return;
-    const next = value as Disposition;
+    const next: Disposition | null = value === '__clear__' ? null : value as Disposition;
     const ids = Array.from(selectedIds);
     const previous = { ...dispositions };
 
@@ -129,7 +129,7 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
           fetch(`/api/candidates/${id}/disposition`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ disposition: next })
+            body: JSON.stringify({ disposition: next ?? '' })
           })
         )
       );
@@ -275,6 +275,7 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
         <option value="screen">{DISPOSITION_LABEL.screen}</option>
         <option value="interview">{DISPOSITION_LABEL.interview}</option>
         <option value="hire">{DISPOSITION_LABEL.hire}</option>
+        <option value="__clear__">No status — clear</option>
         <option value="delete">{DISPOSITION_LABEL.delete}</option>
       </select>
     </div>
