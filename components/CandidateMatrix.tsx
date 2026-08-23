@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { CandidateReport } from '@/components/CandidateReport';
 import { CandidateDetailActions } from '@/components/CandidateDetailActions';
+import { InterviewEvaluationSummaryPreview } from '@/components/InterviewEvaluationSummaryPreview';
 
 export type Disposition = 'screen' | 'interview' | 'hire' | 'delete';
 
@@ -60,10 +61,6 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
-  // candidates is the single source of truth (server-fetched, already
-  // excludes soft-deleted). Resync whenever it changes rather than
-  // trusting local state, which can otherwise silently drift after a
-  // refresh.
   useEffect(() => {
     setOrderedCandidates(candidates);
     setDispositions(Object.fromEntries(candidates.map((c) => [c.id, c.disposition])));
@@ -114,8 +111,6 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
     if (index >= 0 && target) void moveCandidate(id, target.id);
   }
 
-  // Status changes are selection-driven: choose one or more candidates,
-  // then apply the disposition once from the toolbar.
   async function applyDispositionToSelected(value: string) {
     if (!value || selectedIds.size === 0) return;
     const next = value as Disposition;
@@ -149,10 +144,6 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
     }
   }
 
-  // Shared banner markup - used both for the pinned banner (rendered
-  // outside the scroll container, for the currently-expanded candidate)
-  // and for every normal collapsed row. Kept in one place so the two
-  // contexts can never visually drift apart.
   function renderBanner(candidate: MatrixCandidate, isOpen: boolean, rank: number, extraClass = ''): ReactNode {
     const disposition = dispositions[candidate.id];
     const dispositionLabel = disposition ? DISPOSITION_LABEL[disposition] : 'No status';
@@ -317,17 +308,20 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
             <div className="matrix-row expanded">
               <div className="matrix-row-body">
                 {expandedCandidate.match !== null ? (
-                  <CandidateReport
-                    candidateName={expandedCandidate.name}
-                    positionTitle={positionTitle}
-                    overallMatch={expandedCandidate.match}
-                    responsibilities={expandedCandidate.responsibilities}
-                    hardSkills={expandedCandidate.hardSkills}
-                    softSkills={expandedCandidate.softSkills}
-                    keywords={expandedCandidate.keywords}
-                    assessment={expandedCandidate.assessment}
-                    evaluationDate={expandedCandidate.evaluationDate}
-                  />
+                  <>
+                    <CandidateReport
+                      candidateName={expandedCandidate.name}
+                      positionTitle={positionTitle}
+                      overallMatch={expandedCandidate.match}
+                      responsibilities={expandedCandidate.responsibilities}
+                      hardSkills={expandedCandidate.hardSkills}
+                      softSkills={expandedCandidate.softSkills}
+                      keywords={expandedCandidate.keywords}
+                      assessment={expandedCandidate.assessment}
+                      evaluationDate={expandedCandidate.evaluationDate}
+                    />
+                    <InterviewEvaluationSummaryPreview candidateName={expandedCandidate.name} />
+                  </>
                 ) : (
                   <p className="muted">No evaluation available for this candidate yet.</p>
                 )}
@@ -336,9 +330,6 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
           </div>
         </div>
       ) : (
-        // Nothing selected - the full list of every candidate's banner,
-        // matching "clicking the bar returns to the main view of all
-        // candidate bars."
         <div className="matrix-list">
           {orderedCandidates.map((candidate, index) => (
             <div className="matrix-row" key={candidate.id}>
