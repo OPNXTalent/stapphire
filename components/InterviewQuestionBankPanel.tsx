@@ -12,12 +12,23 @@ import {
 } from '@/lib/interviewQuestionBankEvents';
 import styles from './InterviewQuestionBankPanel.module.css';
 
-export function InterviewQuestionBankPanel() {
-  const [stage, setStage] = useState<InterviewStageId>('phone-screen');
-  const [positionTitle, setPositionTitle] = useState('this role');
+export function InterviewQuestionBankPanel({
+  initialStage = 'phone-screen',
+  initialPositionTitle = 'this role'
+}: {
+  initialStage?: InterviewStageId;
+  initialPositionTitle?: string;
+}) {
+  const [stage, setStage] = useState<InterviewStageId>(initialStage);
+  const [positionTitle, setPositionTitle] = useState(initialPositionTitle);
   const [usedIds, setUsedIds] = useState<Set<string>>(() => new Set());
   const bank = useMemo(() => buildQuestionBank(positionTitle), [positionTitle]);
   const questions = bank.filter((question) => question.stage === stage);
+
+  useEffect(() => {
+    setStage(initialStage);
+    setPositionTitle(initialPositionTitle);
+  }, [initialStage, initialPositionTitle]);
 
   useEffect(() => {
     function syncContext(event: Event) {
