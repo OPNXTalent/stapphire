@@ -9,22 +9,16 @@ import { subscribeToResumeOperationTerminal } from '@/lib/resumeTerminalSync';
 const requisitionTabs: { id: RequisitionTab; label: string }[] = [
   { id: 'job-description', label: 'Job Description' },
   { id: 'hiring-criteria', label: 'Hiring Criteria' },
-  { id: 'market-analysis', label: 'Market Analysis' }
+  { id: 'interviews', label: 'Interviews' }
 ];
 
-// Two tabs shown side by side, matching the same visual pattern used
-// in the WorkspacePanel (Communication / Resume Upload) - not a
-// single destination-labeled button anymore. Both views' content is
-// already rendered by the server (from the same existing components,
-// nothing duplicated); this just shows/hides between them client-side.
-// No route change, no reload, no lost scroll/context.
 export function RequisitionViewToggle({
   title,
   requisitionId,
   jobDescription,
   dnsAction,
   hiringCriteriaView,
-  marketAnalysisView,
+  interviewsView,
   candidatesView
 }: {
   title: string;
@@ -32,7 +26,7 @@ export function RequisitionViewToggle({
   jobDescription: string;
   dnsAction: ReactNode;
   hiringCriteriaView: ReactNode;
-  marketAnalysisView: ReactNode;
+  interviewsView: ReactNode;
   candidatesView: ReactNode;
 }) {
   const router = useRouter();
@@ -41,18 +35,14 @@ export function RequisitionViewToggle({
   const requisitionTab = state.requisitionTab;
   const [archiving, setArchiving] = useState(false);
 
-  // ResumeUpload lives in the shared WorkspacePanel, outside this
-  // route's Server Component subtree. A terminal operation therefore
-  // notifies the page-owned client boundary, which performs exactly
-  // one refresh of the current requisition data. This is the refresh
-  // that supplies CandidateMatrix with newly persisted candidates.
   useEffect(() => {
     return subscribeToResumeOperationTerminal(window, requisitionId, () => router.refresh());
   }, [requisitionId, router]);
+
   const activeRequisitionView = requisitionTab === 'hiring-criteria'
     ? hiringCriteriaView
-    : requisitionTab === 'market-analysis'
-      ? marketAnalysisView
+    : requisitionTab === 'interviews'
+      ? interviewsView
       : <RequisitionJobDescription requisitionId={requisitionId} title={title} jobDescription={jobDescription} />;
 
   async function archiveRequisition() {
@@ -84,33 +74,15 @@ export function RequisitionViewToggle({
   return (
     <div className={`requisition-workspace ${view === 'candidates' ? 'candidates-active' : 'requisition-active'}`}>
       <div className="requisition-view-tabs side-tabs" role="tablist" aria-label="Workspace view">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === 'requisition'}
-          className={`side-tab ${view === 'requisition' ? 'active' : ''}`}
-          onClick={() => update({ view: 'requisition' })}
-        >
-          Requisition
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === 'candidates'}
-          className={`side-tab ${view === 'candidates' ? 'active' : ''}`}
-          onClick={() => update({ view: 'candidates' })}
-        >
-          Candidates
-        </button>
+        <button type="button" role="tab" aria-selected={view === 'requisition'} className={`side-tab ${view === 'requisition' ? 'active' : ''}`} onClick={() => update({ view: 'requisition' })}>Requisition</button>
+        <button type="button" role="tab" aria-selected={view === 'candidates'} className={`side-tab ${view === 'candidates' ? 'active' : ''}`} onClick={() => update({ view: 'candidates' })}>Candidates</button>
       </div>
 
       <div className="requisition-title-row">
         <h1>{title}</h1>
         <div className="requisition-title-actions">
           <div className="requisition-title-action-stack">
-            <button type="button" className="req-archive-btn" onClick={archiveRequisition} disabled={archiving}>
-              {archiving ? 'Archiving…' : 'Archive requisition'}
-            </button>
+            <button type="button" className="req-archive-btn" onClick={archiveRequisition} disabled={archiving}>{archiving ? 'Archiving…' : 'Archive requisition'}</button>
             {view === 'candidates' && dnsAction}
           </div>
         </div>
