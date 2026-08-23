@@ -8,11 +8,11 @@ import { isActiveOperation, isTerminalOperation } from '@/lib/operationTypes';
 import { StapphireProcessing } from '@/components/StapphireProcessing';
 
 const categories: { id: HiringCriteriaCategory; label: string }[] = [
-  { id: 'responsibilities', label: 'Job Responsibilities' },
+  { id: 'responsibilities', label: 'Duties' },
   { id: 'hard_skills', label: 'Hard Skills' },
   { id: 'soft_skills', label: 'Soft Skills' },
   { id: 'keywords', label: 'Keywords' },
-  { id: 'other_requirements', label: 'Other Requirements' }
+  { id: 'other_requirements', label: 'Other' }
 ];
 
 export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: { model: HiringCriteriaModel | null; requisitionId: string; sourceIsStale?: boolean }) {
