@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
+import { InterviewScorecardPreview } from '@/components/InterviewScorecardPreview';
 import {
   AREAS_OF_EVALUATION,
   buildQuestionBank,
@@ -195,11 +196,7 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
           </div>
         </div>
 
-        <div
-          className={styles.questionList}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={dropAtEnd}
-        >
+        <div className={styles.questionList} onDragOver={(event) => event.preventDefault()} onDrop={dropAtEnd}>
           {questions.map((question, index) => {
             const maxed = question.areas.length >= 4;
             return (
@@ -273,32 +270,7 @@ export function InterviewBuilder({ positionTitle, hasJobDescription }: { positio
         </div>
       </div>
 
-      <div className={`card ${styles.preview}`} aria-label="Participant scorecard preview">
-        <div className={styles.previewHeader}>
-          <div>
-            <span className="eyebrow">Scorecard preview</span>
-            <h2>1–5 stars</h2>
-          </div>
-          <span className={styles.previewNote}>Click any question above to preview its scoring.</span>
-        </div>
-        {previewQuestion ? (
-          <div className={styles.previewGrid}>
-            <div className={styles.previewQuestion}>{previewQuestion.text}</div>
-            {previewQuestion.areas.length ? (
-              <div className={styles.ratingList}>
-                {previewQuestion.areas.map((area) => (
-                  <div className={styles.ratingRow} key={area}>
-                    <span className={styles.ratingArea}>{area}</span>
-                    <div className={styles.stars} aria-label={`${area}: five-star rating scale`}>
-                      {[1,2,3,4,5].map((star) => <button key={star} type="button" className={styles.star} tabIndex={-1} aria-hidden="true">☆</button>)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : <p className={styles.previewEmpty}>Choose one or more Areas of Evaluation to define what the interviewer will rate.</p>}
-          </div>
-        ) : <p className={styles.previewEmpty}>Add a question to preview the interviewer scoring experience.</p>}
-      </div>
+      <InterviewScorecardPreview question={previewQuestion} />
 
       <div className={styles.footer}>
         <span className={styles.footerNote}>Pre-production UI only. Question Bank generation, persistence, invitations, and scoring storage are not wired yet.</span>
