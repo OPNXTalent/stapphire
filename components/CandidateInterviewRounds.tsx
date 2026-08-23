@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
+import { buildQuestionBank } from '@/lib/interviewQuestionBank';
 import styles from './CandidateInterviewRounds.module.css';
 
 type StageId = 'phone-screen' | 'round-1' | 'round-2';
@@ -53,6 +54,17 @@ const PHONE_SCREEN_ASSESSMENTS: ParticipantAssessment[] = [
   }
 ];
 
+function buildStageRows(stage: StageId, positionTitle: string, values: AggregateRow[] = []) {
+  const valueByArea = new Map(values.map((row) => [row.area, row]));
+  const areas = Array.from(new Set(
+    buildQuestionBank(positionTitle)
+      .filter((question) => question.stage === stage)
+      .flatMap((question) => question.areas)
+  ));
+
+  return areas.map((area) => valueByArea.get(area) ?? { area, timesRated: 0, average: 0 });
+}
+
 export function CandidateInterviewRounds({
   candidateId,
   candidateName,
@@ -65,6 +77,12 @@ export function CandidateInterviewRounds({
   evaluationContent: ReactNode;
 }) {
   const [view, setView] = useState<ViewId>(null);
+  const [assessmentOpen, setAssessmentOpen] = useState<Record<StageId, boolean>>({
+    'phone-screen': false,
+    'round-1': false,
+    'round-2': false
+  });
+
   const rounds = useMemo<InterviewRound[]>(() => [
     {
       id: 'phone-screen',
@@ -72,7 +90,7 @@ export function CandidateInterviewRounds({
       participants: 3,
       submitted: 3,
       overall: 4.21,
-      rows: PHONE_SCREEN_SAMPLE,
+      rows: buildStageRows('phone-screen', positionTitle, PHONE_SCREEN_SAMPLE),
       assessments: PHONE_SCREEN_ASSESSMENTS
     },
     {
@@ -81,7 +99,7 @@ export function CandidateInterviewRounds({
       participants: 0,
       submitted: 0,
       overall: null,
-      rows: [],
+      rows: buildStageRows('round-1', positionTitle),
       assessments: []
     },
     {
@@ -90,7 +108,7 @@ export function CandidateInterviewRounds({
       participants: 0,
       submitted: 0,
       overall: null,
-      rows: [],
+      rows: buildStageRows('round-2', positionTitle),
       assessments: []
     }
   ], [positionTitle]);
@@ -157,56 +175,61 @@ export function CandidateInterviewRounds({
   }
 
   const round = rounds.find((item) => item.id === view)!;
+  const assessmentsVisible = assessmentOpen[round.id];
 
   return (
     <section className={styles.records}>
       {renderInterviewBar(round, true)}
       <div className={styles.aggregateCanvas}>
-        {round.rows.length ? (
-          <>
-            <div className={styles.sampleFlag}>PRE-PRODUCTION SAMPLE</div>
-            <div className={styles.aggregateTable} role="table" aria-label={`${round.title} aggregate results`}>
-              <div className={`${styles.aggregateRow} ${styles.headerRow}`} role="row">
-                <span>Area of Evaluation</span>
-                <span>Times Rated</span>
-                <span>Aggregate</span>
-              </div>
-              {round.rows.map((row) => (
-                <div className={styles.aggregateRow} role="row" key={row.area}>
-                  <span>{row.area}</span>
-                  <span>{row.timesRated}</span>
-                  <strong>★ {row.average.toFixed(2)}</strong>
-                </div>
-              ))}
-            </div>
-            <div className={styles.overall}>
-              <span>Overall Interview Average</span>
-              <strong>★ {round.overall?.toFixed(2)} / 5</strong>
-            </div>
-
-            {round.assessments.length > 0 && (
-              <section className={styles.participantAssessments} aria-label="Participant interview assessments">
-                <h3>Participant Assessments</h3>
-                <div className={styles.assessmentList}>
-                  {round.assessments.map((assessment) => (
-                    <article className={styles.assessment} key={assessment.contributor}>
-                      <div className={styles.assessmentHeader}>
-                        <strong>{assessment.contributor}</strong>
-                        <span>{assessment.recommendation}</span>
-                      </div>
-                      <p>{assessment.comments}</p>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
-        ) : (
-          <div className={styles.empty}>
-            <strong>No submitted scores yet.</strong>
-            <span>Open the interview title to share the participant form.</span>
+        <div className={styles.sampleFlag}>PRE-PRODUCTION SAMPLE</div>
+        <div className={styles.aggregateTable} role="table" aria-label={`${round.title} aggregate results`}>
+          <div className={`${styles.aggregateRow} ${styles.headerRow}`} role="row">
+            <span>Area of Evaluation</span>
+            <span>Times Rated</span>
+            <span>Aggregate</span>
           </div>
-        )}
+          {round.rows.map((row) => (
+            <div className={styles.aggregateRow} role="row" key={row.area}>
+              <span>{row.area}</span>
+              <span>{row.timesRated}</span>
+              <strong>★ {row.average.toFixed(2)}</strong>
+            </div>
+          ))}
+        </div>
+        <div className={styles.overall}>
+          <span>Overall Interview Average</span>
+          <strong>★ {(round.overall ?? 0).toFixed(2)} / 5</strong>
+        </div>
+
+        <section className={styles.participantAssessments} aria-label="Participant interview assessments">
+          <button
+            type="button"
+            className={styles.assessmentToggle}
+            aria-expanded={assessmentsVisible}
+            onClick={() => setAssessmentOpen((current) => ({ ...current, [round.id]: !current[round.id] }))}
+          >
+            <span>Participant Assessments</span>
+            <span>{round.assessments.length} Submitted</span>
+          </button>
+
+          {assessmentsVisible && (
+            round.assessments.length > 0 ? (
+              <div className={styles.assessmentList}>
+                {round.assessments.map((assessment) => (
+                  <article className={styles.assessment} key={assessment.contributor}>
+                    <div className={styles.assessmentHeader}>
+                      <strong>{assessment.contributor}</strong>
+                      <span>{assessment.recommendation}</span>
+                    </div>
+                    <p>{assessment.comments}</p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.assessmentEmpty}>No participant assessments submitted yet.</div>
+            )
+          )}
+        </section>
       </div>
     </section>
   );
