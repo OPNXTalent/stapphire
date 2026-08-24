@@ -1,7 +1,7 @@
 import './globals.css';
 import './matrix.css';
 import './candidate-interview-scroll.css';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { AppShell } from '@/components/AppShell';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { GATE_COOKIE, isGateCookieValid } from '@/lib/gate';
@@ -9,6 +9,16 @@ import { GATE_COOKIE, isGateCookieValid } from '@/lib/gate';
 export const metadata = { title: 'Stapphire', description: 'Hiring quality control' };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const publicInvite = headers().get('x-stapphire-public-invite') === '1';
+
+  if (publicInvite) {
+    return (
+      <html lang="en">
+        <body>{children}</body>
+      </html>
+    );
+  }
+
   // The root layout wraps every route, including the gate's own login
   // page - so this fetch has to be conditional. Rendering the real
   // requisition list into the sidebar unconditionally would leak
