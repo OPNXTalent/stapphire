@@ -10,7 +10,13 @@ import { GATE_COOKIE, gateToken, isProductionEnv } from '@/lib/gate';
 // - in production: fails CLOSED - everything is denied except the
 //   config-error page itself, never silently left open
 
-const EXEMPT_PATHS = ['/gate-login', '/api/gate', '/gate-config-error'];
+const EXEMPT_PATHS = [
+  '/gate-login',
+  '/api/gate',
+  '/gate-config-error',
+  '/interview/invite',
+  '/api/interview-invitations'
+];
 
 function isStaticAsset(pathname: string): boolean {
   return (
