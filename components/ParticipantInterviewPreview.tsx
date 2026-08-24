@@ -41,12 +41,12 @@ export function ParticipantInterviewPreview({
   const [shareStatus, setShareStatus] = useState('');
   const [participantNameValue, setParticipantNameValue] = useState(participantName);
   const [identityStatus, setIdentityStatus] = useState('');
+  const [submitStatus, setSubmitStatus] = useState('');
+  const [submitted, setSubmitted] = useState(false);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(formQuestions[0]?.id ?? null);
 
   const ratingCount = formQuestions.reduce((sum, question) => sum + question.areas.length, 0);
   const completedCount = Object.keys(ratings).length;
-  const assessmentComplete = comments.trim().length > 0 && recommendation !== '';
-  const assessmentReady = completedCount === ratingCount && assessmentComplete;
 
   function setRating(questionId: string, area: string, value: number) {
     setRatings((current) => ({ ...current, [`${questionId}:${area}`]: value }));
@@ -98,10 +98,7 @@ export function ParticipantInterviewPreview({
   async function saveParticipantName() {
     if (!invitationToken) return;
     const nextName = participantNameValue.trim();
-    if (!nextName) {
-      setIdentityStatus('Name required');
-      return;
-    }
+    if (!nextName) return;
 
     try {
       setIdentityStatus('Saving…');
@@ -115,6 +112,31 @@ export function ParticipantInterviewPreview({
       window.setTimeout(() => setIdentityStatus(''), 1800);
     } catch {
       setIdentityStatus('Unable to save');
+    }
+  }
+
+  async function submitInterview() {
+    if (!invitationToken || submitted) return;
+
+    try {
+      setSubmitStatus('Submitting…');
+      const response = await fetch(`/api/interview-invitations/${invitationToken}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          submit: true,
+          participantName: participantNameValue.trim(),
+          ratings,
+          comments,
+          recommendation
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error || 'Unable to submit interview.');
+      setSubmitted(true);
+      setSubmitStatus('Interview submitted');
+    } catch (error) {
+      setSubmitStatus(error instanceof Error ? error.message : 'Unable to submit interview');
     }
   }
 
@@ -216,14 +238,13 @@ export function ParticipantInterviewPreview({
         <section className={styles.assessment} aria-labelledby="interview-assessment-heading">
           <div className={styles.assessmentHeader}>
             <h2 id="interview-assessment-heading">Interview Assessment</h2>
-            <span>Required</span>
+            <span>Optional</span>
           </div>
 
           <div className={styles.assessmentField}>
             <label htmlFor="overall-comments">Overall Comments</label>
             <textarea
               id="overall-comments"
-              required
               value={comments}
               onChange={(event) => setComments(event.target.value)}
               placeholder="Add your overall observations about the candidate…"
@@ -234,7 +255,6 @@ export function ParticipantInterviewPreview({
             <label htmlFor="recommendation">Recommendation</label>
             <select
               id="recommendation"
-              required
               value={recommendation}
               onChange={(event) => setRecommendation(event.target.value as InterviewRecommendation)}
             >
@@ -247,8 +267,10 @@ export function ParticipantInterviewPreview({
         </section>
 
         <div className={styles.submitRow}>
-          <span>{assessmentReady ? 'Interview assessment complete — submission is not yet enabled' : 'Complete all ratings, comments, and recommendation'}</span>
-          <button type="button" disabled>Submit Interview</button>
+          <span>{invitationToken ? (submitStatus || 'Submit whenever you are ready. Unanswered items may remain blank.') : 'Use Share to invite interview participants.'}</span>
+          <button type="button" disabled={!invitationToken || submitted} onClick={submitInterview}>
+            {submitted ? 'Submitted' : 'Submit Interview'}
+          </button>
         </div>
       </main>
     </div>

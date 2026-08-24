@@ -4,8 +4,52 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 export async function PATCH(request: Request, { params }: { params: { token: string } }) {
   try {
     const body = await request.json();
-    const participantName = String(body?.participantName ?? '').trim();
 
+    if (body?.submit === true) {
+      const participantName = String(body?.participantName ?? '').trim();
+      if (participantName.length > 200) {
+        return NextResponse.json({ error: 'Participant name is too long.' }, { status: 400 });
+      }
+
+      const ratings = body?.ratings && typeof body.ratings === 'object' && !Array.isArray(body.ratings)
+        ? body.ratings
+        : {};
+      const comments = String(body?.comments ?? '');
+      const recommendation = String(body?.recommendation ?? '');
+      const allowedRecommendations = new Set(['', 'Proceed', 'Decline', 'Undecided - Need more information']);
+      if (!allowedRecommendations.has(recommendation)) {
+        return NextResponse.json({ error: 'Recommendation is invalid.' }, { status: 400 });
+      }
+
+      const now = new Date().toISOString();
+      const { data, error } = await supabaseAdmin
+        .from('phase1_interview_invitations')
+        .update({
+          participant_name: participantName || null,
+          submission_payload: { ratings, comments, recommendation },
+          status: 'submitted',
+          submitted_at: now,
+          updated_at: now
+        })
+        .eq('token', params.token)
+        .neq('status', 'revoked')
+        .select('id, participant_name, status, submitted_at')
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) return NextResponse.json({ error: 'Invitation not found.' }, { status: 404 });
+
+      return NextResponse.json({
+        invitation: {
+          id: data.id,
+          participantName: data.participant_name,
+          status: data.status,
+          submittedAt: data.submitted_at
+        }
+      });
+    }
+
+    const participantName = String(body?.participantName ?? '').trim();
     if (!participantName || participantName.length > 200) {
       return NextResponse.json({ error: 'Participant name is required.' }, { status: 400 });
     }
