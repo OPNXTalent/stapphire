@@ -83,7 +83,7 @@ export function ParticipantInterviewPreview({
       const shareText = `${text}\n\n${url}`;
 
       if (navigator.share) {
-        await navigator.share({ title, text, url });
+        await navigator.share({ title, text: shareText });
         setShareStatus('Shared');
       } else {
         await navigator.clipboard.writeText(shareText);
