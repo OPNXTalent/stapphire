@@ -211,6 +211,28 @@ export function InterviewPlan({
   }, [hydrated, requisitionId, serializedPlan]);
 
   useEffect(() => {
+    if (!openAreaId) return;
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpenAreaId(null);
+    }
+
+    function closeOnOutsideClick(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest(`[data-area-picker="${openAreaId}"]`)) {
+        setOpenAreaId(null);
+      }
+    }
+
+    document.addEventListener('keydown', closeOnEscape);
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape);
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+    };
+  }, [openAreaId]);
+
+  useEffect(() => {
     if (!selectedRound) {
       window.dispatchEvent(new CustomEvent(INTERVIEW_WORKSPACE_CLEAR_EVENT));
       return;
@@ -419,7 +441,7 @@ export function InterviewPlan({
                       <button type="button" className={styles.removeQuestion} onClick={() => removeQuestion(question.id)} aria-label={`Remove question ${index + 1}`}>×</button>
                     </div>
 
-                    <div className={styles.areaLine}>
+                    <div className={styles.areaLine} data-area-picker={question.id}>
                       <button
                         type="button"
                         className={styles.areaButton}
@@ -447,6 +469,7 @@ export function InterviewPlan({
                               </label>
                             );
                           })}
+                          <button type="button" className={styles.areaDone} onClick={() => setOpenAreaId(null)}>Done</button>
                         </div>
                       )}
                     </div>
