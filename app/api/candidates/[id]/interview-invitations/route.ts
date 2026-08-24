@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { buildQuestionBank, INTERVIEW_STAGES, type InterviewStageId } from '@/lib/interviewQuestionBank';
 
 const ALLOWED_STAGES = new Set(['phone-screen', 'round-1', 'round-2', 'final']);
 
@@ -72,6 +73,15 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (candidateError) throw candidateError;
     if (!candidate) return NextResponse.json({ error: 'Candidate not found.' }, { status: 404 });
 
+    const { data: requisition, error: requisitionError } = await supabaseAdmin
+      .from('phase1_requisitions')
+      .select('title')
+      .eq('id', candidate.requisition_id)
+      .maybeSingle();
+
+    if (requisitionError) throw requisitionError;
+    if (!requisition) return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 });
+
     const { data: plan, error: planError } = await supabaseAdmin
       .from('phase1_interview_plans')
       .select('id, revision')
@@ -79,46 +89,74 @@ export async function POST(request: Request, { params }: { params: { id: string 
       .maybeSingle();
 
     if (planError) throw planError;
-    if (!plan) return NextResponse.json({ error: 'Interview Plan has not been saved yet.' }, { status: 409 });
 
-    const { data: round, error: roundError } = await supabaseAdmin
-      .from('phase1_interview_rounds')
-      .select('id, stage, title')
-      .eq('plan_id', plan.id)
-      .eq('stage', stage)
-      .maybeSingle();
-
-    if (roundError) throw roundError;
-    if (!round) return NextResponse.json({ error: 'Interview round not found.' }, { status: 404 });
-
-    const { data: questions, error: questionsError } = await supabaseAdmin
-      .from('phase1_interview_questions')
-      .select('id, source_id, question_text, areas, sort_order')
-      .eq('round_id', round.id)
-      .order('sort_order', { ascending: true });
-
-    if (questionsError) throw questionsError;
-
-    const snapshot = {
-      stage: round.stage,
-      title: round.title,
-      questions: (questions ?? []).map((question) => ({
-        id: question.id,
-        ...(question.source_id ? { sourceId: question.source_id } : {}),
-        text: question.question_text,
-        areas: question.areas ?? []
-      }))
+    let interviewRoundId: string | null = null;
+    let planRevision = 1;
+    let roundTitle = INTERVIEW_STAGES.find((item) => item.id === stage)?.label || 'Interview';
+    let snapshot: {
+      stage: string;
+      title: string;
+      questions: Array<{ id: string; sourceId?: string; text: string; areas: string[] }>;
     };
+
+    if (plan) {
+      const { data: round, error: roundError } = await supabaseAdmin
+        .from('phase1_interview_rounds')
+        .select('id, stage, title')
+        .eq('plan_id', plan.id)
+        .eq('stage', stage)
+        .maybeSingle();
+
+      if (roundError) throw roundError;
+      if (!round) return NextResponse.json({ error: 'Interview round not found.' }, { status: 404 });
+
+      const { data: questions, error: questionsError } = await supabaseAdmin
+        .from('phase1_interview_questions')
+        .select('id, source_id, question_text, areas, sort_order')
+        .eq('round_id', round.id)
+        .order('sort_order', { ascending: true });
+
+      if (questionsError) throw questionsError;
+
+      interviewRoundId = round.id;
+      planRevision = plan.revision;
+      roundTitle = round.title;
+      snapshot = {
+        stage: round.stage,
+        title: round.title,
+        questions: (questions ?? []).map((question) => ({
+          id: question.id,
+          ...(question.source_id ? { sourceId: question.source_id } : {}),
+          text: question.question_text,
+          areas: question.areas ?? []
+        }))
+      };
+    } else {
+      const fallbackQuestions = buildQuestionBank(requisition.title)
+        .filter((question) => question.stage === stage as InterviewStageId)
+        .map((question) => ({
+          id: question.id,
+          sourceId: question.id,
+          text: question.text,
+          areas: question.areas
+        }));
+
+      snapshot = {
+        stage,
+        title: roundTitle,
+        questions: fallbackQuestions
+      };
+    }
 
     const { data: invitation, error: invitationError } = await supabaseAdmin
       .from('phase1_interview_invitations')
       .insert({
         candidate_id: candidate.id,
         requisition_id: candidate.requisition_id,
-        interview_round_id: round.id,
+        interview_round_id: interviewRoundId,
         stage,
-        round_title: round.title,
-        plan_revision: plan.revision,
+        round_title: roundTitle,
+        plan_revision: planRevision,
         round_snapshot: snapshot
       })
       .select('id, token, status, invited_at')
