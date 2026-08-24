@@ -47,6 +47,8 @@ export function ParticipantInterviewPreview({
 
   const ratingCount = formQuestions.reduce((sum, question) => sum + question.areas.length, 0);
   const completedCount = Object.keys(ratings).length;
+  const assessmentComplete = participantNameValue.trim().length > 0 && comments.trim().length > 0 && recommendation !== '';
+  const assessmentReady = completedCount === ratingCount && assessmentComplete;
 
   function setRating(questionId: string, area: string, value: number) {
     setRatings((current) => ({ ...current, [`${questionId}:${area}`]: value }));
@@ -98,7 +100,10 @@ export function ParticipantInterviewPreview({
   async function saveParticipantName() {
     if (!invitationToken) return;
     const nextName = participantNameValue.trim();
-    if (!nextName) return;
+    if (!nextName) {
+      setIdentityStatus('Name required');
+      return;
+    }
 
     try {
       setIdentityStatus('Saving…');
@@ -116,7 +121,7 @@ export function ParticipantInterviewPreview({
   }
 
   async function submitInterview() {
-    if (!invitationToken || submitted) return;
+    if (!invitationToken || !assessmentReady || submitted) return;
 
     try {
       setSubmitStatus('Submitting…');
@@ -127,7 +132,7 @@ export function ParticipantInterviewPreview({
           submit: true,
           participantName: participantNameValue.trim(),
           ratings,
-          comments,
+          comments: comments.trim(),
           recommendation
         })
       });
@@ -175,6 +180,7 @@ export function ParticipantInterviewPreview({
                 onBlur={saveParticipantName}
                 placeholder="Enter your name"
                 autoComplete="name"
+                required
               />
               {identityStatus && <span role="status">{identityStatus}</span>}
             </div>
@@ -238,13 +244,14 @@ export function ParticipantInterviewPreview({
         <section className={styles.assessment} aria-labelledby="interview-assessment-heading">
           <div className={styles.assessmentHeader}>
             <h2 id="interview-assessment-heading">Interview Assessment</h2>
-            <span>Optional</span>
+            <span>Required</span>
           </div>
 
           <div className={styles.assessmentField}>
             <label htmlFor="overall-comments">Overall Comments</label>
             <textarea
               id="overall-comments"
+              required
               value={comments}
               onChange={(event) => setComments(event.target.value)}
               placeholder="Add your overall observations about the candidate…"
@@ -255,6 +262,7 @@ export function ParticipantInterviewPreview({
             <label htmlFor="recommendation">Recommendation</label>
             <select
               id="recommendation"
+              required
               value={recommendation}
               onChange={(event) => setRecommendation(event.target.value as InterviewRecommendation)}
             >
@@ -267,8 +275,8 @@ export function ParticipantInterviewPreview({
         </section>
 
         <div className={styles.submitRow}>
-          <span>{invitationToken ? (submitStatus || 'Submit whenever you are ready. Unanswered items may remain blank.') : 'Use Share to invite interview participants.'}</span>
-          <button type="button" disabled={!invitationToken || submitted} onClick={submitInterview}>
+          <span>{submitStatus || (assessmentReady ? 'Interview assessment complete — ready to submit' : 'Complete all ratings, your name, comments, and recommendation')}</span>
+          <button type="button" disabled={!invitationToken || !assessmentReady || submitted} onClick={submitInterview}>
             {submitted ? 'Submitted' : 'Submit Interview'}
           </button>
         </div>
