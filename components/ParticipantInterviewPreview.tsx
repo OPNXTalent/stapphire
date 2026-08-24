@@ -6,25 +6,44 @@ import { StapphireBrand } from '@/components/StapphireBrand';
 import styles from './ParticipantInterviewPreview.module.css';
 
 type InterviewRecommendation = '' | 'Proceed' | 'Decline' | 'Undecided - Need more information';
+type FormQuestion = { id: string; text: string; areas: string[] };
 
 export function ParticipantInterviewPreview({
   stage,
   candidateName,
-  positionTitle
+  positionTitle,
+  candidateId,
+  questions,
+  invitationToken,
+  participantName = '',
+  shareEnabled = true
 }: {
   stage: InterviewStageId;
   candidateName: string;
   positionTitle: string;
+  candidateId?: string;
+  questions?: FormQuestion[];
+  invitationToken?: string;
+  participantName?: string;
+  shareEnabled?: boolean;
 }) {
-  const questions = useMemo(() => buildQuestionBank(positionTitle).filter((question) => question.stage === stage), [positionTitle, stage]);
+  const formQuestions = useMemo<FormQuestion[]>(() => {
+    if (questions) return questions;
+    return buildQuestionBank(positionTitle)
+      .filter((question) => question.stage === stage)
+      .map((question) => ({ id: question.id, text: question.text, areas: question.areas }));
+  }, [positionTitle, questions, stage]);
+
   const stageLabel = INTERVIEW_STAGES.find((item) => item.id === stage)?.label || 'Interview';
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [comments, setComments] = useState('');
   const [recommendation, setRecommendation] = useState<InterviewRecommendation>('');
   const [shareStatus, setShareStatus] = useState('');
-  const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(questions[0]?.id ?? null);
+  const [participantNameValue, setParticipantNameValue] = useState(participantName);
+  const [identityStatus, setIdentityStatus] = useState('');
+  const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(formQuestions[0]?.id ?? null);
 
-  const ratingCount = questions.reduce((sum, question) => sum + question.areas.length, 0);
+  const ratingCount = formQuestions.reduce((sum, question) => sum + question.areas.length, 0);
   const completedCount = Object.keys(ratings).length;
   const assessmentComplete = comments.trim().length > 0 && recommendation !== '';
   const assessmentReady = completedCount === ratingCount && assessmentComplete;
@@ -41,11 +60,25 @@ export function ParticipantInterviewPreview({
   }
 
   async function shareInterview() {
-    const url = window.location.href;
-    const title = `${stageLabel} — ${positionTitle}`;
-    const text = `You're invited to participate in the ${stageLabel} for ${candidateName}.`;
+    if (!candidateId) {
+      setShareStatus('Unable to share');
+      return;
+    }
 
     try {
+      setShareStatus('Creating link…');
+      const response = await fetch(`/api/candidates/${candidateId}/interview-invitations`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ stage })
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload?.invitation?.url) throw new Error(payload?.error || 'Unable to create invitation.');
+
+      const url = payload.invitation.url as string;
+      const title = `${stageLabel} — ${positionTitle}`;
+      const text = `You're invited to participate in the ${stageLabel} for ${candidateName}.`;
+
       if (navigator.share) {
         await navigator.share({ title, text, url });
         setShareStatus('Shared');
@@ -55,15 +88,33 @@ export function ParticipantInterviewPreview({
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
-      try {
-        await navigator.clipboard.writeText(url);
-        setShareStatus('Link copied');
-      } catch {
-        setShareStatus('Unable to share');
-      }
+      setShareStatus(error instanceof Error ? error.message : 'Unable to share');
     }
 
-    window.setTimeout(() => setShareStatus(''), 2200);
+    window.setTimeout(() => setShareStatus(''), 2600);
+  }
+
+  async function saveParticipantName() {
+    if (!invitationToken) return;
+    const nextName = participantNameValue.trim();
+    if (!nextName) {
+      setIdentityStatus('Name required');
+      return;
+    }
+
+    try {
+      setIdentityStatus('Saving…');
+      const response = await fetch(`/api/interview-invitations/${invitationToken}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ participantName: nextName })
+      });
+      if (!response.ok) throw new Error();
+      setIdentityStatus('Saved');
+      window.setTimeout(() => setIdentityStatus(''), 1800);
+    } catch {
+      setIdentityStatus('Unable to save');
+    }
   }
 
   return (
@@ -71,13 +122,15 @@ export function ParticipantInterviewPreview({
       <header className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.brand}><StapphireBrand decorative /></div>
-          <div className={styles.shareWrap}>
-            <button type="button" className={styles.shareButton} onClick={shareInterview} aria-label="Share interview invitation">
-              <span aria-hidden="true">↗</span>
-              Share
-            </button>
-            {shareStatus && <span className={styles.shareStatus} role="status">{shareStatus}</span>}
-          </div>
+          {shareEnabled && (
+            <div className={styles.shareWrap}>
+              <button type="button" className={styles.shareButton} onClick={shareInterview} aria-label="Share interview invitation">
+                <span aria-hidden="true">↗</span>
+                Share
+              </button>
+              {shareStatus && <span className={styles.shareStatus} role="status">{shareStatus}</span>}
+            </div>
+          )}
         </div>
         <span className={styles.preview}>PRE-PRODUCTION PARTICIPANT FORM</span>
         <h1>{stageLabel} — {positionTitle}</h1>
@@ -88,7 +141,24 @@ export function ParticipantInterviewPreview({
       </header>
 
       <main className={styles.form}>
-        {questions.map((question, index) => {
+        {invitationToken && (
+          <section className={styles.identity} aria-label="Interview participant identity">
+            <label htmlFor="participant-name">Your name</label>
+            <div className={styles.identityRow}>
+              <input
+                id="participant-name"
+                value={participantNameValue}
+                onChange={(event) => setParticipantNameValue(event.target.value)}
+                onBlur={saveParticipantName}
+                placeholder="Enter your name"
+                autoComplete="name"
+              />
+              {identityStatus && <span role="status">{identityStatus}</span>}
+            </div>
+          </section>
+        )}
+
+        {formQuestions.map((question, index) => {
           const isExpanded = expandedQuestionId === question.id;
           const progress = questionProgress(question.id, question.areas);
           return (
