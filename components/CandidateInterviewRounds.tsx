@@ -150,6 +150,7 @@ export function CandidateInterviewRounds({
         <button type="button" className={styles.bar} onClick={() => setView('evaluation')}>
           <span>Evaluation</span>
         </button>
+        {/* Keep this production helper copy literal; it explains link versus bar behavior. */}
         <p className={styles.interviewHelper}>
           Click the round name to open the evaluation form and share it with interview participants from there. Once results come in, click the bar to expand and view them.
         </p>
