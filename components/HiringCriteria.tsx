@@ -57,7 +57,6 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
         }
         if (nextOperation && isActiveOperation(nextOperation.status) && !document.hidden) timer = setTimeout(loadOperation, 2500);
       } catch {
-        // Persisted Hiring Criteria model state remains the legacy fallback.
         if (!cancelled && !document.hidden) timer = setTimeout(loadOperation, 5000);
       }
     }
@@ -82,7 +81,7 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
   async function adjustWeight(criterionId: string, delta: -1 | 1) {
     const criterion = criteria.find((item) => item.id === criterionId);
     if ((knockouts[criterionId] ?? criterion?.isKnockout ?? false) || savingId === criterionId) return;
-    const previous = weights[criterionId] ?? 0;
+    const previous = weights[criterionId] ?? criterion?.draftWeight ?? 0;
     const next = Math.max(0, previous + delta);
     if (next === previous) return;
     setWeights((current) => ({ ...current, [criterionId]: next }));
@@ -99,6 +98,7 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
       setWeights((current) => ({ ...current, [criterionId]: result.weight as number }));
     } catch {
       setWeights((current) => ({ ...current, [criterionId]: previous }));
+      alert('Unable to save that weight adjustment. The previous value has been restored.');
     } finally {
       setSavingId(null);
     }
@@ -106,8 +106,9 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
 
   async function setKnockout(criterionId: string, isKnockout: boolean) {
     if (savingId === criterionId) return;
-    const previousKnockout = knockouts[criterionId] ?? false;
-    const previousWeight = weights[criterionId] ?? 0;
+    const criterion = criteria.find((item) => item.id === criterionId);
+    const previousKnockout = knockouts[criterionId] ?? criterion?.isKnockout ?? false;
+    const previousWeight = weights[criterionId] ?? criterion?.draftWeight ?? 0;
     setKnockouts((current) => ({ ...current, [criterionId]: isKnockout }));
     setWeights((current) => ({ ...current, [criterionId]: 0 }));
     setSavingId(criterionId);
@@ -125,6 +126,7 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
     } catch {
       setKnockouts((current) => ({ ...current, [criterionId]: previousKnockout }));
       setWeights((current) => ({ ...current, [criterionId]: previousWeight }));
+      alert('Unable to save that treatment change. The previous value has been restored.');
     } finally {
       setSavingId(null);
     }
@@ -199,9 +201,12 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
     );
   }
 
+  function categoryCriteria(category: HiringCriteriaCategory): HiringCriterion[] {
+    return criteria.filter((criterion) => criterion.category === category);
+  }
+
   function categoryTotal(category: HiringCriteriaCategory): number {
-    return criteria
-      .filter((criterion) => criterion.category === category)
+    return categoryCriteria(category)
       .reduce((sum, criterion) => sum + ((knockouts[criterion.id] ?? criterion.isKnockout) ? 0 : (weights[criterion.id] ?? criterion.draftWeight)), 0);
   }
 
@@ -226,7 +231,6 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
     <section className="hiring-criteria" aria-labelledby="hiring-criteria-heading">
       <div className="hiring-criteria-heading">
         <div><span className="eyebrow">Hiring calibration</span><h2 id="hiring-criteria-heading">Hiring Criteria</h2></div>
-        {ready && <div className="criteria-actions"><button type="button" className="criteria-reset" onClick={() => runAction('reset')} disabled={!changedFromDefault || action !== null || savingId !== null}>Reset</button><button type="button" className="criteria-apply" onClick={() => runAction('apply')} disabled={total !== 100 || action !== null || savingId !== null}>{action === 'apply' ? 'Updating…' : 'Update'}</button></div>}
       </div>
 
       {sourceIsStale&&<div className="source-stale-notice">Job Description has changed since these Hiring Criteria were generated.</div>}
@@ -243,20 +247,27 @@ export function HiringCriteria({ model, requisitionId, sourceIsStale = false }: 
       ) : (
         <>
           <p className="criteria-treatment-help">Choose whether each criterion contributes to Match or must be satisfied.</p>
-          <div className={`criteria-meter ${meterState}`} role="status" aria-live="polite"><span>Total Weight</span><strong>{total}%</strong><span>{meterCopy}</span></div>
+          <div className={`criteria-meter ${meterState}`} aria-live="polite">
+            <span>Total Weight</span>
+            <strong>{total}%</strong>
+            <span>{meterCopy}</span>
+            <div className="criteria-meter-actions" aria-label="Hiring Criteria actions">
+              <button type="button" onClick={() => runAction('reset')} disabled={!changedFromDefault || action !== null || savingId !== null}>{action === 'reset' ? 'Resetting…' : 'Reset'}</button>
+              <button type="button" onClick={() => runAction('apply')} disabled={total !== 100 || action !== null || savingId !== null}>Update</button>
+            </div>
+          </div>
           {activeCategory ? (
             <div className="criteria-category-focused">
               {renderCategorySelection(categories.find((category) => category.id === activeCategory)!, true)}
               <div className="criteria-category-detail">
-                {criteria.filter((criterion) => criterion.category === activeCategory).length
-                  ? criteria.filter((criterion) => criterion.category === activeCategory).map(renderCriterion)
+                {categoryCriteria(activeCategory).length
+                  ? categoryCriteria(activeCategory).map(renderCriterion)
                   : <p className="muted">No criteria in this category.</p>}
               </div>
             </div>
           ) : (
             <div className="criteria-category-list">{categories.map((category) => renderCategorySelection(category, false))}</div>
           )}
-          <p className="criteria-active-note">{model.latestAppliedVersionId ? 'Draft changes do not affect the latest applied version or Candidate Match.' : 'No applied version yet. Review or calibrate this draft, then apply it at exactly 100%.'}</p>
         </>
       )}
     </section>

@@ -1,18 +1,24 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { CandidateFilesPanel } from '@/components/CandidateFilesPanel';
+import { CandidateTeamworkPanel } from '@/components/CandidateTeamworkPanel';
+import { InterviewQuestionBankPanel } from '@/components/InterviewQuestionBankPanel';
 import { ResumeUpload } from '@/components/ResumeUpload';
 import { RequisitionNotes } from '@/components/RequisitionNotes';
 import { useRequisitionViewState } from '@/components/RequisitionViewStateProvider';
+import {
+  CANDIDATE_FILES_CLEAR_EVENT,
+  CANDIDATE_FILES_FOCUS_EVENT,
+  type CandidateFilesSelection
+} from '@/lib/candidateFilesEvents';
+import {
+  INTERVIEW_WORKSPACE_CLEAR_EVENT,
+  INTERVIEW_WORKSPACE_FOCUS_EVENT,
+  type InterviewWorkspaceFocusDetail
+} from '@/lib/interviewQuestionBankEvents';
 
-// Visual-only restoration of the old right-side panel shell, now with
-// its first real piece of hiring-team functionality: notes/teamwork,
-// toggled against resume upload. Still deliberately NOT the old
-// CollaborationPanel - no realtime, no Supabase subscriptions, no
-// per-user accounts (none exist yet). Collapse state stays local UI
-// state, not persisted - but which tab (Resume Upload vs Teamwork) is
-// selected is now remembered per requisition, since this component
-// never unmounts but the requisition being viewed does change.
 export function WorkspacePanel({
   collapsed,
   onExpand,
@@ -24,13 +30,67 @@ export function WorkspacePanel({
 }) {
   const pathname = usePathname();
   const requisitionId = pathname.match(/^\/requisitions\/([^/]+)/)?.[1] || null;
+  const isInterviewBuilder = /^\/requisitions\/[^/]+\/interviews\/builder\/?$/.test(pathname);
   const { state, update } = useRequisitionViewState(requisitionId || '');
   const tab = state.panelTab;
+  const [candidate, setCandidate] = useState<CandidateFilesSelection | null>(null);
+  const [candidatePanelTab, setCandidatePanelTab] = useState<'files' | 'teamwork'>('files');
+  const [interviewContext, setInterviewContext] = useState<InterviewWorkspaceFocusDetail | null>(null);
+
+  useEffect(() => {
+    function focusCandidate(event: Event) {
+      const detail = (event as CustomEvent<CandidateFilesSelection>).detail;
+      if (detail?.id) {
+        setCandidate(detail);
+        setCandidatePanelTab('files');
+      }
+    }
+
+    function clearCandidate(event: Event) {
+      const detail = (event as CustomEvent<{ id?: string }>).detail;
+      setCandidate((current) => !detail?.id || current?.id === detail.id ? null : current);
+    }
+
+    function focusInterview(event: Event) {
+      const detail = (event as CustomEvent<InterviewWorkspaceFocusDetail>).detail;
+      if (detail?.stage && detail?.positionTitle) setInterviewContext(detail);
+    }
+
+    function clearInterview() {
+      setInterviewContext(null);
+    }
+
+    window.addEventListener(CANDIDATE_FILES_FOCUS_EVENT, focusCandidate);
+    window.addEventListener(CANDIDATE_FILES_CLEAR_EVENT, clearCandidate);
+    window.addEventListener(INTERVIEW_WORKSPACE_FOCUS_EVENT, focusInterview);
+    window.addEventListener(INTERVIEW_WORKSPACE_CLEAR_EVENT, clearInterview);
+    return () => {
+      window.removeEventListener(CANDIDATE_FILES_FOCUS_EVENT, focusCandidate);
+      window.removeEventListener(CANDIDATE_FILES_CLEAR_EVENT, clearCandidate);
+      window.removeEventListener(INTERVIEW_WORKSPACE_FOCUS_EVENT, focusInterview);
+      window.removeEventListener(INTERVIEW_WORKSPACE_CLEAR_EVENT, clearInterview);
+    };
+  }, []);
+
+  useEffect(() => {
+    setCandidate(null);
+    setCandidatePanelTab('files');
+    setInterviewContext(null);
+  }, [pathname]);
+
+  const showCandidateFiles = Boolean(requisitionId && state.view === 'candidates' && candidate);
+  const showInterviewBank = Boolean(
+    requisitionId &&
+    state.view === 'requisition' &&
+    state.requisitionTab === 'interviews' &&
+    interviewContext
+  );
+  const showQuestionBank = isInterviewBuilder || showInterviewBank;
 
   if (collapsed) {
     return (
       <div className="pull-tab" onClick={onExpand}>
-        Hiring Workspace
+        {showQuestionBank ? 'Question Bank' : showCandidateFiles ? (candidatePanelTab === 'teamwork' ? 'Teamwork' : 'Candidate Files') : 'Hiring Workspace'}
       </div>
     );
   }
@@ -40,27 +100,51 @@ export function WorkspacePanel({
       <button className="panel-collapse-btn" onClick={onCollapse} aria-label="Collapse panel">
         ›
       </button>
-      <div className="side-tabs">
-        <button type="button" className={`side-tab ${tab === 'upload' ? 'active' : ''}`} onClick={() => update({ panelTab: 'upload' })}>
-          Resume Upload
-        </button>
-        <button type="button" className={`side-tab ${tab === 'teamwork' ? 'active' : ''}`} onClick={() => update({ panelTab: 'teamwork' })}>
-          Teamwork
-        </button>
-      </div>
-      <div className="side-content">
-        {!requisitionId && <p className="muted">Open a requisition to see its notes and upload resumes.</p>}
-        {requisitionId && (
-          <>
-            <div hidden={tab !== 'upload'}>
-              <ResumeUpload requisitionId={requisitionId} />
-            </div>
-            <div hidden={tab !== 'teamwork'}>
-              <RequisitionNotes requisitionId={requisitionId} />
-            </div>
-          </>
-        )}
-      </div>
+
+      {showQuestionBank ? (
+        <InterviewQuestionBankPanel
+          initialStage={interviewContext?.stage}
+          initialPositionTitle={interviewContext?.positionTitle}
+        />
+      ) : showCandidateFiles && candidate ? (
+        <>
+          <div className="side-tabs">
+            <button type="button" className={`side-tab ${candidatePanelTab === 'files' ? 'active' : ''}`} onClick={() => setCandidatePanelTab('files')}>
+              Candidate Files
+            </button>
+            <button type="button" className={`side-tab ${candidatePanelTab === 'teamwork' ? 'active' : ''}`} onClick={() => setCandidatePanelTab('teamwork')}>
+              Teamwork
+            </button>
+          </div>
+          <div className="side-content" style={{ padding: 0 }}>
+            {candidatePanelTab === 'files' ? <CandidateFilesPanel candidate={candidate} /> : <CandidateTeamworkPanel candidate={candidate} />}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="side-tabs">
+            <button type="button" className={`side-tab ${tab === 'upload' ? 'active' : ''}`} onClick={() => update({ panelTab: 'upload' })}>
+              Resume Upload
+            </button>
+            <button type="button" className={`side-tab ${tab === 'teamwork' ? 'active' : ''}`} onClick={() => update({ panelTab: 'teamwork' })}>
+              Teamwork
+            </button>
+          </div>
+          <div className="side-content">
+            {!requisitionId && <p className="muted">Open a requisition to see its notes and upload resumes.</p>}
+            {requisitionId && (
+              <>
+                <div hidden={tab !== 'upload'}>
+                  <ResumeUpload requisitionId={requisitionId} />
+                </div>
+                <div hidden={tab !== 'teamwork'}>
+                  <RequisitionNotes requisitionId={requisitionId} />
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

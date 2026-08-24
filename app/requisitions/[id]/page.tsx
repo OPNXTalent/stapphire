@@ -2,10 +2,9 @@ import { notFound } from 'next/navigation';
 import { CandidateMatrix, type MatrixCandidate, type Disposition } from '@/components/CandidateMatrix';
 import { RequisitionViewToggle } from '@/components/RequisitionViewToggle';
 import { DNSBin, type DNSCandidate } from '@/components/DNSBin';
-import { RequisitionIntelligence } from '@/components/RequisitionIntelligence';
 import { HiringCriteria } from '@/components/HiringCriteria';
+import { InterviewPlan } from '@/components/InterviewPlan';
 import { getHiringCriteriaModel } from '@/lib/hiringCriteria';
-import { getLatestRequisitionIntelligence } from '@/lib/requisitionIntelligence';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic='force-dynamic';
@@ -20,7 +19,7 @@ export default async function RequisitionPage({params}:{params:{id:string}}){
   const {data:candidates,error:candidatesError}=await supabaseAdmin.from('phase1_candidates').select('id,full_name,source_filename,source_storage_path,disposition,rank_order,created_at,phase1_evaluations!phase1_evaluations_candidate_id_fkey(overall_match,job_responsibilities_score,hard_skills_score,soft_skills_score,keyword_terminology_score,assessment,evaluation_basis_id,created_at)').eq('requisition_id',params.id).is('deleted_at',null).order('created_at',{ascending:false});
   if(candidatesError)throw new Error(`Unable to load candidates: ${candidatesError.message}`);
   const {data:dnsList}=await supabaseAdmin.from('phase1_candidates').select('id,full_name,deleted_at').eq('requisition_id',params.id).not('deleted_at','is',null).order('deleted_at',{ascending:false});
-  const [requisitionIntelligence,hiringCriteria]=await Promise.all([getLatestRequisitionIntelligence(params.id),getHiringCriteriaModel(params.id)]);
+  const hiringCriteria=await getHiringCriteriaModel(params.id);
   const matrixCandidates:MatrixCandidate[]=(candidates||[]).map(candidate=>{const evaluations=((candidate.phase1_evaluations as unknown as EvaluationRow[])||[]).sort((a,b)=>b.created_at.localeCompare(a.created_at));const evaluation=evaluations[0];const assessment=evaluation?.assessment??null;return{id:candidate.id,name:candidate.full_name,sourceFilename:String(candidate.source_filename||''),resumeAvailable:Boolean(candidate.source_storage_path),match:number(evaluation?.overall_match),rankOrder:number(candidate.rank_order),createdAt:String(candidate.created_at),evaluationDate:String(evaluation?.created_at||candidate.created_at),evaluationBasisId:typeof evaluation?.evaluation_basis_id==='string'?evaluation.evaluation_basis_id:null,responsibilities:number(evaluation?.job_responsibilities_score),hardSkills:number(evaluation?.hard_skills_score),softSkills:number(evaluation?.soft_skills_score),keywords:number(evaluation?.keyword_terminology_score),otherRequirements:criteriaRollup(assessment,'other_requirements'),assessment,disposition:(['screen','interview','hire','delete'].includes(String(candidate.disposition))?candidate.disposition as Disposition:null)}});
   const hasCustomRanking=matrixCandidates.some(candidate=>candidate.rankOrder!==null);
   matrixCandidates.sort((a,b)=>hasCustomRanking
@@ -29,8 +28,8 @@ export default async function RequisitionPage({params}:{params:{id:string}}){
   const dnsCandidates:DNSCandidate[]=(dnsList||[]).map(c=>({id:c.id,name:c.full_name,deletedAt:c.deleted_at as string}));
 
   const hiringCriteriaView = <HiringCriteria model={hiringCriteria} requisitionId={req.id} sourceIsStale={sourceIsNewer(req.job_description_updated_at,hiringCriteria?.generatedAt)}/>;
-  const marketAnalysisView = <RequisitionIntelligence analysis={requisitionIntelligence} checkedAt={new Date()} sourceIsStale={sourceIsNewer(req.job_description_updated_at,requisitionIntelligence?.analysisGeneratedAt||requisitionIntelligence?.createdAt)}/>;
+  const interviewsView = <InterviewPlan requisitionId={req.id} positionTitle={req.title} candidateNames={matrixCandidates.map(candidate=>candidate.name)}/>;
   const candidatesView = <CandidateMatrix candidates={matrixCandidates} positionTitle={req.title} requisitionId={req.id}/>;
 
-  return <RequisitionViewToggle title={req.title} requisitionId={req.id} jobDescription={req.job_description} dnsAction={<DNSBin candidates={dnsCandidates}/>} hiringCriteriaView={hiringCriteriaView} marketAnalysisView={marketAnalysisView} candidatesView={candidatesView}/>;
+  return <RequisitionViewToggle title={req.title} requisitionId={req.id} jobDescription={req.job_description} dnsAction={<DNSBin candidates={dnsCandidates}/>} hiringCriteriaView={hiringCriteriaView} interviewsView={interviewsView} candidatesView={candidatesView}/>;
 }

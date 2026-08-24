@@ -1,0 +1,28 @@
+.panel{display:flex;height:100%;min-height:0;flex-direction:column;background:var(--paper)}
+.header{padding:16px 16px 12px;border-bottom:1px solid var(--line)}
+.eyebrow{display:block;margin-bottom:4px;color:var(--faint);font:600 9px var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.header h2{margin:0;color:var(--ink);font:700 23px/1.15 var(--display)}
+.header p{margin:6px 0 0;color:var(--muted);font-size:11.5px;line-height:1.4}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:10px 10px 8px;border-bottom:1px solid var(--line)}
+.tabs button{min-width:0;padding:7px 4px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--muted);font-size:10px;font-weight:700;white-space:nowrap}
+.tabs button:hover{background:var(--wash);color:var(--deep)}
+.tabs .activeTab{border-color:var(--sapphire-2);background:var(--sapphire-pale);color:var(--deep)}
+.list{display:grid;gap:8px;min-height:0;overflow-y:auto;padding:10px}
+.question{padding:10px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:grab}
+.question:active{cursor:grabbing}
+.question:hover{border-color:var(--sapphire-2);box-shadow:0 2px 7px rgba(12,18,32,.05)}
+.question.used{opacity:.58;cursor:default;background:var(--wash)}
+.questionTop{display:grid;grid-template-columns:18px minmax(0,1fr);gap:6px;align-items:start}
+.drag{padding-top:2px;color:var(--faint);font:700 14px/1 var(--mono)}
+.question p{margin:0;color:var(--ink);font-size:11.5px;font-weight:600;line-height:1.4}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0}
+.chips span{padding:4px 6px;border-radius:999px;background:var(--sapphire-pale);color:var(--deep);font-size:9.5px;font-weight:700}
+.question button{width:100%;padding:6px 8px;border:1px solid var(--line-strong);background:transparent;color:var(--sapphire);font-size:10.5px;font-weight:700}
+.question button:hover:not(:disabled){border-color:var(--sapphire);background:var(--sapphire-pale)}
+.question button:disabled{color:var(--muted);opacity:.8}
+.wildcard{border-style:dashed;border-color:var(--sapphire-2);background:var(--sapphire-pale);cursor:default}
+.wildcard:active{cursor:default}
+.wildcardIcon{display:flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--sapphire-2);border-radius:50%;color:var(--sapphire);font:700 13px/1 var(--mono)}
+.wildcardCopy{display:block;margin-top:3px;color:var(--muted);font-size:10.5px;line-height:1.35}
+.wildcard button{margin-top:9px;background:#fff}
+.footer{padding:9px 12px 12px;border-top:1px solid var(--line);color:var(--faint);font-size:10.5px;line-height:1.35}
