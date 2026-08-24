@@ -77,14 +77,15 @@ export function ParticipantInterviewPreview({
 
       const url = payload.invitation.url as string;
       const title = `${stageLabel} — ${positionTitle}`;
-      const text = `You're invited to participate in the ${stageLabel} for ${candidateName}.`;
+      const text = `You're invited to participate in the ${stageLabel} interview evaluation for ${candidateName} for the ${positionTitle} position. Please use the link below to complete your ratings, comments, and recommendation. Your feedback will be recorded with the candidate's interview results.`;
+      const shareText = `${text}\n\n${url}`;
 
       if (navigator.share) {
         await navigator.share({ title, text, url });
         setShareStatus('Shared');
       } else {
-        await navigator.clipboard.writeText(url);
-        setShareStatus('Link copied');
+        await navigator.clipboard.writeText(shareText);
+        setShareStatus('Message + link copied');
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
