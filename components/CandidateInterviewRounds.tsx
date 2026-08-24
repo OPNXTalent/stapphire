@@ -150,6 +150,9 @@ export function CandidateInterviewRounds({
         <button type="button" className={styles.bar} onClick={() => setView('evaluation')}>
           <span>Evaluation</span>
         </button>
+        <p className={styles.interviewHelper}>
+          Select an interview round to open the evaluation form. From there, you can share the form with Hiring Leaders.
+        </p>
         {rounds.map((round) => renderInterviewBar(round))}
       </section>
     );
