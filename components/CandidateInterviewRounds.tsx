@@ -10,7 +10,7 @@ type ViewId = 'evaluation' | StageId | null;
 type AggregateRow = {
   area: string;
   timesRated: number;
-  average: number;
+  average: number | null;
 };
 
 type ParticipantAssessment = {
@@ -29,40 +29,14 @@ type InterviewRound = {
   assessments: ParticipantAssessment[];
 };
 
-const PHONE_SCREEN_SAMPLE: AggregateRow[] = [
-  { area: 'Communication', timesRated: 9, average: 4.33 },
-  { area: 'Job Knowledge', timesRated: 6, average: 4.17 },
-  { area: 'Problem Solving', timesRated: 6, average: 3.83 },
-  { area: 'Interpersonal Skills', timesRated: 3, average: 4.67 }
-];
-
-const PHONE_SCREEN_ASSESSMENTS: ParticipantAssessment[] = [
-  {
-    contributor: 'Participant 1',
-    recommendation: 'Proceed',
-    comments: 'Strong communicator with relevant experience and clear examples throughout the interview.'
-  },
-  {
-    contributor: 'Participant 2',
-    recommendation: 'Proceed',
-    comments: 'Demonstrated solid job knowledge and handled the problem-solving questions well.'
-  },
-  {
-    contributor: 'Participant 3',
-    recommendation: 'Undecided - Need more information',
-    comments: 'Good overall conversation. I would like more detail about the candidate’s experience with financial reporting before making a final recommendation.'
-  }
-];
-
-function buildStageRows(stage: StageId, positionTitle: string, values: AggregateRow[] = []) {
-  const valueByArea = new Map(values.map((row) => [row.area, row]));
+function buildStageRows(stage: StageId, positionTitle: string): AggregateRow[] {
   const areas = Array.from(new Set(
     buildQuestionBank(positionTitle)
       .filter((question) => question.stage === stage)
       .flatMap((question) => question.areas)
   ));
 
-  return areas.map((area) => valueByArea.get(area) ?? { area, timesRated: 0, average: 0 });
+  return areas.map((area) => ({ area, timesRated: 0, average: null }));
 }
 
 export function CandidateInterviewRounds({
@@ -87,11 +61,11 @@ export function CandidateInterviewRounds({
     {
       id: 'phone-screen',
       title: `Phone Screen — ${positionTitle}`,
-      participants: 3,
-      submitted: 3,
-      overall: 4.21,
-      rows: buildStageRows('phone-screen', positionTitle, PHONE_SCREEN_SAMPLE),
-      assessments: PHONE_SCREEN_ASSESSMENTS
+      participants: 0,
+      submitted: 0,
+      overall: null,
+      rows: buildStageRows('phone-screen', positionTitle),
+      assessments: []
     },
     {
       id: 'round-1',
@@ -199,7 +173,6 @@ export function CandidateInterviewRounds({
     <section className={styles.records}>
       {renderInterviewBar(round, true)}
       <div className={styles.aggregateCanvas}>
-        <div className={styles.sampleFlag}>PRE-PRODUCTION SAMPLE</div>
         <div className={styles.aggregateTable} role="table" aria-label={`${round.title} aggregate results`}>
           <div className={`${styles.aggregateRow} ${styles.headerRow}`} role="row">
             <span>Area of Evaluation</span>
@@ -210,13 +183,13 @@ export function CandidateInterviewRounds({
             <div className={styles.aggregateRow} role="row" key={row.area}>
               <span>{row.area}</span>
               <span>{row.timesRated}</span>
-              <strong>★ {row.average.toFixed(2)}</strong>
+              <strong>{row.average === null ? '—' : `★ ${row.average.toFixed(2)}`}</strong>
             </div>
           ))}
         </div>
         <div className={styles.overall}>
           <span>Overall Interview Average</span>
-          <strong>★ {(round.overall ?? 0).toFixed(2)} / 5</strong>
+          <strong>{round.overall === null ? '—' : `★ ${round.overall.toFixed(2)} / 5`}</strong>
         </div>
 
         <section className={styles.participantAssessments} aria-label="Participant interview assessments">
