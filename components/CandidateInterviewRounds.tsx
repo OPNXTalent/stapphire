@@ -151,7 +151,7 @@ export function CandidateInterviewRounds({
           <span>Evaluation</span>
         </button>
         <p className={styles.interviewHelper}>
-          Select an interview round to open the evaluation form. From there, you can share the form with Hiring Leaders.
+          Click the round name to open the evaluation form and share it with interview participants from there. Once results come in, click the bar to expand and view them.
         </p>
         {rounds.map((round) => renderInterviewBar(round))}
       </section>
