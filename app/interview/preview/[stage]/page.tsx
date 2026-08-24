@@ -9,7 +9,7 @@ export default function InterviewPreviewPage({
   searchParams
 }: {
   params: { stage: string };
-  searchParams: { candidate?: string; role?: string };
+  searchParams: { candidate?: string; role?: string; candidateId?: string };
 }) {
   if (!VALID_STAGES.includes(params.stage as InterviewStageId)) notFound();
 
@@ -18,6 +18,7 @@ export default function InterviewPreviewPage({
       stage={params.stage as InterviewStageId}
       candidateName={searchParams.candidate || 'Candidate'}
       positionTitle={searchParams.role || 'Position'}
+      candidateId={searchParams.candidateId}
     />
   );
 }
