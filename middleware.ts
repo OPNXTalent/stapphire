@@ -35,14 +35,17 @@ export async function middleware(request: NextRequest) {
   if (!sitePassword) {
     if (!isProductionEnv()) return NextResponse.next(); // dev convenience only
 
-    // Production, misconfigured - fail closed. Nothing gets through,
-    // including the normal login page (it can never succeed anyway,
-    // since /api/gate also refuses without a configured password).
     if (pathname === '/gate-config-error') return NextResponse.next();
     if (pathname.startsWith('/api')) {
       return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
     }
     return NextResponse.rewrite(new URL('/gate-config-error', request.url));
+  }
+
+  if (pathname === '/interview/invite' || pathname.startsWith('/interview/invite/')) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set('x-stapphire-public-invite', '1');
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   const isExempt = EXEMPT_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
