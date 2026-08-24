@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import {
   AREAS_OF_EVALUATION,
   buildQuestionBank,
@@ -31,6 +31,16 @@ type Question = {
   areas: string[];
 };
 
+type PersistedRound = {
+  stage: string;
+  questions?: Array<{
+    id: string;
+    sourceId?: string;
+    text: string;
+    areas: string[];
+  }>;
+};
+
 function localId() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
@@ -41,12 +51,34 @@ function cloneBankQuestion(question: BankQuestion): Question {
   return { id: localId(), sourceId: question.id, text: question.text, areas: [...question.areas] };
 }
 
+function defaultQuestionsByRound(bank: BankQuestion[]) {
+  return {
+    'phone-screen': bank.filter((question) => question.stage === 'phone-screen').slice(0, 3).map(cloneBankQuestion),
+    'round-1': bank.filter((question) => question.stage === 'round-1').slice(0, 4).map(cloneBankQuestion),
+    'round-2': bank.filter((question) => question.stage === 'round-2').slice(0, 4).map(cloneBankQuestion)
+  } satisfies Record<string, Question[]>;
+}
+
+function serializePlan(rounds: InterviewRound[], questionsByRound: Record<string, Question[]>) {
+  return JSON.stringify({
+    rounds: rounds.map((round) => ({
+      stage: round.stage,
+      title: round.title,
+      questions: (questionsByRound[round.id] || []).map((question) => ({
+        ...(question.sourceId ? { sourceId: question.sourceId } : {}),
+        text: question.text,
+        areas: question.areas
+      }))
+    }))
+  });
+}
+
 function parseBankQuestion(event: DragEvent<HTMLElement>): BankQuestion | null {
   const raw = event.dataTransfer.getData(INTERVIEW_BANK_DRAG_MIME);
   if (!raw) return null;
   try {
     const question = JSON.parse(raw) as BankQuestion;
-    return question?.id && question?.text && Array.isArray(question.areas) ? question : null;
+    return question?.id && typeof question?.text === 'string' && Array.isArray(question.areas) ? question : null;
   } catch {
     return null;
   }
@@ -72,22 +104,133 @@ export function InterviewPlan({
   ], [positionTitle]);
   const bank = useMemo(() => buildQuestionBank(positionTitle), [positionTitle]);
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
-  const [questionsByRound, setQuestionsByRound] = useState<Record<string, Question[]>>(() => ({
-    'phone-screen': bank.filter((question) => question.stage === 'phone-screen').slice(0, 3).map(cloneBankQuestion),
-    'round-1': bank.filter((question) => question.stage === 'round-1').slice(0, 4).map(cloneBankQuestion),
-    'round-2': bank.filter((question) => question.stage === 'round-2').slice(0, 4).map(cloneBankQuestion)
-  }));
+  const [questionsByRound, setQuestionsByRound] = useState<Record<string, Question[]>>(() => defaultQuestionsByRound(bank));
   const [openAreaId, setOpenAreaId] = useState<string | null>(null);
   const [draggedQuestionId, setDraggedQuestionId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [ratings, setRatings] = useState<Record<string, number>>({});
+  const [hydrated, setHydrated] = useState(false);
+  const latestPayloadRef = useRef('');
+  const savedPayloadRef = useRef('');
+  const savingRef = useRef(false);
 
   const selectedRound = rounds.find((round) => round.id === selectedRoundId) || null;
   const questions = selectedRound ? questionsByRound[selectedRound.id] || [] : [];
+  const serializedPlan = useMemo(() => serializePlan(rounds, questionsByRound), [rounds, questionsByRound]);
   const usedSourceIds = useMemo(
     () => new Set(questions.map((question) => question.sourceId).filter(Boolean) as string[]),
     [questions]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    const defaults = defaultQuestionsByRound(bank);
+    setHydrated(false);
+
+    async function loadPlan() {
+      try {
+        const response = await fetch(`/api/requisitions/${requisitionId}/interview-plan`, { cache: 'no-store' });
+        if (!response.ok) throw new Error('Unable to load the Interview Plan.');
+        const result = await response.json();
+
+        if (cancelled) return;
+
+        const persistedRounds = (result?.plan?.rounds ?? []) as PersistedRound[];
+        const next: Record<string, Question[]> = { ...defaults };
+
+        for (const persistedRound of persistedRounds) {
+          const matchingRound = rounds.find((round) => round.stage === persistedRound.stage);
+          if (!matchingRound || !Array.isArray(persistedRound.questions)) continue;
+          next[matchingRound.id] = persistedRound.questions.map((question) => ({
+            id: question.id || localId(),
+            ...(question.sourceId ? { sourceId: question.sourceId } : {}),
+            text: String(question.text ?? ''),
+            areas: Array.isArray(question.areas) ? [...question.areas] : []
+          }));
+        }
+
+        setQuestionsByRound(next);
+        const baseline = serializePlan(rounds, next);
+        latestPayloadRef.current = baseline;
+        savedPayloadRef.current = baseline;
+        setHydrated(true);
+      } catch (error) {
+        console.error(error);
+        if (cancelled) return;
+        setQuestionsByRound(defaults);
+        const baseline = serializePlan(rounds, defaults);
+        latestPayloadRef.current = baseline;
+        savedPayloadRef.current = baseline;
+        setHydrated(true);
+      }
+    }
+
+    void loadPlan();
+    return () => {
+      cancelled = true;
+    };
+  }, [bank, requisitionId, rounds]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    latestPayloadRef.current = serializedPlan;
+    if (serializedPlan === savedPayloadRef.current) return;
+
+    const timer = window.setTimeout(() => {
+      async function flushPendingPlan() {
+        if (savingRef.current) return;
+        savingRef.current = true;
+
+        try {
+          while (latestPayloadRef.current !== savedPayloadRef.current) {
+            const payload = latestPayloadRef.current;
+            const response = await fetch(`/api/requisitions/${requisitionId}/interview-plan`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: payload
+            });
+
+            if (!response.ok) {
+              const result = await response.json().catch(() => null);
+              throw new Error(result?.error || 'Unable to save the Interview Plan.');
+            }
+
+            savedPayloadRef.current = payload;
+          }
+        } catch (error) {
+          console.error(error);
+        } finally {
+          savingRef.current = false;
+        }
+      }
+
+      void flushPendingPlan();
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [hydrated, requisitionId, serializedPlan]);
+
+  useEffect(() => {
+    if (!openAreaId) return;
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpenAreaId(null);
+    }
+
+    function closeOnOutsideClick(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest(`[data-area-picker="${openAreaId}"]`)) {
+        setOpenAreaId(null);
+      }
+    }
+
+    document.addEventListener('keydown', closeOnEscape);
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape);
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+    };
+  }, [openAreaId]);
 
   useEffect(() => {
     if (!selectedRound) {
@@ -298,7 +441,7 @@ export function InterviewPlan({
                       <button type="button" className={styles.removeQuestion} onClick={() => removeQuestion(question.id)} aria-label={`Remove question ${index + 1}`}>×</button>
                     </div>
 
-                    <div className={styles.areaLine}>
+                    <div className={styles.areaLine} data-area-picker={question.id}>
                       <button
                         type="button"
                         className={styles.areaButton}
@@ -326,6 +469,7 @@ export function InterviewPlan({
                               </label>
                             );
                           })}
+                          <button type="button" className={styles.areaDone} onClick={() => setOpenAreaId(null)}>Done</button>
                         </div>
                       )}
                     </div>
