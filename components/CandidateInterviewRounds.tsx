@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { buildQuestionBank } from '@/lib/interviewQuestionBank';
 import styles from './CandidateInterviewRounds.module.css';
 
 type StageId = 'phone-screen' | 'round-1' | 'round-2';
 type ViewId = 'evaluation' | StageId | null;
+type InvitationCount = { participants: number; submitted: number };
 
 type AggregateRow = {
   area: string;
@@ -27,6 +28,12 @@ type InterviewRound = {
   overall: number | null;
   rows: AggregateRow[];
   assessments: ParticipantAssessment[];
+};
+
+const EMPTY_COUNTS: Record<StageId, InvitationCount> = {
+  'phone-screen': { participants: 0, submitted: 0 },
+  'round-1': { participants: 0, submitted: 0 },
+  'round-2': { participants: 0, submitted: 0 }
 };
 
 function buildStageRows(stage: StageId, positionTitle: string): AggregateRow[] {
@@ -51,18 +58,47 @@ export function CandidateInterviewRounds({
   evaluationContent: ReactNode;
 }) {
   const [view, setView] = useState<ViewId>(null);
+  const [invitationCounts, setInvitationCounts] = useState<Record<StageId, InvitationCount>>(EMPTY_COUNTS);
   const [assessmentOpen, setAssessmentOpen] = useState<Record<StageId, boolean>>({
     'phone-screen': false,
     'round-1': false,
     'round-2': false
   });
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadInvitationCounts() {
+      try {
+        const response = await fetch(`/api/candidates/${candidateId}/interview-invitations`, { cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (!active || !payload?.counts) return;
+
+        setInvitationCounts({
+          'phone-screen': payload.counts['phone-screen'] ?? { participants: 0, submitted: 0 },
+          'round-1': payload.counts['round-1'] ?? { participants: 0, submitted: 0 },
+          'round-2': payload.counts['round-2'] ?? { participants: 0, submitted: 0 }
+        });
+      } catch {
+        // Keep the existing zero state if invitation metadata cannot be loaded.
+      }
+    }
+
+    void loadInvitationCounts();
+    window.addEventListener('focus', loadInvitationCounts);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', loadInvitationCounts);
+    };
+  }, [candidateId]);
+
   const rounds = useMemo<InterviewRound[]>(() => [
     {
       id: 'phone-screen',
       title: `Phone Screen — ${positionTitle}`,
-      participants: 0,
-      submitted: 0,
+      participants: invitationCounts['phone-screen'].participants,
+      submitted: invitationCounts['phone-screen'].submitted,
       overall: null,
       rows: buildStageRows('phone-screen', positionTitle),
       assessments: []
@@ -70,8 +106,8 @@ export function CandidateInterviewRounds({
     {
       id: 'round-1',
       title: 'Round 1 — Hiring Manager',
-      participants: 0,
-      submitted: 0,
+      participants: invitationCounts['round-1'].participants,
+      submitted: invitationCounts['round-1'].submitted,
       overall: null,
       rows: buildStageRows('round-1', positionTitle),
       assessments: []
@@ -79,13 +115,13 @@ export function CandidateInterviewRounds({
     {
       id: 'round-2',
       title: 'Round 2 — Panel Interview',
-      participants: 0,
-      submitted: 0,
+      participants: invitationCounts['round-2'].participants,
+      submitted: invitationCounts['round-2'].submitted,
       overall: null,
       rows: buildStageRows('round-2', positionTitle),
       assessments: []
     }
-  ], [positionTitle]);
+  ], [invitationCounts, positionTitle]);
 
   function interviewUrl(stage: StageId) {
     const params = new URLSearchParams({
