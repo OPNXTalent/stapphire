@@ -21,14 +21,13 @@ export function ParticipantInterviewPreview({
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [comments, setComments] = useState('');
   const [recommendation, setRecommendation] = useState<InterviewRecommendation>('');
-  const [submitted, setSubmitted] = useState(false);
   const [shareStatus, setShareStatus] = useState('');
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(questions[0]?.id ?? null);
 
   const ratingCount = questions.reduce((sum, question) => sum + question.areas.length, 0);
   const completedCount = Object.keys(ratings).length;
   const assessmentComplete = comments.trim().length > 0 && recommendation !== '';
-  const canSubmit = completedCount === ratingCount && assessmentComplete;
+  const assessmentReady = completedCount === ratingCount && assessmentComplete;
 
   function setRating(questionId: string, area: string, value: number) {
     setRatings((current) => ({ ...current, [`${questionId}:${area}`]: value }));
@@ -65,20 +64,6 @@ export function ParticipantInterviewPreview({
     }
 
     window.setTimeout(() => setShareStatus(''), 2200);
-  }
-
-  if (submitted) {
-    return (
-      <div className={styles.page}>
-        <div className={styles.brand}><StapphireBrand decorative /></div>
-        <section className={styles.submitted}>
-          <span className={styles.eyebrow}>Interview submitted</span>
-          <h1>Thank you.</h1>
-          <p>Your pre-production interview form has been completed. In the wired version, this submission will contribute to the candidate's aggregate interview result.</p>
-          <span className={styles.preview}>PRE-PRODUCTION PREVIEW · NOTHING WAS SAVED</span>
-        </section>
-      </div>
-    );
   }
 
   return (
@@ -191,8 +176,8 @@ export function ParticipantInterviewPreview({
         </section>
 
         <div className={styles.submitRow}>
-          <span>{canSubmit ? 'Interview assessment complete' : 'Complete all ratings, comments, and recommendation'}</span>
-          <button type="button" disabled={!canSubmit} onClick={() => setSubmitted(true)}>Submit Interview</button>
+          <span>{assessmentReady ? 'Interview assessment complete — submission is not yet enabled' : 'Complete all ratings, comments, and recommendation'}</span>
+          <button type="button" disabled>Submit Interview</button>
         </div>
       </main>
     </div>
