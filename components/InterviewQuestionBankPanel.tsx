@@ -14,9 +14,31 @@ import styles from './InterviewQuestionBankPanel.module.css';
 
 type AvailableQuestion = { id: string; text: string; areas: string[] };
 
+const UNSAVED_STARTER_USED_IDS = new Set([
+  'phone-screen-1','phone-screen-2','phone-screen-3',
+  'round-1-1','round-1-2','round-1-3','round-1-4',
+  'round-2-1','round-2-2','round-2-3','round-2-4'
+]);
+
 function customQuestionId(stage: InterviewStageId) {
   const suffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
   return `custom-${stage}-${suffix}`;
+}
+
+function sourceIdsFromPlan(plan: unknown) {
+  if (!plan || typeof plan !== 'object') return new Set(UNSAVED_STARTER_USED_IDS);
+  const sourceIds = new Set<string>();
+  const rounds = Array.isArray((plan as { rounds?: unknown }).rounds) ? (plan as { rounds: unknown[] }).rounds : [];
+  for (const round of rounds) {
+    const questions = round && typeof round === 'object' && Array.isArray((round as { questions?: unknown }).questions)
+      ? (round as { questions: unknown[] }).questions
+      : [];
+    for (const question of questions) {
+      const sourceId = question && typeof question === 'object' ? (question as { sourceId?: unknown }).sourceId : null;
+      if (typeof sourceId === 'string' && sourceId) sourceIds.add(sourceId);
+    }
+  }
+  return sourceIds;
 }
 
 export function InterviewQuestionBankPanel({
@@ -48,15 +70,9 @@ export function InterviewQuestionBankPanel({
       const response = await fetch(`/api/requisitions/${requisitionId}/interview-plan`, { cache: 'no-store' });
       if (!response.ok) return;
       const result = await response.json();
-      const sourceIds = new Set<string>();
-      for (const round of result?.plan?.rounds || []) {
-        for (const question of round?.questions || []) {
-          if (typeof question?.sourceId === 'string' && question.sourceId) sourceIds.add(question.sourceId);
-        }
-      }
-      setUsedIds(sourceIds);
+      setUsedIds(sourceIdsFromPlan(result?.plan));
     } catch {
-      // Availability can still be updated optimistically from builder events.
+      // Builder events still keep the visible inventory useful if this refresh fails.
     }
   }
 
@@ -80,13 +96,7 @@ export function InterviewQuestionBankPanel({
         if (cancelled) return;
         setStarterQuestions(Array.isArray(bankResult.starterQuestions) ? bankResult.starterQuestions : []);
         setGeneratedQuestions(Array.isArray(bankResult.generatedQuestions) ? bankResult.generatedQuestions : []);
-        const sourceIds = new Set<string>();
-        for (const round of planResult?.plan?.rounds || []) {
-          for (const question of round?.questions || []) {
-            if (typeof question?.sourceId === 'string' && question.sourceId) sourceIds.add(question.sourceId);
-          }
-        }
-        setUsedIds(sourceIds);
+        setUsedIds(sourceIdsFromPlan(planResult?.plan));
       })
       .catch((loadError) => {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Unable to load interview questions.');
@@ -146,7 +156,6 @@ export function InterviewQuestionBankPanel({
   }
 
   function add(question: AvailableQuestion) {
-    setUsedIds((current) => new Set(current).add(question.id));
     window.dispatchEvent(new CustomEvent(INTERVIEW_BANK_ADD_EVENT, { detail: { question: asBankQuestion(question) } }));
   }
 
@@ -157,7 +166,6 @@ export function InterviewQuestionBankPanel({
 
   function startDrag(event: DragEvent<HTMLDivElement>, question: AvailableQuestion) {
     const bankQuestion = asBankQuestion(question);
-    setUsedIds((current) => new Set(current).add(question.id));
     event.dataTransfer.effectAllowed = 'copy';
     event.dataTransfer.setData(INTERVIEW_BANK_DRAG_MIME, JSON.stringify(bankQuestion));
     event.dataTransfer.setData('text/plain', question.text);
