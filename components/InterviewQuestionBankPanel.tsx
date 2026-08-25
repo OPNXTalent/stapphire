@@ -202,7 +202,7 @@ export function InterviewQuestionBankPanel({
       <div className={styles.generator}>
         <div className={styles.areaPicker} ref={pickerRef}>
           <button type="button" className={styles.areaPickerButton} onClick={() => setAreaPickerOpen((open) => !open)} aria-expanded={areaPickerOpen}>
-            {selectedAreas.length ? `Areas of Evaluation (${selectedAreas.length})` : 'Areas of Evaluation (optional)'} ▾
+            {selectedAreas.length ? `AOE (${selectedAreas.length})` : 'AOE (optional)'} ▾
           </button>
           {areaPickerOpen && (
             <div className={styles.areaMenu}>
