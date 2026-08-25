@@ -114,8 +114,9 @@ export function WorkspacePanel({
         ›
       </button>
 
-      {showQuestionBank ? (
+      {showQuestionBank && requisitionId ? (
         <InterviewQuestionBankPanel
+          requisitionId={requisitionId}
           initialStage={interviewContext?.stage}
           initialPositionTitle={interviewContext?.positionTitle}
         />
