@@ -359,9 +359,9 @@ export function InterviewPlan({
     patchQuestions(roundId, (current) => {
       if (current.some((question) => question.sourceId === source.id)) return current;
       const next = cloneBankQuestion(source);
-      if (!targetId) return [...current, next];
+      if (!targetId) return [next, ...current];
       const targetIndex = current.findIndex((question) => question.id === targetId);
-      if (targetIndex < 0) return [...current, next];
+      if (targetIndex < 0) return [next, ...current];
       const result = [...current];
       result.splice(targetIndex, 0, next);
       return result;
