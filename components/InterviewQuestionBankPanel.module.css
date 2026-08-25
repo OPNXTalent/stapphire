@@ -2,7 +2,8 @@
 .generator{position:relative;padding:12px;border-bottom:1px solid var(--line);background:#fff}
 .areaPicker{position:relative;margin-right:38px}
 .panelHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
-.panelHeader h3{margin:0;color:var(--deep);font-size:15px;font-weight:700;line-height:1.2}
+.panelHeader h3{display:flex;align-items:center;gap:6px;margin:0;color:var(--deep);font-size:15px;font-weight:700;line-height:1.2}
+.bankCount{display:inline-flex;min-width:18px;height:18px;align-items:center;justify-content:center;padding:0 5px;border-radius:999px;background:var(--sapphire-pale);color:var(--deep);font-size:9.5px;font-weight:700;line-height:1}
 .headerManageButton{width:auto;padding:4px 7px;border:0;border-radius:4px;background:transparent;color:var(--sapphire);font-size:10px;font-weight:700;white-space:nowrap}
 .headerManageButton:hover{background:var(--sapphire-pale)}
 .areaPickerButton{width:100%;padding:8px 10px;border:1px solid var(--line-strong);border-radius:5px;background:#fff;color:var(--deep);font-size:10.5px;font-weight:700;text-align:left}
