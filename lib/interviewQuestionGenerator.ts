@@ -1,6 +1,7 @@
 import 'server-only';
 import OpenAI from 'openai';
 import type { EvaluationBasis } from './evaluationBasis';
+import { INTERVIEW_QUESTION_TYPE_GUIDANCE, type InterviewQuestionType } from './interviewQuestionTypes';
 
 const MODEL = process.env.OPENAI_EVALUATION_MODEL || 'gpt-5.6';
 
@@ -54,11 +55,13 @@ function criteriaText(basis: EvaluationBasis) {
 export async function generateInterviewQuestions({
   basis,
   selectedAreas,
+  questionType,
   existingQuestions,
   availableAreas
 }: {
   basis: EvaluationBasis;
   selectedAreas: string[];
+  questionType: InterviewQuestionType | null;
   existingQuestions: string[];
   availableAreas: string[];
 }): Promise<GeneratedInterviewQuestion[]> {
@@ -68,10 +71,14 @@ export async function generateInterviewQuestions({
     ? `The recruiter specifically selected these Areas of Evaluation: ${selectedAreas.join(', ')}. Every generated question must assess at least one selected area, and the batch should distribute attention intelligently across them.`
     : `The recruiter selected no Areas of Evaluation. Identify meaningful coverage gaps from the role context and existing questions, then choose the most useful Areas of Evaluation for the five new questions.`;
 
+  const requestedType = questionType
+    ? `The recruiter selected the Question Type “${questionType}”. All five questions must clearly fit this type. Guidance: ${INTERVIEW_QUESTION_TYPE_GUIDANCE[questionType]}`
+    : 'The recruiter selected All Question Types. Choose the most useful mix of question structures for the role, selected Areas of Evaluation, Hiring Criteria, and uncovered interview needs.';
+
   const response = await client().responses.create({
     model: MODEL,
-    instructions: `You design structured employment interview questions for recruiters. Generate exactly five NEW, practical, job-related questions. Use behavioral or situational wording when useful. Avoid trivia, generic filler, illegal or protected-class topics, and duplicate or near-duplicate questions. Tag each question with one to four Areas of Evaluation from the supplied available list. Do not assign an area unless the question can actually produce evidence for it. Custom Areas of Evaluation are organization-defined and should be treated as first-class assessment categories when relevant.`,
-    input: `JOB DESCRIPTION\n${basis.jobDescriptionSnapshot}\n\nHIRING CRITERIA\n${criteriaText(basis)}\n\nAVAILABLE AREAS OF EVALUATION\n${availableAreas.join(', ')}\n\nREQUEST\n${requestedAreas}\n\nQUESTIONS ALREADY AVAILABLE OR IN USE\n${existingQuestions.length ? existingQuestions.map((question, index) => `${index + 1}. ${question}`).join('\n') : 'None'}`,
+    instructions: `You design structured employment interview questions for recruiters. Generate exactly five NEW, practical, job-related questions. Respect the requested Question Type when one is supplied. Avoid trivia, generic filler, illegal or protected-class topics, and duplicate or near-duplicate questions. Tag each question with one to four Areas of Evaluation from the supplied available list. Do not assign an area unless the question can actually produce evidence for it. Custom Areas of Evaluation are organization-defined and should be treated as first-class assessment categories when relevant.`,
+    input: `JOB DESCRIPTION\n${basis.jobDescriptionSnapshot}\n\nHIRING CRITERIA\n${criteriaText(basis)}\n\nAVAILABLE AREAS OF EVALUATION\n${availableAreas.join(', ')}\n\nAREA OF EVALUATION REQUEST\n${requestedAreas}\n\nQUESTION TYPE REQUEST\n${requestedType}\n\nQUESTIONS ALREADY AVAILABLE OR IN USE\n${existingQuestions.length ? existingQuestions.map((question, index) => `${index + 1}. ${question}`).join('\n') : 'None'}`,
     max_output_tokens: 4000,
     store: false,
     text: {
