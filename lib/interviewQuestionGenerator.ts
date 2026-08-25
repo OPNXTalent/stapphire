@@ -31,7 +31,6 @@ function schemaForAreas(allowedAreas: string[]) {
               type: 'array',
               minItems: 1,
               maxItems: 4,
-              uniqueItems: true,
               items: { type: 'string', enum: allowedAreas }
             }
           }
@@ -78,7 +77,7 @@ export async function generateInterviewQuestions({
 
   const response = await client().responses.create({
     model: MODEL,
-    instructions: `You design structured employment interview questions for recruiters. Generate exactly five NEW, practical, job-related questions. Respect the requested Question Type when one is supplied. Avoid trivia, generic filler, illegal or protected-class topics, and duplicate or near-duplicate questions. Tag each question with one to four Areas of Evaluation from the supplied allowed list. Do not assign an area unless the question can actually produce evidence for it. Custom Areas of Evaluation are organization-defined and should be treated as first-class assessment categories when relevant.`,
+    instructions: `You design structured employment interview questions for recruiters. Generate exactly five NEW, practical, job-related questions. Respect the requested Question Type when one is supplied. Avoid trivia, generic filler, illegal or protected-class topics, and duplicate or near-duplicate questions. Tag each question with one to four Areas of Evaluation from the supplied allowed list. Do not repeat the same Area of Evaluation within a single question. Do not assign an area unless the question can actually produce evidence for it. Custom Areas of Evaluation are organization-defined and should be treated as first-class assessment categories when relevant.`,
     input: `JOB DESCRIPTION\n${basis.jobDescriptionSnapshot}\n\nHIRING CRITERIA\n${criteriaText(basis)}\n\nAVAILABLE AREAS OF EVALUATION\n${availableAreas.join(', ')}\n\nALLOWED AREAS FOR THIS BATCH\n${allowedAreas.join(', ')}\n\nAREA OF EVALUATION REQUEST\n${requestedAreas}\n\nQUESTION TYPE REQUEST\n${requestedType}\n\nQUESTIONS ALREADY AVAILABLE OR IN USE\n${existingQuestions.length ? existingQuestions.map((question, index) => `${index + 1}. ${question}`).join('\n') : 'None'}`,
     max_output_tokens: 4000,
     store: false,
@@ -115,6 +114,9 @@ export async function generateInterviewQuestions({
   }));
   if (questions.some((question) => !question.text || question.areas.length === 0 || question.areas.some((area) => !allowedAreaSet.has(area)))) {
     throw new Error('Interview question generation returned incomplete or invalid question data.');
+  }
+  if (questions.some((question) => new Set(question.areas).size !== question.areas.length)) {
+    throw new Error('Interview question generation returned duplicate Area of Evaluation tags.');
   }
   if (selectedAreas.length > 0 && questions.some((question) => !question.areas.some((area) => selectedAreaSet.has(area)))) {
     throw new Error('Interview question generation did not honor the selected Areas of Evaluation.');
