@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { AREAS_OF_EVALUATION, type BankQuestion, type InterviewStageId } from '@/lib/interviewQuestionBank';
 import { AOE_PREFERENCES_CHANGED_EVENT, type AoePreferences } from '@/lib/aoePreferences';
 import {
-  INTERVIEW_BANK_ADD_EVENT,
   INTERVIEW_BANK_DRAG_MIME,
   INTERVIEW_BANK_USED_EVENT,
   INTERVIEW_BUILDER_CONTEXT_EVENT,
@@ -31,11 +30,6 @@ async function readJson(response: Response, fallbackMessage: string): Promise<Js
   } catch {
     throw new Error(fallbackMessage);
   }
-}
-
-function customQuestionId(stage: InterviewStageId) {
-  const suffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
-  return `custom-${stage}-${suffix}`;
 }
 
 function sourceIdsFromPlan(plan: unknown) {
@@ -208,20 +202,19 @@ export function InterviewQuestionBankPanel({
     return { ...question, stage };
   }
 
-  function add(question: AvailableQuestion) {
-    window.dispatchEvent(new CustomEvent(INTERVIEW_BANK_ADD_EVENT, { detail: { question: asBankQuestion(question) } }));
-  }
-
-  function addCustomQuestion() {
-    const question: BankQuestion = { id: customQuestionId(stage), stage, text: '', areas: [] };
-    window.dispatchEvent(new CustomEvent(INTERVIEW_BANK_ADD_EVENT, { detail: { question } }));
+  function writeDragData(event: DragEvent<HTMLDivElement>, question: BankQuestion) {
+    event.dataTransfer.effectAllowed = 'copy';
+    event.dataTransfer.setData(INTERVIEW_BANK_DRAG_MIME, JSON.stringify(question));
+    event.dataTransfer.setData('text/plain', question.text);
   }
 
   function startDrag(event: DragEvent<HTMLDivElement>, question: AvailableQuestion) {
-    const bankQuestion = asBankQuestion(question);
-    event.dataTransfer.effectAllowed = 'copy';
-    event.dataTransfer.setData(INTERVIEW_BANK_DRAG_MIME, JSON.stringify(bankQuestion));
-    event.dataTransfer.setData('text/plain', question.text);
+    writeDragData(event, asBankQuestion(question));
+  }
+
+  function startBlankDrag(event: DragEvent<HTMLDivElement>) {
+    const suffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`;
+    writeDragData(event, { id: `custom-${stage}-${suffix}`, stage, text: '', areas: [] });
   }
 
   function toggleSelectedArea(area: string) {
@@ -355,15 +348,14 @@ export function InterviewQuestionBankPanel({
       </div>
 
       <div className={styles.list}>
-        <div className={`${styles.question} ${styles.wildcard}`}>
+        <div className={`${styles.question} ${styles.wildcard}`} draggable onDragStart={startBlankDrag}>
           <div className={styles.questionTop}>
-            <span className={styles.wildcardIcon} aria-hidden="true">＋</span>
+            <span className={styles.drag} aria-hidden="true">⠿</span>
             <div>
               <p>Blank Question</p>
-              <span className={styles.wildcardCopy}>Write your own question and choose its Areas of Evaluation.</span>
+              <span className={styles.wildcardCopy}>Drag into an interview, then write your question and choose its Areas of Evaluation.</span>
             </div>
           </div>
-          <button type="button" onClick={addCustomQuestion}>+ Add Blank Question</button>
         </div>
 
         {loadingBank && <p className={styles.empty}>Loading questions…</p>}
@@ -376,13 +368,12 @@ export function InterviewQuestionBankPanel({
             <div className={styles.chips}>
               {question.areas.map((area) => <span key={area}>{area}</span>)}
             </div>
-            <button type="button" onClick={() => add(question)}>+ Add</button>
           </div>
         ))}
         {!loadingBank && availableQuestions.length === 0 && <p className={styles.empty}>All available questions are currently in use.</p>}
       </div>
 
-      <div className={styles.footer}>Questions disappear from the bank when used and return if removed from an interview.</div>
+      <div className={styles.footer}>Drag questions into an interview. Used questions disappear from the bank and return if removed.</div>
     </div>
   );
 }
