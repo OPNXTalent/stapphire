@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { AREAS_OF_EVALUATION, type BankQuestion, type InterviewStageId } from '@/lib/interviewQuestionBank';
 import { AOE_PREFERENCES_CHANGED_EVENT, type AoePreferences } from '@/lib/aoePreferences';
+import { INTERVIEW_QUESTION_TYPES, type InterviewQuestionType } from '@/lib/interviewQuestionTypes';
 import {
   INTERVIEW_BANK_DRAG_MIME,
   INTERVIEW_BANK_USED_EVENT,
@@ -61,6 +62,7 @@ export function InterviewQuestionBankPanel({
   const [generatedQuestions, setGeneratedQuestions] = useState<AvailableQuestion[]>([]);
   const [usedIds, setUsedIds] = useState<Set<string>>(() => new Set());
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  const [selectedQuestionType, setSelectedQuestionType] = useState<InterviewQuestionType | ''>('');
   const [availableAreas, setAvailableAreas] = useState<string[]>([...AREAS_OF_EVALUATION]);
   const [preferences, setPreferences] = useState<AoePreferences>({ hiddenStandardAreas: [], customAreas: [] });
   const [areaPickerOpen, setAreaPickerOpen] = useState(false);
@@ -254,7 +256,7 @@ export function InterviewQuestionBankPanel({
       const response = await fetch(`/api/requisitions/${requisitionId}/interview-question-bank`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selectedAreas })
+        body: JSON.stringify({ selectedAreas, questionType: selectedQuestionType || null })
       });
       const result = await readJson(response, 'Unable to generate interview questions.');
       if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Unable to generate interview questions.');
@@ -262,6 +264,7 @@ export function InterviewQuestionBankPanel({
       if (questions.length !== 5) throw new Error('Unable to generate five interview questions. No QC was used.');
       setGeneratedQuestions((current) => [...questions, ...current]);
       setSelectedAreas([]);
+      setSelectedQuestionType('');
       setAreaPickerOpen(false);
       setManagingAreas(false);
     } catch (generationError) {
@@ -270,6 +273,11 @@ export function InterviewQuestionBankPanel({
       setGenerating(false);
     }
   }
+
+  const generatorHint = [
+    selectedQuestionType || null,
+    selectedAreas.length ? `Targeting ${selectedAreas.join(', ')}` : null
+  ].filter(Boolean).join(' · ');
 
   return (
     <div className={styles.panel}>
@@ -337,12 +345,23 @@ export function InterviewQuestionBankPanel({
               )}
             </div>
           )}
+
+          <select
+            className={styles.questionTypeSelect}
+            value={selectedQuestionType}
+            onChange={(event) => setSelectedQuestionType(event.target.value as InterviewQuestionType | '')}
+            aria-label="Question Type"
+          >
+            <option value="">All Question Types</option>
+            {INTERVIEW_QUESTION_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+          </select>
         </div>
+
         <button type="button" className={styles.generateButton} onClick={generateMore} disabled={generating}>
           {generating ? 'Generating…' : 'Generate 5 Questions · 1 QC'}
         </button>
         <p className={styles.generatorHint}>
-          {selectedAreas.length ? `Targeting ${selectedAreas.join(', ')}.` : 'No AOE selected — Stapphire will target useful coverage gaps.'}
+          {generatorHint || 'No filters selected — Stapphire will target useful coverage gaps with the most appropriate question types.'}
         </p>
         {error && <p className={styles.error}>{error}</p>}
       </div>
