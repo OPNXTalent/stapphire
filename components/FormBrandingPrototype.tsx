@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ChangeEvent, type CSSProperties } from 'react';
+import { useSearchParams } from 'next/navigation';
 import styles from './FormBrandingPrototype.module.css';
 
 type Palette = {
@@ -37,6 +38,9 @@ function readableText(hex: string) {
 }
 
 export function FormBrandingPrototype() {
+  const searchParams = useSearchParams();
+  const requisitionId = searchParams.get('requisitionId');
+  const backHref = requisitionId ? `/requisitions/${encodeURIComponent(requisitionId)}` : '/';
   const [primary, setPrimary] = useState(PALETTES[0].primary);
   const [accent, setAccent] = useState(PALETTES[0].accent);
   const [paletteName, setPaletteName] = useState(PALETTES[0].name);
@@ -79,8 +83,13 @@ export function FormBrandingPrototype() {
   return (
     <main className={styles.page}>
       <section className={styles.intro}>
-        <span className={styles.eyebrow}>PRE-PRODUCTION EXPERIMENT</span>
-        <h1>Interview Form Designer</h1>
+        <div className={styles.introRow}>
+          <div>
+            <span className={styles.eyebrow}>PRE-PRODUCTION EXPERIMENT</span>
+            <h1>Interview Form Designer</h1>
+          </div>
+          <a className={styles.backLink} href={backHref}>← Back to Interviews</a>
+        </div>
         <p>Customize this interview form only. Nothing here changes the Stapphire workspace or your production interview setup.</p>
       </section>
 
@@ -89,7 +98,7 @@ export function FormBrandingPrototype() {
           <div className={styles.controlHeader}>
             <div>
               <span className={styles.eyebrow}>INTERVIEW FORM 1</span>
-              <h2>Branding</h2>
+              <h2>Designer</h2>
             </div>
             <button type="button" className={styles.reset} onClick={reset}>Reset</button>
           </div>
