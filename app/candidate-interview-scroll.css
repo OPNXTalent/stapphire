@@ -46,8 +46,9 @@
   .requisition-tab-panel>.hiring-criteria>.criteria-category-focused>.criteria-category-detail{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable}
 
   /* Interviews use the selected round banner as the final fixed element.
-     The interview editor beneath it owns the only vertical scrollbar. */
-  .requisition-tab-panel:has(>section[data-interview-plan="selected"]){display:flex;overflow:hidden;scrollbar-gutter:auto}
+     The interview editor beneath it owns the only vertical scrollbar. Keep the
+     parent gutter reserved so opening a round does not change workspace width. */
+  .requisition-tab-panel:has(>section[data-interview-plan="selected"]){display:flex;overflow:hidden;scrollbar-gutter:stable}
   .requisition-tab-panel>section[data-interview-plan="selected"]{flex:1;min-height:0;overflow:hidden}
 }
 
