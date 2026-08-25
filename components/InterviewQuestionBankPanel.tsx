@@ -274,11 +274,6 @@ export function InterviewQuestionBankPanel({
     }
   }
 
-  const generatorHint = [
-    selectedQuestionType || null,
-    selectedAreas.length ? `Targeting ${selectedAreas.join(', ')}` : null
-  ].filter(Boolean).join(' · ');
-
   return (
     <div className={styles.panel}>
       <div className={styles.generator}>
@@ -360,9 +355,12 @@ export function InterviewQuestionBankPanel({
         <button type="button" className={styles.generateButton} onClick={generateMore} disabled={generating}>
           {generating ? 'Generating…' : 'Generate 5 Questions · 1 QC'}
         </button>
-        <p className={styles.generatorHint}>
-          {generatorHint || 'No filters selected — Stapphire will target useful coverage gaps with the most appropriate question types.'}
-        </p>
+        {selectedQuestionType && <p className={styles.generatorHint}>{selectedQuestionType}</p>}
+        {selectedAreas.length > 0 && (
+          <div className={styles.chips}>
+            {selectedAreas.map((area) => <span key={area}>{area}</span>)}
+          </div>
+        )}
         {error && <p className={styles.error}>{error}</p>}
       </div>
 
