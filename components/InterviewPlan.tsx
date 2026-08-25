@@ -534,7 +534,6 @@ export function InterviewPlan({
                               </label>
                             );
                           })}
-                          <button type="button" className={styles.areaDone} onClick={() => setOpenAreaId(null)}>Done</button>
                         </div>
                       )}
                     </div>
