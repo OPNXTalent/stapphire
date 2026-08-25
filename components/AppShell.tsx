@@ -56,7 +56,14 @@ export function AppShell({ requisitions, children }: { requisitions: Requisition
           </nav>
           <div className="req-nav-footer"><Link className={`req-nav-archived ${pathname === '/archived' ? 'active' : ''}`} href="/archived">Archived</Link></div>
         </aside>
-        <main className="workspace-main"><div className="workspace-content">{children}</div></main>
+        <main className="workspace-main">
+          <div
+            className="workspace-content"
+            style={formDesigner ? { maxWidth: 'none', margin: 0, paddingRight: 28, paddingLeft: 28 } : undefined}
+          >
+            {children}
+          </div>
+        </main>
         {!formDesigner && <WorkspacePanel collapsed={rightCollapsed} onExpand={() => setRightCollapsed(false)} onCollapse={() => setRightCollapsed(true)}/>} 
       </div>
     </RequisitionViewStateProvider>
