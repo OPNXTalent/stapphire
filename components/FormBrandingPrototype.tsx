@@ -108,20 +108,27 @@ export function FormBrandingPrototype() {
           <div className={styles.controlGroup}>
             <label>Corporate Color Palette</label>
             <div className={styles.palettes}>
-              {PALETTES.map((palette, index) => (
-                <button
-                  type="button"
-                  key={palette.name}
-                  className={`${styles.palette} ${paletteName === palette.name ? styles.paletteSelected : ''}`}
-                  onClick={() => choosePalette(palette)}
-                >
-                  <span className={styles.swatches}>
-                    <i style={{ background: palette.primary }} />
-                    <i style={{ background: palette.accent }} />
-                  </span>
-                  <span>{palette.name}{index === 0 ? ' — Default' : ''}</span>
-                </button>
-              ))}
+              {PALETTES.map((palette, index) => {
+                const selected = paletteName === palette.name;
+                return (
+                  <button
+                    type="button"
+                    key={palette.name}
+                    className={`${styles.palette} ${selected ? styles.paletteSelected : ''}`}
+                    onClick={() => choosePalette(palette)}
+                    aria-pressed={selected}
+                  >
+                    <span className={styles.swatches}>
+                      <i style={{ background: palette.primary }} />
+                      <i style={{ background: palette.accent }} />
+                    </span>
+                    <span className={styles.paletteLabel}>
+                      <span>{palette.name}{index === 0 ? ' — Default' : ''}</span>
+                      {selected && <span className={styles.selectedBadge}>✓ Selected</span>}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
