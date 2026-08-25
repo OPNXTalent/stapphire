@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { AREAS_OF_EVALUATION, type BankQuestion, type InterviewStageId } from '@/lib/interviewQuestionBank';
+import { AOE_PREFERENCES_CHANGED_EVENT, type AoePreferences } from '@/lib/aoePreferences';
 import {
   INTERVIEW_BANK_ADD_EVENT,
   INTERVIEW_BANK_DRAG_MIME,
@@ -53,7 +54,12 @@ export function InterviewQuestionBankPanel({
   const [generatedQuestions, setGeneratedQuestions] = useState<AvailableQuestion[]>([]);
   const [usedIds, setUsedIds] = useState<Set<string>>(() => new Set());
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  const [availableAreas, setAvailableAreas] = useState<string[]>([...AREAS_OF_EVALUATION]);
+  const [preferences, setPreferences] = useState<AoePreferences>({ hiddenStandardAreas: [], customAreas: [] });
   const [areaPickerOpen, setAreaPickerOpen] = useState(false);
+  const [managingAreas, setManagingAreas] = useState(false);
+  const [newCustomArea, setNewCustomArea] = useState('');
+  const [savingAreas, setSavingAreas] = useState(false);
   const [loadingBank, setLoadingBank] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
@@ -72,6 +78,32 @@ export function InterviewQuestionBankPanel({
       setUsedIds(sourceIdsFromPlan(result?.plan));
     } catch {
       // Builder events still keep the visible inventory useful if this refresh fails.
+    }
+  }
+
+  async function savePreferences(next: AoePreferences) {
+    setSavingAreas(true);
+    setError('');
+    try {
+      const response = await fetch('/api/aoe-preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next)
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error || 'Unable to save AOE preferences.');
+      const saved: AoePreferences = {
+        hiddenStandardAreas: Array.isArray(result.hiddenStandardAreas) ? result.hiddenStandardAreas : [],
+        customAreas: Array.isArray(result.customAreas) ? result.customAreas : []
+      };
+      setPreferences(saved);
+      setAvailableAreas(Array.isArray(result.activeAreas) ? result.activeAreas : [...AREAS_OF_EVALUATION]);
+      setSelectedAreas((current) => current.filter((area) => result.activeAreas?.includes(area)));
+      window.dispatchEvent(new CustomEvent(AOE_PREFERENCES_CHANGED_EVENT, { detail: { ...saved, activeAreas: result.activeAreas } }));
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Unable to save AOE preferences.');
+    } finally {
+      setSavingAreas(false);
     }
   }
 
@@ -96,6 +128,8 @@ export function InterviewQuestionBankPanel({
         setStarterQuestions(Array.isArray(bankResult.starterQuestions) ? bankResult.starterQuestions : []);
         setGeneratedQuestions(Array.isArray(bankResult.generatedQuestions) ? bankResult.generatedQuestions : []);
         setUsedIds(sourceIdsFromPlan(planResult?.plan));
+        setPreferences(bankResult.aoePreferences || { hiddenStandardAreas: [], customAreas: [] });
+        setAvailableAreas(Array.isArray(bankResult.availableAreas) ? bankResult.availableAreas : [...AREAS_OF_EVALUATION]);
       })
       .catch((loadError) => {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Unable to load interview questions.');
@@ -137,10 +171,16 @@ export function InterviewQuestionBankPanel({
   useEffect(() => {
     if (!areaPickerOpen) return;
     function closeOnPointer(event: PointerEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) setAreaPickerOpen(false);
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+        setAreaPickerOpen(false);
+        setManagingAreas(false);
+      }
     }
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setAreaPickerOpen(false);
+      if (event.key === 'Escape') {
+        setAreaPickerOpen(false);
+        setManagingAreas(false);
+      }
     }
     document.addEventListener('pointerdown', closeOnPointer);
     document.addEventListener('keydown', closeOnEscape);
@@ -174,6 +214,31 @@ export function InterviewQuestionBankPanel({
     setSelectedAreas((current) => current.includes(area) ? current.filter((item) => item !== area) : [...current, area]);
   }
 
+  function toggleStandardVisibility(area: string) {
+    const hidden = preferences.hiddenStandardAreas.includes(area);
+    void savePreferences({
+      ...preferences,
+      hiddenStandardAreas: hidden
+        ? preferences.hiddenStandardAreas.filter((item) => item !== area)
+        : [...preferences.hiddenStandardAreas, area]
+    });
+  }
+
+  function addCustomArea() {
+    const value = newCustomArea.trim().replace(/\s+/g, ' ');
+    if (!value) return;
+    if ([...AREAS_OF_EVALUATION, ...preferences.customAreas].some((area) => area.toLocaleLowerCase() === value.toLocaleLowerCase())) {
+      setError('That Area of Evaluation already exists.');
+      return;
+    }
+    setNewCustomArea('');
+    void savePreferences({ ...preferences, customAreas: [...preferences.customAreas, value] });
+  }
+
+  function removeCustomArea(area: string) {
+    void savePreferences({ ...preferences, customAreas: preferences.customAreas.filter((item) => item !== area) });
+  }
+
   async function generateMore() {
     if (generating) return;
     setGenerating(true);
@@ -190,6 +255,7 @@ export function InterviewQuestionBankPanel({
       setGeneratedQuestions((current) => [...questions, ...current]);
       setSelectedAreas([]);
       setAreaPickerOpen(false);
+      setManagingAreas(false);
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : 'Unable to generate interview questions.');
     } finally {
@@ -206,12 +272,44 @@ export function InterviewQuestionBankPanel({
           </button>
           {areaPickerOpen && (
             <div className={styles.areaMenu}>
-              {AREAS_OF_EVALUATION.map((area) => (
-                <label key={area} className={styles.areaOption}>
-                  <input type="checkbox" checked={selectedAreas.includes(area)} onChange={() => toggleSelectedArea(area)} />
-                  <span>{area}</span>
-                </label>
-              ))}
+              {!managingAreas ? (
+                <>
+                  {availableAreas.map((area) => (
+                    <label key={area} className={styles.areaOption}>
+                      <input type="checkbox" checked={selectedAreas.includes(area)} onChange={() => toggleSelectedArea(area)} />
+                      <span>{area}</span>
+                    </label>
+                  ))}
+                  <button type="button" className={styles.manageAreasButton} onClick={() => setManagingAreas(true)}>Manage AOE</button>
+                </>
+              ) : (
+                <div className={styles.manager}>
+                  <div className={styles.managerHeading}>
+                    <strong>Manage AOE</strong>
+                    <button type="button" onClick={() => setManagingAreas(false)}>Back</button>
+                  </div>
+                  <p>Standard AOE can be hidden or restored. Custom AOE can be added or removed.</p>
+                  <div className={styles.customAdd}>
+                    <input value={newCustomArea} maxLength={80} placeholder="Add custom AOE" onChange={(event) => setNewCustomArea(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addCustomArea(); } }} />
+                    <button type="button" onClick={addCustomArea} disabled={savingAreas || !newCustomArea.trim()}>Add</button>
+                  </div>
+                  {preferences.customAreas.length > 0 && (
+                    <div className={styles.managerGroup}>
+                      <span className={styles.managerLabel}>Custom</span>
+                      {preferences.customAreas.map((area) => (
+                        <div className={styles.managerRow} key={area}><span>{area}</span><button type="button" onClick={() => removeCustomArea(area)} disabled={savingAreas}>Remove</button></div>
+                      ))}
+                    </div>
+                  )}
+                  <div className={styles.managerGroup}>
+                    <span className={styles.managerLabel}>Standard</span>
+                    {AREAS_OF_EVALUATION.map((area) => {
+                      const hidden = preferences.hiddenStandardAreas.includes(area);
+                      return <div className={`${styles.managerRow} ${hidden ? styles.hiddenArea : ''}`} key={area}><span>{area}</span><button type="button" onClick={() => toggleStandardVisibility(area)} disabled={savingAreas}>{hidden ? 'Restore' : 'Hide'}</button></div>;
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
