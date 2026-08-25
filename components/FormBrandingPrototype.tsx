@@ -80,7 +80,7 @@ export function FormBrandingPrototype() {
     <main className={styles.page}>
       <section className={styles.intro}>
         <span className={styles.eyebrow}>PRE-PRODUCTION EXPERIMENT</span>
-        <h1>Form Branding</h1>
+        <h1>Interview Form Designer</h1>
         <p>Customize this interview form only. Nothing here changes the Stapphire workspace or your production interview setup.</p>
       </section>
 
