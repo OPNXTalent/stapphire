@@ -11,7 +11,7 @@ type Palette = {
 
 const PALETTES: Palette[] = [
   { name: 'Modern Indigo', primary: '#3730A3', accent: '#4F46E5' },
-  { name: 'Classic Blue', primary: '#1E3A8A', accent: '#2563EB' },
+  { name: 'Bold Orange', primary: '#9A3412', accent: '#EA580C' },
   { name: 'Executive Slate', primary: '#334155', accent: '#0F766E' },
   { name: 'Growth Green', primary: '#166534', accent: '#047857' },
   { name: 'Deep Teal', primary: '#115E59', accent: '#0E7490' },
