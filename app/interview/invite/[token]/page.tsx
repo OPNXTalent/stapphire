@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation';
 import { ParticipantInterviewPreview } from '@/components/ParticipantInterviewPreview';
-import type { InterviewStageId } from '@/lib/interviewQuestionBank';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +11,7 @@ type SnapshotQuestion = {
 };
 
 type RoundSnapshot = {
-  stage: InterviewStageId;
+  stage: string;
   title: string;
   questions: SnapshotQuestion[];
 };
@@ -48,7 +47,8 @@ export default async function InterviewInvitationPage({ params }: { params: { to
 
   return (
     <ParticipantInterviewPreview
-      stage={invitation.stage as InterviewStageId}
+      stage={invitation.stage}
+      interviewTitle={invitation.round_title || snapshot?.title || 'Interview'}
       candidateName={candidate.full_name}
       positionTitle={requisition.title}
       questions={questions}
