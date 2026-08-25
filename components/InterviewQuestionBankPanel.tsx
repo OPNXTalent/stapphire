@@ -267,7 +267,20 @@ export function InterviewQuestionBankPanel({
     <div className={styles.panel}>
       <div className={styles.generator}>
         <div className={styles.areaPicker} ref={pickerRef}>
-          <button type="button" className={styles.areaPickerButton} onClick={() => setAreaPickerOpen((open) => !open)} aria-expanded={areaPickerOpen}>
+          <div className={styles.panelHeader}>
+            <h3>Question Bank</h3>
+            <button
+              type="button"
+              className={styles.headerManageButton}
+              onClick={() => {
+                setAreaPickerOpen(true);
+                setManagingAreas(true);
+              }}
+            >
+              Manage AOE
+            </button>
+          </div>
+          <button type="button" className={styles.areaPickerButton} onClick={() => { setManagingAreas(false); setAreaPickerOpen((open) => !open); }} aria-expanded={areaPickerOpen}>
             {selectedAreas.length ? `AOE (${selectedAreas.length})` : 'AOE (optional)'} ▾
           </button>
           {areaPickerOpen && (
@@ -280,7 +293,6 @@ export function InterviewQuestionBankPanel({
                       <span>{area}</span>
                     </label>
                   ))}
-                  <button type="button" className={styles.manageAreasButton} onClick={() => setManagingAreas(true)}>Manage AOE</button>
                 </>
               ) : (
                 <div className={styles.manager}>
