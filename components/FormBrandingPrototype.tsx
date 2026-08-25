@@ -10,12 +10,14 @@ type Palette = {
 };
 
 const PALETTES: Palette[] = [
-  { name: 'Stapphire', primary: '#0d1f3c', accent: '#5b6fba' },
-  { name: 'Professional Navy', primary: '#16324f', accent: '#4f7cac' },
-  { name: 'Slate', primary: '#334155', accent: '#64748b' },
-  { name: 'Forest', primary: '#1f4d3a', accent: '#4f8a6f' },
-  { name: 'Burgundy', primary: '#642b3b', accent: '#a65b6d' },
-  { name: 'Indigo', primary: '#3730a3', accent: '#6366f1' }
+  { name: 'Modern Indigo', primary: '#3730A3', accent: '#4F46E5' },
+  { name: 'Classic Blue', primary: '#1E3A8A', accent: '#2563EB' },
+  { name: 'Executive Slate', primary: '#334155', accent: '#0F766E' },
+  { name: 'Growth Green', primary: '#166534', accent: '#047857' },
+  { name: 'Deep Teal', primary: '#115E59', accent: '#0E7490' },
+  { name: 'Royal Purple', primary: '#581C87', accent: '#7E22CE' },
+  { name: 'Burgundy', primary: '#881337', accent: '#BE123C' },
+  { name: 'Black & Gold', primary: '#18181B', accent: '#A16207' }
 ];
 
 const QUESTIONS = [
@@ -104,9 +106,9 @@ export function FormBrandingPrototype() {
           </div>
 
           <div className={styles.controlGroup}>
-            <label>Color palette</label>
+            <label>Corporate Color Palette</label>
             <div className={styles.palettes}>
-              {PALETTES.map((palette) => (
+              {PALETTES.map((palette, index) => (
                 <button
                   type="button"
                   key={palette.name}
@@ -117,26 +119,26 @@ export function FormBrandingPrototype() {
                     <i style={{ background: palette.primary }} />
                     <i style={{ background: palette.accent }} />
                   </span>
-                  <span>{palette.name}</span>
+                  <span>{palette.name}{index === 0 ? ' — Default' : ''}</span>
                 </button>
               ))}
             </div>
           </div>
 
           <div className={styles.controlGroup}>
-            <label>Custom colors</label>
+            <label>Custom Colors</label>
             <div className={styles.colorRow}>
               <label>
                 <span>Primary</span>
                 <div className={styles.colorInput}>
-                  <input type="color" value={primary} onChange={(event) => { setPaletteName('Custom'); setPrimary(event.target.value); }} />
+                  <input type="color" value={primary} onChange={(event) => { setPaletteName('Custom Colors'); setPrimary(event.target.value); }} />
                   <code>{primary.toUpperCase()}</code>
                 </div>
               </label>
               <label>
                 <span>Accent</span>
                 <div className={styles.colorInput}>
-                  <input type="color" value={accent} onChange={(event) => { setPaletteName('Custom'); setAccent(event.target.value); }} />
+                  <input type="color" value={accent} onChange={(event) => { setPaletteName('Custom Colors'); setAccent(event.target.value); }} />
                   <code>{accent.toUpperCase()}</code>
                 </div>
               </label>
@@ -186,7 +188,7 @@ export function FormBrandingPrototype() {
                   <div className={styles.questionHeading}>
                     <span>Q{index + 1}</span>
                     <strong>{question.text}</strong>
-                    <small>{index === 0 ? 'Not Rated' : 'Not Rated'}</small>
+                    <small>Not Rated</small>
                   </div>
                   {index === 0 && (
                     <div className={styles.ratingPanel}>
