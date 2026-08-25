@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-const ALLOWED_STAGES = new Set(['phone-screen', 'round-1', 'round-2', 'final']);
-
 type PlanQuestionInput = {
   sourceId?: string;
   text: string;
@@ -32,8 +30,8 @@ function normalizeRounds(value: unknown): PlanRoundInput[] {
     const title = String(candidate.title ?? '').trim();
     const rawQuestions = candidate.questions;
 
-    if (!ALLOWED_STAGES.has(stage) || seenStages.has(stage)) {
-      throw new Error('Interview round stage is invalid or duplicated.');
+    if (!stage || stage.length > 120 || seenStages.has(stage)) {
+      throw new Error('Interview round key is invalid or duplicated.');
     }
     seenStages.add(stage);
 
