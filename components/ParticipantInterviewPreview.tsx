@@ -54,7 +54,10 @@ export function ParticipantInterviewPreview({
   const brandedStyle = {
     '--form-primary': primary,
     '--form-accent': accent,
-    '--form-primary-text': readableText(primary)
+    '--form-primary-text': readableText(primary),
+    '--navy': primary,
+    '--sapphire': accent,
+    '--sapphire-2': accent
   } as CSSProperties;
 
   const [ratings, setRatings] = useState<Record<string, number>>({});
@@ -173,7 +176,7 @@ export function ParticipantInterviewPreview({
         <div className={styles.headerTop}>
           <div className={styles.brand}>
             {branding?.logoUrl
-              ? <img className={styles.brandLogo} src={branding.logoUrl} alt={branding.logoName || 'Company logo'} />
+              ? <img src={branding.logoUrl} alt={branding.logoName || 'Company logo'} style={{ display: 'block', maxWidth: '180px', maxHeight: '48px', objectFit: 'contain' }} />
               : <StapphireBrand decorative />}
           </div>
           {shareEnabled && (
