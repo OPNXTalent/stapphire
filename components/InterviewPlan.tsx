@@ -71,11 +71,11 @@ function starterRounds(positionTitle: string): InterviewRound[] {
   ];
 }
 
-function starterQuestions(bank: BankQuestion[]) {
+function starterQuestions(_bank: BankQuestion[]) {
   return {
-    'phone-screen': bank.filter((question) => question.stage === 'phone-screen').slice(0, 3).map(cloneBankQuestion),
-    'round-1': bank.filter((question) => question.stage === 'round-1').slice(0, 4).map(cloneBankQuestion),
-    'round-2': bank.filter((question) => question.stage === 'round-2').slice(0, 4).map(cloneBankQuestion)
+    'phone-screen': [],
+    'round-1': [],
+    'round-2': []
   } satisfies Record<string, Question[]>;
 }
 
