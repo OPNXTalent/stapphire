@@ -7,6 +7,7 @@ const ALLOWED_STAGES = new Set(['phone-screen', 'round-1', 'round-2', 'final']);
 type InvitationRow = {
   id: string;
   stage: string;
+  round_title: string;
   status: string;
   participant_name: string | null;
   invited_at: string;
@@ -31,7 +32,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   try {
     const { data, error } = await supabaseAdmin
       .from('phase1_interview_invitations')
-      .select('id, stage, status, participant_name, invited_at, opened_at, submitted_at')
+      .select('id, stage, round_title, status, participant_name, invited_at, opened_at, submitted_at')
       .eq('candidate_id', params.id)
       .order('invited_at', { ascending: true });
 
@@ -43,6 +44,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       invitations: invitations.map((row) => ({
         id: row.id,
         stage: row.stage,
+        roundTitle: row.round_title,
         status: row.status,
         participantName: row.participant_name,
         invitedAt: row.invited_at,
