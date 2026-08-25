@@ -10,9 +10,18 @@ type SnapshotQuestion = {
   areas: string[];
 };
 
+type FormBranding = {
+  paletteName?: string;
+  primary?: string;
+  accent?: string;
+  logoUrl?: string;
+  logoName?: string;
+};
+
 type RoundSnapshot = {
   stage: string;
   title: string;
+  branding?: FormBranding;
   questions: SnapshotQuestion[];
 };
 
@@ -52,6 +61,7 @@ export default async function InterviewInvitationPage({ params }: { params: { to
       candidateName={candidate.full_name}
       positionTitle={requisition.title}
       questions={questions}
+      branding={snapshot?.branding}
       invitationToken={params.token}
       participantName={invitation.participant_name || ''}
       shareEnabled={false}
