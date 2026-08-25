@@ -102,7 +102,7 @@ export function RequisitionJobDescription({ requisitionId, title, jobDescription
     }
   }
 
-  return <><section className="requisition-intelligence job-description-workspace" aria-labelledby="job-description-heading">
+  return <><style>{`.jd-view-actions .jd-edit-action{padding:7px 12px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--muted);font-size:12px;font-weight:700;transition:border-color .15s ease,background .15s ease,color .15s ease}.jd-view-actions .jd-edit-action:hover,.jd-view-actions .jd-edit-action:focus-visible{border-color:var(--sapphire-2);background:#fff;color:var(--sapphire);outline:none}`}</style><section className="requisition-intelligence job-description-workspace" aria-labelledby="job-description-heading">
     <div className="intelligence-heading">
       <div><span className="eyebrow">Requisition source</span><h2 id="job-description-heading">Job Description</h2></div>
       {editing ? <div className="jd-edit-header-actions"><button type="submit" form="requisition-jd-edit-form" disabled={saving}>{saving?'Saving…':'Save changes'}</button><button type="button" className="secondary-action" onClick={cancel} disabled={saving}>Cancel</button></div> : <div className="jd-view-actions"><button type="button" className="jd-edit-action" onClick={beginEditing}>Edit</button><button type="button" className="jd-edit-action" onClick={()=>printStapphireDocument('job-description')}>Print Job Description</button></div>}
