@@ -297,6 +297,7 @@ export function InterviewQuestionBankPanel({
               Manage AOE
             </button>
           </div>
+          <p className={styles.workflowHint}>Choose a type or Area of Evaluation to generate targeted questions, then add the questions you want to the interview.</p>
 
           <div className={styles.selectWrap}>
             <select
@@ -305,14 +306,14 @@ export function InterviewQuestionBankPanel({
               onChange={(event) => setSelectedQuestionType(event.target.value as InterviewQuestionType | '')}
               aria-label="Question Type"
             >
-              <option value="">All Question Types</option>
+              <option value="">Choose a question type</option>
               {INTERVIEW_QUESTION_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
             </select>
             <span className={styles.dropdownChevron} aria-hidden="true">▾</span>
           </div>
 
           <button type="button" className={styles.areaPickerButton} onClick={() => { setManagingAreas(false); setAreaPickerOpen((open) => !open); }} aria-expanded={areaPickerOpen && !managingAreas}>
-            <span>{selectedAreas.length ? `AOE (${selectedAreas.length})` : 'AOE (optional)'}</span>
+            <span>{selectedAreas.length ? `AOE (${selectedAreas.length})` : 'Choose an Area of Evaluation (optional)'}</span>
             <span className={styles.dropdownChevron} aria-hidden="true">▾</span>
           </button>
           {areaPickerOpen && (
@@ -363,7 +364,7 @@ export function InterviewQuestionBankPanel({
           </div>
         )}
         <button type="button" className={styles.generateButton} onClick={generateMore} disabled={generating}>
-          {generating ? 'Generating…' : 'Generate 5 Questions · 1 QC'}
+          {generating ? 'Generating…' : 'Generate 5 Questions · Uses 1 QC'}
         </button>
         {error && <p className={styles.error}>{error}</p>}
       </div>
@@ -373,8 +374,8 @@ export function InterviewQuestionBankPanel({
           <div className={styles.questionTop}>
             <span className={styles.drag} aria-hidden="true">⠿</span>
             <div>
-              <p>Blank Question</p>
-              <span className={styles.wildcardCopy}>Drag into an interview, then write your question and choose its Areas of Evaluation.</span>
+              <p>Create Your Own Question</p>
+              <span className={styles.wildcardCopy}>Drag this into the interview, then add your question and select its Areas of Evaluation.</span>
             </div>
           </div>
         </div>
