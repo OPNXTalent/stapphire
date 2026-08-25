@@ -142,16 +142,6 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
     await persistSections(next);
   }
 
-  async function moveBy(sectionKey: string, offset: number) {
-    const index = sections.findIndex((section) => section.key === sectionKey);
-    const target = index + offset;
-    if (index < 0 || target < 0 || target >= sections.length || layoutSaving) return;
-    const next = [...sections];
-    const [moved] = next.splice(index, 1);
-    next.splice(target, 0, moved);
-    await persistSections(next);
-  }
-
   function startDrag(event: DragEvent<HTMLSpanElement>, key: string) {
     if (layoutSaving) {
       event.preventDefault();
@@ -274,7 +264,7 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
       </div>
 
       <div className={styles.folders} aria-busy={layoutSaving}>
-        {sections.map((section, index) => (
+        {sections.map((section) => (
           <div
             key={section.key}
             className={`${styles.folderShell} ${draggedKey === section.key ? styles.dragging : ''}`}
@@ -286,7 +276,7 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
             }}
             onDrop={(event) => dropOn(event, section.key)}
           >
-            <details className={styles.folder} open={section.key === 'resume' ? undefined : undefined}>
+            <details className={styles.folder}>
               <summary>{section.name}</summary>
               <div className={styles.folderBody}>{sectionBody(section)}</div>
             </details>
@@ -299,8 +289,6 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
                 title="Drag to reorder"
                 aria-hidden="true"
               >⋮⋮</span>
-              <button type="button" onClick={() => void moveBy(section.key, -1)} disabled={index === 0 || layoutSaving} aria-label={`Move ${section.name} up`}>↑</button>
-              <button type="button" onClick={() => void moveBy(section.key, 1)} disabled={index === sections.length - 1 || layoutSaving} aria-label={`Move ${section.name} down`}>↓</button>
             </div>
           </div>
         ))}
