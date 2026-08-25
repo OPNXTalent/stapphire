@@ -45,6 +45,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     if (candidateError) throw candidateError;
     const invitations = (invitationsData ?? []) as InvitationRow[];
 
+    let hasPlan = false;
     let rounds: Array<{ stage: string; title: string; areas: string[] }> = [];
     if (candidate) {
       const { data: plan, error: planError } = await supabaseAdmin
@@ -54,6 +55,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         .maybeSingle();
       if (planError) throw planError;
 
+      hasPlan = Boolean(plan);
       if (plan) {
         const { data: planRounds, error: roundsError } = await supabaseAdmin
           .from('phase1_interview_rounds')
@@ -85,6 +87,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
     return NextResponse.json({
       counts: summarize(invitations),
+      hasPlan,
       rounds,
       invitations: invitations.map((row) => ({
         id: row.id,
