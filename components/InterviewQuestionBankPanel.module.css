@@ -3,10 +3,27 @@
 .areaPicker{position:relative;margin-right:38px}
 .areaPickerButton{width:100%;padding:8px 10px;border:1px solid var(--line-strong);border-radius:5px;background:#fff;color:var(--deep);font-size:10.5px;font-weight:700;text-align:left}
 .areaPickerButton:hover{border-color:var(--sapphire);background:var(--sapphire-pale)}
-.areaMenu{position:absolute;left:0;right:0;top:calc(100% + 5px);z-index:30;max-height:260px;overflow-y:auto;padding:6px;border:1px solid var(--line-strong);border-radius:6px;background:#fff;box-shadow:0 10px 24px rgba(12,18,32,.14)}
+.areaMenu{position:absolute;left:0;right:0;top:calc(100% + 5px);z-index:30;max-height:320px;overflow-y:auto;padding:6px;border:1px solid var(--line-strong);border-radius:6px;background:#fff;box-shadow:0 10px 24px rgba(12,18,32,.14)}
 .areaOption{display:flex;align-items:center;gap:8px;padding:6px 7px;border-radius:4px;color:var(--ink);font-size:10.5px;cursor:pointer}
 .areaOption:hover{background:var(--wash)}
 .areaOption input{width:auto;margin:0}
+.manageAreasButton{width:100%;margin-top:5px;padding:7px 8px;border:1px solid var(--line);border-radius:4px;background:var(--wash);color:var(--deep);font-size:10.5px;font-weight:700}
+.manageAreasButton:hover{border-color:var(--sapphire);background:var(--sapphire-pale)}
+.manager{display:grid;gap:8px}
+.managerHeading{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 2px 6px;border-bottom:1px solid var(--line)}
+.managerHeading strong{font-size:11px;color:var(--deep)}
+.managerHeading button,.managerRow button{width:auto;padding:3px 6px;border:0;background:transparent;color:var(--sapphire);font-size:9.5px;font-weight:700}
+.managerHeading button:hover,.managerRow button:hover:not(:disabled){background:var(--sapphire-pale)}
+.manager p{margin:0 2px;color:var(--muted);font-size:9.5px;line-height:1.35}
+.customAdd{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
+.customAdd input{min-width:0;padding:6px 7px;font-size:10px}
+.customAdd button{padding:6px 9px;font-size:10px}
+.managerGroup{display:grid;gap:2px}
+.managerLabel{padding:5px 3px 3px;color:var(--faint);font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.managerRow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 6px;border-radius:4px;font-size:10px}
+.managerRow:hover{background:var(--wash)}
+.managerRow span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hiddenArea span{color:var(--faint);text-decoration:line-through}
 .generateButton{width:100%;margin-top:8px;padding:8px 10px;border:1px solid var(--sapphire-2);border-radius:5px;background:var(--sapphire);color:#fff;font-size:10.5px;font-weight:700}
 .generateButton:hover:not(:disabled){filter:brightness(.96)}
 .generateButton:disabled{opacity:.55;cursor:wait}
