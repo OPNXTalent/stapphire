@@ -15,9 +15,8 @@ import styles from './InterviewQuestionBankPanel.module.css';
 type AvailableQuestion = { id: string; text: string; areas: string[] };
 
 const UNSAVED_STARTER_USED_IDS = new Set([
-  'phone-screen-1','phone-screen-2','phone-screen-3',
-  'round-1-1','round-1-2','round-1-3','round-1-4',
-  'round-2-1','round-2-2','round-2-3','round-2-4'
+  'phone-screen-1','phone-screen-2','phone-screen-3','phone-screen-4','phone-screen-5','phone-screen-6',
+  'round-1-1','round-1-2','round-1-3','round-1-4','round-1-5'
 ]);
 
 function customQuestionId(stage: InterviewStageId) {
