@@ -43,6 +43,23 @@ export function InterviewQuestionBankPanel({
     [generatedQuestions, starterQuestions, usedIds]
   );
 
+  async function refreshUsedIds() {
+    try {
+      const response = await fetch(`/api/requisitions/${requisitionId}/interview-plan`, { cache: 'no-store' });
+      if (!response.ok) return;
+      const result = await response.json();
+      const sourceIds = new Set<string>();
+      for (const round of result?.plan?.rounds || []) {
+        for (const question of round?.questions || []) {
+          if (typeof question?.sourceId === 'string' && question.sourceId) sourceIds.add(question.sourceId);
+        }
+      }
+      setUsedIds(sourceIds);
+    } catch {
+      // Availability can still be updated optimistically from builder events.
+    }
+  }
+
   useEffect(() => {
     setStage(initialStage);
   }, [initialStage]);
@@ -51,13 +68,25 @@ export function InterviewQuestionBankPanel({
     let cancelled = false;
     setLoadingBank(true);
     setError('');
-    fetch(`/api/requisitions/${requisitionId}/interview-question-bank`, { cache: 'no-store' })
-      .then(async (response) => {
+    Promise.all([
+      fetch(`/api/requisitions/${requisitionId}/interview-question-bank`, { cache: 'no-store' }).then(async (response) => {
         const result = await response.json();
         if (!response.ok) throw new Error(result?.error || 'Unable to load interview questions.');
+        return result;
+      }),
+      fetch(`/api/requisitions/${requisitionId}/interview-plan`, { cache: 'no-store' }).then(async (response) => response.ok ? response.json() : null)
+    ])
+      .then(([bankResult, planResult]) => {
         if (cancelled) return;
-        setStarterQuestions(Array.isArray(result.starterQuestions) ? result.starterQuestions : []);
-        setGeneratedQuestions(Array.isArray(result.generatedQuestions) ? result.generatedQuestions : []);
+        setStarterQuestions(Array.isArray(bankResult.starterQuestions) ? bankResult.starterQuestions : []);
+        setGeneratedQuestions(Array.isArray(bankResult.generatedQuestions) ? bankResult.generatedQuestions : []);
+        const sourceIds = new Set<string>();
+        for (const round of planResult?.plan?.rounds || []) {
+          for (const question of round?.questions || []) {
+            if (typeof question?.sourceId === 'string' && question.sourceId) sourceIds.add(question.sourceId);
+          }
+        }
+        setUsedIds(sourceIds);
       })
       .catch((loadError) => {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Unable to load interview questions.');
@@ -69,21 +98,32 @@ export function InterviewQuestionBankPanel({
   }, [requisitionId]);
 
   useEffect(() => {
+    let refreshTimer: number | null = null;
     function syncContext(event: Event) {
       const detail = (event as CustomEvent<InterviewBuilderContextDetail>).detail;
       if (detail?.stage) setStage(detail.stage);
     }
     function syncUsed(event: Event) {
       const detail = (event as CustomEvent<InterviewBankUsedDetail>).detail;
-      setUsedIds(new Set(detail?.sourceIds || []));
+      if (detail?.sourceIds) {
+        setUsedIds((current) => {
+          const next = new Set(current);
+          for (const id of detail.sourceIds) next.add(id);
+          return next;
+        });
+      }
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => void refreshUsedIds(), 750);
     }
     window.addEventListener(INTERVIEW_BUILDER_CONTEXT_EVENT, syncContext);
     window.addEventListener(INTERVIEW_BANK_USED_EVENT, syncUsed);
     return () => {
+      if (refreshTimer) window.clearTimeout(refreshTimer);
       window.removeEventListener(INTERVIEW_BUILDER_CONTEXT_EVENT, syncContext);
       window.removeEventListener(INTERVIEW_BANK_USED_EVENT, syncUsed);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requisitionId]);
 
   useEffect(() => {
     if (!areaPickerOpen) return;
@@ -106,6 +146,7 @@ export function InterviewQuestionBankPanel({
   }
 
   function add(question: AvailableQuestion) {
+    setUsedIds((current) => new Set(current).add(question.id));
     window.dispatchEvent(new CustomEvent(INTERVIEW_BANK_ADD_EVENT, { detail: { question: asBankQuestion(question) } }));
   }
 
@@ -116,6 +157,7 @@ export function InterviewQuestionBankPanel({
 
   function startDrag(event: DragEvent<HTMLDivElement>, question: AvailableQuestion) {
     const bankQuestion = asBankQuestion(question);
+    setUsedIds((current) => new Set(current).add(question.id));
     event.dataTransfer.effectAllowed = 'copy';
     event.dataTransfer.setData(INTERVIEW_BANK_DRAG_MIME, JSON.stringify(bankQuestion));
     event.dataTransfer.setData('text/plain', question.text);
@@ -189,7 +231,7 @@ export function InterviewQuestionBankPanel({
 
         {loadingBank && <p className={styles.empty}>Loading questions…</p>}
         {!loadingBank && availableQuestions.map((question) => (
-          <div key={question.id} className={styles.question} draggable onDragStart={(event) => startDrag(event, question)}>
+          <div key={question.id} className={styles.question} draggable onDragStart={(event) => startDrag(event, question)} onDragEnd={() => window.setTimeout(() => void refreshUsedIds(), 750)}>
             <div className={styles.questionTop}>
               <span className={styles.drag} aria-hidden="true">⠿</span>
               <p>{question.text}</p>
