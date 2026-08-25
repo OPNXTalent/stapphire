@@ -1,5 +1,6 @@
 .page{max-width:980px;margin:0 auto;padding:28px 28px 56px;color:var(--ink)}
 .topRow{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
+.topActions{display:flex;align-items:center;gap:8px}
 .back{color:var(--sapphire);font-size:12px;font-weight:700;text-decoration:none}
 .back:hover{text-decoration:underline}
 .locked{padding:5px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font:700 9px var(--mono);letter-spacing:.08em}
@@ -24,4 +25,5 @@
 .assessmentBlock+ .assessmentBlock{margin-top:18px}
 .assessmentBlock strong{display:block;margin-bottom:5px;color:var(--muted);font-size:10px;letter-spacing:.04em;text-transform:uppercase}
 .assessmentBlock p{margin:0;font-size:13px;line-height:1.55;white-space:pre-wrap}
-@media(max-width:640px){.page{padding:20px 16px 40px}.meta{grid-template-columns:1fr}.header h1{font-size:25px}.ratingRow{align-items:flex-start}}
+@media(max-width:640px){.page{padding:20px 16px 40px}.meta{grid-template-columns:1fr}.header h1{font-size:25px}.ratingRow{align-items:flex-start}.topRow{align-items:flex-start}.topActions{align-items:flex-end;flex-direction:column}}
+@media print{.topRow{display:none}.page{max-width:none;padding:0}.question,.assessment{break-inside:avoid;box-shadow:none}}
