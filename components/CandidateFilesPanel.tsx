@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type DragEvent, type FormEvent } from 'react';
 import { CandidateNoteStream } from '@/components/CandidateNoteStream';
+import { CompletedInterviewActions } from '@/components/CompletedInterviewActions';
 import type { CandidateFilesSelection } from '@/lib/candidateFilesEvents';
 import styles from './CandidateFilesPanel.module.css';
 
@@ -208,21 +209,23 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
         <>
           {interviews === null && <p className={styles.empty}>Loading interviews…</p>}
           {interviews !== null && interviews.length === 0 && <p className={styles.empty}>No completed interview assessments yet.</p>}
-          {interviews?.map((interview) => (
-            <a
-              key={interview.id}
-              className={styles.fileRow}
-              href={`/candidates/${candidate.id}/interviews/${interview.id}`}
-            >
-              <span className={styles.interviewInfo}>
-                <span className={styles.fileName}>{interview.roundTitle || 'Interview'}</span>
-                <span className={styles.fileMeta}>
-                  {[interview.participantName, submittedLabel(interview.submittedAt)].filter(Boolean).join(' · ')}
-                </span>
-              </span>
-              <span className={styles.fileAction}>View</span>
-            </a>
-          ))}
+          {interviews?.map((interview) => {
+            const href = `/candidates/${candidate.id}/interviews/${interview.id}`;
+            return (
+              <div key={interview.id} className={styles.interviewRow}>
+                <a className={styles.interviewView} href={href}>
+                  <span className={styles.interviewInfo}>
+                    <span className={styles.fileName}>{interview.roundTitle || 'Interview'}</span>
+                    <span className={styles.fileMeta}>
+                      {[interview.participantName, submittedLabel(interview.submittedAt)].filter(Boolean).join(' · ')}
+                    </span>
+                  </span>
+                  <span className={styles.fileAction}>View</span>
+                </a>
+                <CompletedInterviewActions href={href} compact />
+              </div>
+            );
+          })}
         </>
       );
     }
