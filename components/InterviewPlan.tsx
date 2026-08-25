@@ -63,19 +63,15 @@ function cloneBankQuestion(question: BankQuestion): Question {
   return { id: localId(), sourceId: question.id, text: question.text, areas: [...question.areas] };
 }
 
-function starterRounds(positionTitle: string): InterviewRound[] {
+function starterRounds(): InterviewRound[] {
   return [
-    { id: 'phone-screen', stage: 'phone-screen', title: `Phone Screen — ${positionTitle}`, bankStage: 'phone-screen' },
-    { id: 'round-1', stage: 'round-1', title: 'Round 1 — Hiring Manager', bankStage: 'round-1' },
-    { id: 'round-2', stage: 'round-2', title: 'Round 2 — Panel Interview', bankStage: 'round-2' }
+    { id: 'round-1', stage: 'round-1', title: 'Interview', bankStage: 'round-1' }
   ];
 }
 
-function starterQuestions(_bank: BankQuestion[]) {
+function starterQuestions(bank: BankQuestion[]) {
   return {
-    'phone-screen': [],
-    'round-1': [],
-    'round-2': []
+    'round-1': bank.slice(0, 11).map(cloneBankQuestion)
   } satisfies Record<string, Question[]>;
 }
 
@@ -118,7 +114,7 @@ export function InterviewPlan({
   candidateNames: string[];
 }) {
   const bank = useMemo(() => buildQuestionBank(positionTitle), [positionTitle]);
-  const [rounds, setRounds] = useState<InterviewRound[]>(() => starterRounds(positionTitle));
+  const [rounds, setRounds] = useState<InterviewRound[]>(() => starterRounds());
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
   const [questionsByRound, setQuestionsByRound] = useState<Record<string, Question[]>>(() => starterQuestions(bank));
   const [openAreaId, setOpenAreaId] = useState<string | null>(null);
@@ -141,7 +137,7 @@ export function InterviewPlan({
 
   useEffect(() => {
     let cancelled = false;
-    const defaultsRounds = starterRounds(positionTitle);
+    const defaultsRounds = starterRounds();
     const defaultsQuestions = starterQuestions(bank);
     setHydrated(false);
 
