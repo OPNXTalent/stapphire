@@ -14,11 +14,24 @@ import {
 import styles from './InterviewQuestionBankPanel.module.css';
 
 type AvailableQuestion = { id: string; text: string; areas: string[] };
+type JsonRecord = Record<string, unknown>;
 
 const UNSAVED_STARTER_USED_IDS = new Set([
   'phone-screen-1','phone-screen-2','phone-screen-3','phone-screen-4','phone-screen-5','phone-screen-6',
   'round-1-1','round-1-2','round-1-3','round-1-4','round-1-5'
 ]);
+
+async function readJson(response: Response, fallbackMessage: string): Promise<JsonRecord> {
+  const raw = await response.text();
+  if (!raw.trim()) {
+    throw new Error(response.ok ? fallbackMessage : `${fallbackMessage} Please try again.`);
+  }
+  try {
+    return JSON.parse(raw) as JsonRecord;
+  } catch {
+    throw new Error(fallbackMessage);
+  }
+}
 
 function customQuestionId(stage: InterviewStageId) {
   const suffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
@@ -90,16 +103,17 @@ export function InterviewQuestionBankPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(next)
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result?.error || 'Unable to save AOE preferences.');
+      const result = await readJson(response, 'Unable to save AOE preferences.');
+      if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Unable to save AOE preferences.');
+      const activeAreas = Array.isArray(result.activeAreas) ? result.activeAreas.map(String) : [...AREAS_OF_EVALUATION];
       const saved: AoePreferences = {
-        hiddenStandardAreas: Array.isArray(result.hiddenStandardAreas) ? result.hiddenStandardAreas : [],
-        customAreas: Array.isArray(result.customAreas) ? result.customAreas : []
+        hiddenStandardAreas: Array.isArray(result.hiddenStandardAreas) ? result.hiddenStandardAreas.map(String) : [],
+        customAreas: Array.isArray(result.customAreas) ? result.customAreas.map(String) : []
       };
       setPreferences(saved);
-      setAvailableAreas(Array.isArray(result.activeAreas) ? result.activeAreas : [...AREAS_OF_EVALUATION]);
-      setSelectedAreas((current) => current.filter((area) => result.activeAreas?.includes(area)));
-      window.dispatchEvent(new CustomEvent(AOE_PREFERENCES_CHANGED_EVENT, { detail: { ...saved, activeAreas: result.activeAreas } }));
+      setAvailableAreas(activeAreas);
+      setSelectedAreas((current) => current.filter((area) => activeAreas.includes(area)));
+      window.dispatchEvent(new CustomEvent(AOE_PREFERENCES_CHANGED_EVENT, { detail: { ...saved, activeAreas } }));
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to save AOE preferences.');
     } finally {
@@ -117,19 +131,19 @@ export function InterviewQuestionBankPanel({
     setError('');
     Promise.all([
       fetch(`/api/requisitions/${requisitionId}/interview-question-bank`, { cache: 'no-store' }).then(async (response) => {
-        const result = await response.json();
-        if (!response.ok) throw new Error(result?.error || 'Unable to load interview questions.');
+        const result = await readJson(response, 'Unable to load interview questions.');
+        if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Unable to load interview questions.');
         return result;
       }),
       fetch(`/api/requisitions/${requisitionId}/interview-plan`, { cache: 'no-store' }).then(async (response) => response.ok ? response.json() : null)
     ])
       .then(([bankResult, planResult]) => {
         if (cancelled) return;
-        setStarterQuestions(Array.isArray(bankResult.starterQuestions) ? bankResult.starterQuestions : []);
-        setGeneratedQuestions(Array.isArray(bankResult.generatedQuestions) ? bankResult.generatedQuestions : []);
+        setStarterQuestions(Array.isArray(bankResult.starterQuestions) ? bankResult.starterQuestions as AvailableQuestion[] : []);
+        setGeneratedQuestions(Array.isArray(bankResult.generatedQuestions) ? bankResult.generatedQuestions as AvailableQuestion[] : []);
         setUsedIds(sourceIdsFromPlan(planResult?.plan));
-        setPreferences(bankResult.aoePreferences || { hiddenStandardAreas: [], customAreas: [] });
-        setAvailableAreas(Array.isArray(bankResult.availableAreas) ? bankResult.availableAreas : [...AREAS_OF_EVALUATION]);
+        setPreferences(bankResult.aoePreferences && typeof bankResult.aoePreferences === 'object' ? bankResult.aoePreferences as AoePreferences : { hiddenStandardAreas: [], customAreas: [] });
+        setAvailableAreas(Array.isArray(bankResult.availableAreas) ? bankResult.availableAreas.map(String) : [...AREAS_OF_EVALUATION]);
       })
       .catch((loadError) => {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Unable to load interview questions.');
@@ -249,9 +263,10 @@ export function InterviewQuestionBankPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ selectedAreas })
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result?.error || 'Unable to generate interview questions.');
+      const result = await readJson(response, 'Unable to generate interview questions.');
+      if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Unable to generate interview questions.');
       const questions = Array.isArray(result.questions) ? result.questions as AvailableQuestion[] : [];
+      if (questions.length !== 5) throw new Error('Unable to generate five interview questions. No QC was used.');
       setGeneratedQuestions((current) => [...questions, ...current]);
       setSelectedAreas([]);
       setAreaPickerOpen(false);
