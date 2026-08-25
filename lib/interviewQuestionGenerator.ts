@@ -11,7 +11,7 @@ export type GeneratedInterviewQuestion = {
   areas: string[];
 };
 
-function schemaForAreas(availableAreas: string[]) {
+function schemaForAreas(allowedAreas: string[]) {
   return {
     type: 'object',
     additionalProperties: false,
@@ -32,7 +32,7 @@ function schemaForAreas(availableAreas: string[]) {
               minItems: 1,
               maxItems: 4,
               uniqueItems: true,
-              items: { type: 'string', enum: availableAreas }
+              items: { type: 'string', enum: allowedAreas }
             }
           }
         }
@@ -67,8 +67,9 @@ export async function generateInterviewQuestions({
 }): Promise<GeneratedInterviewQuestion[]> {
   if (availableAreas.length === 0) throw new Error('No Areas of Evaluation are available.');
 
+  const allowedAreas = selectedAreas.length > 0 ? selectedAreas : availableAreas;
   const requestedAreas = selectedAreas.length > 0
-    ? `The recruiter specifically selected these Areas of Evaluation: ${selectedAreas.join(', ')}. Every generated question must assess at least one selected area, and the batch should distribute attention intelligently across them.`
+    ? `The recruiter specifically selected these Areas of Evaluation: ${selectedAreas.join(', ')}. Every generated question must assess at least one selected area, and the batch should distribute attention intelligently across them. Tag questions only with the selected Areas of Evaluation.`
     : `The recruiter selected no Areas of Evaluation. Identify meaningful coverage gaps from the role context and existing questions, then choose the most useful Areas of Evaluation for the five new questions.`;
 
   const requestedType = questionType
@@ -77,8 +78,8 @@ export async function generateInterviewQuestions({
 
   const response = await client().responses.create({
     model: MODEL,
-    instructions: `You design structured employment interview questions for recruiters. Generate exactly five NEW, practical, job-related questions. Respect the requested Question Type when one is supplied. Avoid trivia, generic filler, illegal or protected-class topics, and duplicate or near-duplicate questions. Tag each question with one to four Areas of Evaluation from the supplied available list. Do not assign an area unless the question can actually produce evidence for it. Custom Areas of Evaluation are organization-defined and should be treated as first-class assessment categories when relevant.`,
-    input: `JOB DESCRIPTION\n${basis.jobDescriptionSnapshot}\n\nHIRING CRITERIA\n${criteriaText(basis)}\n\nAVAILABLE AREAS OF EVALUATION\n${availableAreas.join(', ')}\n\nAREA OF EVALUATION REQUEST\n${requestedAreas}\n\nQUESTION TYPE REQUEST\n${requestedType}\n\nQUESTIONS ALREADY AVAILABLE OR IN USE\n${existingQuestions.length ? existingQuestions.map((question, index) => `${index + 1}. ${question}`).join('\n') : 'None'}`,
+    instructions: `You design structured employment interview questions for recruiters. Generate exactly five NEW, practical, job-related questions. Respect the requested Question Type when one is supplied. Avoid trivia, generic filler, illegal or protected-class topics, and duplicate or near-duplicate questions. Tag each question with one to four Areas of Evaluation from the supplied allowed list. Do not assign an area unless the question can actually produce evidence for it. Custom Areas of Evaluation are organization-defined and should be treated as first-class assessment categories when relevant.`,
+    input: `JOB DESCRIPTION\n${basis.jobDescriptionSnapshot}\n\nHIRING CRITERIA\n${criteriaText(basis)}\n\nAVAILABLE AREAS OF EVALUATION\n${availableAreas.join(', ')}\n\nALLOWED AREAS FOR THIS BATCH\n${allowedAreas.join(', ')}\n\nAREA OF EVALUATION REQUEST\n${requestedAreas}\n\nQUESTION TYPE REQUEST\n${requestedType}\n\nQUESTIONS ALREADY AVAILABLE OR IN USE\n${existingQuestions.length ? existingQuestions.map((question, index) => `${index + 1}. ${question}`).join('\n') : 'None'}`,
     max_output_tokens: 4000,
     store: false,
     text: {
@@ -86,7 +87,7 @@ export async function generateInterviewQuestions({
         type: 'json_schema',
         name: 'interview_questions',
         strict: true,
-        schema: schemaForAreas(availableAreas)
+        schema: schemaForAreas(allowedAreas)
       }
     }
   });
@@ -105,13 +106,18 @@ export async function generateInterviewQuestions({
   }
   if (!Array.isArray(parsed.questions) || parsed.questions.length !== 5) throw new Error('AI did not return five interview questions.');
 
+  const allowedAreaSet = new Set(allowedAreas);
+  const selectedAreaSet = new Set(selectedAreas);
   const questions = parsed.questions.map((question) => ({
     id: `ai-${crypto.randomUUID()}`,
     text: String(question.text || '').trim(),
     areas: Array.isArray(question.areas) ? question.areas : []
   }));
-  if (questions.some((question) => !question.text || question.areas.length === 0)) {
-    throw new Error('Interview question generation returned incomplete question data.');
+  if (questions.some((question) => !question.text || question.areas.length === 0 || question.areas.some((area) => !allowedAreaSet.has(area)))) {
+    throw new Error('Interview question generation returned incomplete or invalid question data.');
+  }
+  if (selectedAreas.length > 0 && questions.some((question) => !question.areas.some((area) => selectedAreaSet.has(area)))) {
+    throw new Error('Interview question generation did not honor the selected Areas of Evaluation.');
   }
   return questions;
 }
