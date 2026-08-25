@@ -45,6 +45,8 @@ export function RequisitionViewToggle({
       ? interviewsView
       : <RequisitionJobDescription requisitionId={requisitionId} title={title} jobDescription={jobDescription} />;
 
+  const interviewsActive = view === 'requisition' && requisitionTab === 'interviews';
+
   async function archiveRequisition() {
     setArchiving(true);
     try {
@@ -72,7 +74,7 @@ export function RequisitionViewToggle({
   }
 
   return (
-    <div className={`requisition-workspace ${view === 'candidates' ? 'candidates-active' : 'requisition-active'}`}>
+    <div className={`requisition-workspace ${view === 'candidates' ? 'candidates-active' : 'requisition-active'}${interviewsActive ? ' interviews-active' : ''}`}>
       <div className="requisition-view-tabs side-tabs" role="tablist" aria-label="Workspace view">
         <button type="button" role="tab" aria-selected={view === 'requisition'} className={`side-tab ${view === 'requisition' ? 'active' : ''}`} onClick={() => update({ view: 'requisition' })}>Requisition</button>
         <button type="button" role="tab" aria-selected={view === 'candidates'} className={`side-tab ${view === 'candidates' ? 'active' : ''}`} onClick={() => update({ view: 'candidates' })}>Candidates</button>
@@ -92,7 +94,7 @@ export function RequisitionViewToggle({
         <div className="requisition-workspace-tabs" role="tablist" aria-label="Requisition workspace">
           {requisitionTabs.map((tab, index) => <button key={tab.id} id={`requisition-tab-${tab.id}`} type="button" role="tab" aria-selected={requisitionTab === tab.id} aria-controls="requisition-tab-panel" tabIndex={requisitionTab === tab.id ? 0 : -1} className={requisitionTab === tab.id ? 'active' : ''} onClick={() => update({ requisitionTab: tab.id })} onKeyDown={(event) => navigateTabs(event, index)}>{tab.label}</button>)}
         </div>
-        <div id="requisition-tab-panel" className={`requisition-tab-panel${requisitionTab === 'job-description' ? ' job-description-panel' : ''}`} role="tabpanel" aria-labelledby={`requisition-tab-${requisitionTab}`}>{activeRequisitionView}</div>
+        <div id="requisition-tab-panel" className={`requisition-tab-panel${requisitionTab === 'job-description' ? ' job-description-panel' : ''}${requisitionTab === 'interviews' ? ' interviews-panel' : ''}`} role="tabpanel" aria-labelledby={`requisition-tab-${requisitionTab}`}>{activeRequisitionView}</div>
       </div>
       <div className="requisition-candidates-view" hidden={view !== 'candidates'}>{candidatesView}</div>
     </div>
