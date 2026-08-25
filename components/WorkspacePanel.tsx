@@ -79,18 +79,31 @@ export function WorkspacePanel({
   }, [pathname]);
 
   const showCandidateFiles = Boolean(requisitionId && state.view === 'candidates' && candidate);
-  const showInterviewBank = Boolean(
+  const showQuestionBank = Boolean(
+    isInterviewBuilder ||
+    (requisitionId && state.view === 'requisition' && state.requisitionTab === 'interviews')
+  );
+  const showCandidateWorkspace = Boolean(requisitionId && state.view === 'candidates');
+  const showRequisitionNotes = Boolean(
     requisitionId &&
     state.view === 'requisition' &&
-    state.requisitionTab === 'interviews' &&
-    interviewContext
+    state.requisitionTab !== 'interviews'
   );
-  const showQuestionBank = isInterviewBuilder || showInterviewBank;
 
   if (collapsed) {
+    const collapsedLabel = showQuestionBank
+      ? 'Generated Questions'
+      : showCandidateFiles
+        ? (candidatePanelTab === 'teamwork' ? 'Teamwork' : 'Candidate Files')
+        : showCandidateWorkspace
+          ? (tab === 'teamwork' ? 'Teamwork' : 'Resume Upload')
+          : showRequisitionNotes
+            ? 'Teamwork'
+            : 'Hiring Workspace';
+
     return (
       <div className="pull-tab" onClick={onExpand}>
-        {showQuestionBank ? 'Question Bank' : showCandidateFiles ? (candidatePanelTab === 'teamwork' ? 'Teamwork' : 'Candidate Files') : 'Hiring Workspace'}
+        {collapsedLabel}
       </div>
     );
   }
@@ -120,7 +133,7 @@ export function WorkspacePanel({
             {candidatePanelTab === 'files' ? <CandidateFilesPanel candidate={candidate} /> : <CandidateTeamworkPanel candidate={candidate} />}
           </div>
         </>
-      ) : (
+      ) : showCandidateWorkspace && requisitionId ? (
         <>
           <div className="side-tabs">
             <button type="button" className={`side-tab ${tab === 'upload' ? 'active' : ''}`} onClick={() => update({ panelTab: 'upload' })}>
@@ -131,19 +144,29 @@ export function WorkspacePanel({
             </button>
           </div>
           <div className="side-content">
-            {!requisitionId && <p className="muted">Open a requisition to see its notes and upload resumes.</p>}
-            {requisitionId && (
-              <>
-                <div hidden={tab !== 'upload'}>
-                  <ResumeUpload requisitionId={requisitionId} />
-                </div>
-                <div hidden={tab !== 'teamwork'}>
-                  <RequisitionNotes requisitionId={requisitionId} />
-                </div>
-              </>
-            )}
+            <div hidden={tab !== 'upload'}>
+              <ResumeUpload requisitionId={requisitionId} />
+            </div>
+            <div hidden={tab !== 'teamwork'}>
+              <RequisitionNotes requisitionId={requisitionId} />
+            </div>
           </div>
         </>
+      ) : showRequisitionNotes && requisitionId ? (
+        <>
+          <div className="side-tabs">
+            <button type="button" className="side-tab active">
+              Teamwork
+            </button>
+          </div>
+          <div className="side-content">
+            <RequisitionNotes requisitionId={requisitionId} />
+          </div>
+        </>
+      ) : (
+        <div className="side-content">
+          <p className="muted">Open a requisition to access its workspace tools.</p>
+        </div>
       )}
     </div>
   );
