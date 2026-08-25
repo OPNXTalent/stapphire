@@ -152,8 +152,8 @@ export function InterviewPlan({
         const result = await response.json();
         if (cancelled) return;
 
-        const persistedRounds = (result?.plan?.rounds ?? []) as PersistedRound[];
-        if (persistedRounds.length > 0) {
+        if (result?.plan) {
+          const persistedRounds = (result.plan.rounds ?? []) as PersistedRound[];
           const loadedRounds: InterviewRound[] = persistedRounds.map((round) => ({
             id: round.stage,
             stage: round.stage,
