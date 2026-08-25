@@ -565,7 +565,7 @@ export function InterviewPlan({
                   <div className={styles.questionMain}>
                     <div className={styles.questionTop}>
                       <span className={styles.questionNumber}>Q{index + 1}</span>
-                      <input value={question.text} aria-label={`Question ${index + 1}`} onChange={(event) => updateQuestion(question.id, { text: event.target.value })} />
+                      <textarea rows={2} value={question.text} aria-label={`Question ${index + 1}`} onChange={(event) => updateQuestion(question.id, { text: event.target.value })} />
                       <button type="button" className={styles.removeQuestion} onClick={() => removeQuestion(question.id)} aria-label={`Remove question ${index + 1}`}>×</button>
                     </div>
 
