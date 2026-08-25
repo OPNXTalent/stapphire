@@ -19,6 +19,9 @@ export function AppShell({ requisitions, children }: { requisitions: Requisition
     return <>{children}</>;
   }
 
+  const formDesigner = pathname.startsWith('/form-branding-preview');
+  const effectiveRightCollapsed = formDesigner || rightCollapsed;
+
   return (
     <ResumeUploadManagerProvider>
     <RequisitionViewStateProvider>
@@ -30,7 +33,7 @@ export function AppShell({ requisitions, children }: { requisitions: Requisition
         <span className="brand-tagline">Hiring Quality Control</span>
         <GlobalBannerControls/>
       </header>
-      <div className={`app-shell ${rightCollapsed ? 'right-collapsed' : ''}`}>
+      <div className={`app-shell ${effectiveRightCollapsed ? 'right-collapsed' : ''}`}>
         <aside className="req-nav">
           <div className="req-nav-head">
             <span className="eyebrow">Workspace</span>
@@ -54,7 +57,7 @@ export function AppShell({ requisitions, children }: { requisitions: Requisition
           <div className="req-nav-footer"><Link className={`req-nav-archived ${pathname === '/archived' ? 'active' : ''}`} href="/archived">Archived</Link></div>
         </aside>
         <main className="workspace-main"><div className="workspace-content">{children}</div></main>
-        <WorkspacePanel collapsed={rightCollapsed} onExpand={() => setRightCollapsed(false)} onCollapse={() => setRightCollapsed(true)}/>
+        {!formDesigner && <WorkspacePanel collapsed={rightCollapsed} onExpand={() => setRightCollapsed(false)} onCollapse={() => setRightCollapsed(true)}/>} 
       </div>
     </RequisitionViewStateProvider>
     </ResumeUploadManagerProvider>
