@@ -9,12 +9,14 @@
 .folder summary:hover{background:var(--wash)}
 .folder[open] summary{border-bottom:1px solid var(--line)}
 .folderBody{padding:7px}
-.fileRow{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border:0;border-radius:5px;background:transparent;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.fileRow{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border:0;border-radius:5px;background:transparent;color:var(--ink);font:inherit;text-align:left;text-decoration:none;cursor:pointer}
 .fileRow:hover:not(:disabled){background:var(--sapphire-pale)}
 .fileRow:focus-visible{outline:2px solid var(--sapphire);outline-offset:-2px}
 .fileRow:disabled{cursor:default;opacity:.65}
 .fileName{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600}
 .fileAction{flex:none;color:var(--sapphire);font-size:10.5px;font-weight:700}
+.interviewInfo{display:flex;min-width:0;flex:1;flex-direction:column;gap:2px}
+.fileMeta{overflow:hidden;color:var(--muted);font-size:10px;line-height:1.3;text-overflow:ellipsis;white-space:nowrap}
 .empty{margin:0;padding:8px 10px;color:var(--muted);font-size:11.5px;line-height:1.45}
 .error{margin:10px 0 0;color:var(--red);font-size:11.5px}
 .teamworkBody{display:flex;min-height:0;flex:1;padding-top:12px}
