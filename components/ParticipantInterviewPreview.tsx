@@ -1,12 +1,22 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { buildQuestionBank, INTERVIEW_STAGES } from '@/lib/interviewQuestionBank';
 import { StapphireBrand } from '@/components/StapphireBrand';
 import styles from './ParticipantInterviewPreview.module.css';
 
 type InterviewRecommendation = '' | 'Proceed' | 'Decline' | 'Undecided - Need more information';
 type FormQuestion = { id: string; text: string; areas: string[] };
+type FormBranding = { paletteName?: string; primary?: string; accent?: string; logoUrl?: string; logoName?: string };
+
+function readableText(hex: string) {
+  const value = hex.replace('#', '');
+  if (value.length !== 6) return '#ffffff';
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? '#172033' : '#ffffff';
+}
 
 export function ParticipantInterviewPreview({
   stage,
@@ -15,6 +25,7 @@ export function ParticipantInterviewPreview({
   positionTitle,
   candidateId,
   questions,
+  branding,
   invitationToken,
   participantName = '',
   shareEnabled = true
@@ -25,6 +36,7 @@ export function ParticipantInterviewPreview({
   positionTitle: string;
   candidateId?: string;
   questions?: FormQuestion[];
+  branding?: FormBranding;
   invitationToken?: string;
   participantName?: string;
   shareEnabled?: boolean;
@@ -37,6 +49,14 @@ export function ParticipantInterviewPreview({
   }, [positionTitle, questions, stage]);
 
   const stageLabel = interviewTitle || INTERVIEW_STAGES.find((item) => item.id === stage)?.label || 'Interview';
+  const primary = branding?.primary || '#030d26';
+  const accent = branding?.accent || '#1e4fd8';
+  const brandedStyle = {
+    '--form-primary': primary,
+    '--form-accent': accent,
+    '--form-primary-text': readableText(primary)
+  } as CSSProperties;
+
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [comments, setComments] = useState('');
   const [recommendation, setRecommendation] = useState<InterviewRecommendation>('');
@@ -148,10 +168,14 @@ export function ParticipantInterviewPreview({
   }
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} style={brandedStyle}>
       <header className={styles.header}>
         <div className={styles.headerTop}>
-          <div className={styles.brand}><StapphireBrand decorative /></div>
+          <div className={styles.brand}>
+            {branding?.logoUrl
+              ? <img className={styles.brandLogo} src={branding.logoUrl} alt={branding.logoName || 'Company logo'} />
+              : <StapphireBrand decorative />}
+          </div>
           {shareEnabled && (
             <div className={styles.shareWrap}>
               <button type="button" className={styles.shareButton} onClick={shareInterview} aria-label="Share interview invitation">
@@ -162,7 +186,7 @@ export function ParticipantInterviewPreview({
             </div>
           )}
         </div>
-        <span className={styles.preview}>PRE-PRODUCTION PARTICIPANT FORM</span>
+        <span className={styles.preview}>INTERVIEW EVALUATION</span>
         <h1>{stageLabel} — {positionTitle}</h1>
         <div className={styles.context}>
           <span><strong>Candidate</strong>{candidateName}</span>
