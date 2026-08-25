@@ -25,6 +25,8 @@ export type MatrixCandidate = {
   otherRequirements: number | null;
   assessment: unknown;
   disposition: Disposition | null;
+  interviewScore: number | null;
+  interviewSubmitted: number;
 };
 
 const DISPOSITION_LABEL: Record<Disposition, string> = {
@@ -147,6 +149,10 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
   function renderBanner(candidate: MatrixCandidate, isOpen: boolean, rank: number, extraClass = ''): ReactNode {
     const disposition = dispositions[candidate.id];
     const dispositionLabel = disposition ? DISPOSITION_LABEL[disposition] : 'No status';
+    const interviewLabel = candidate.interviewScore === null
+      ? `Interview — / 5 · ${candidate.interviewSubmitted} submitted`
+      : `Interview ${candidate.interviewScore.toFixed(2)} / 5 · ${candidate.interviewSubmitted} submitted`;
+
     return (
       <div
         className={`matrix-row-head ${disposition || ''} ${extraClass} ${draggedId === candidate.id ? 'dragging' : ''} ${dropTargetId === candidate.id ? 'drop-target' : ''}`}
@@ -234,6 +240,25 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
           >
             {dispositionLabel}
           </span>
+          {candidate.interviewSubmitted > 0 && (
+            <span
+              aria-label={interviewLabel}
+              style={{
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                color: 'var(--sapphire)',
+                fontFamily: 'var(--mono)',
+                fontSize: '9px',
+                fontWeight: 700,
+                letterSpacing: '.02em',
+                lineHeight: 1.1
+              }}
+            >
+              {interviewLabel}
+            </span>
+          )}
         </span>
         <span className="facet-cell matrix-row-match">
           <span className="score-num">{candidate.match === null ? '—' : `${candidate.match}%`}</span>
