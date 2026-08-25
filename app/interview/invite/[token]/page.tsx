@@ -25,6 +25,7 @@ type RoundSnapshot = {
   questions: SnapshotQuestion[];
 };
 
+// Invitation snapshots preserve both the interview content and the saved form design.
 export default async function InterviewInvitationPage({ params }: { params: { token: string } }) {
   const { data: invitation, error } = await supabaseAdmin
     .from('phase1_interview_invitations')
