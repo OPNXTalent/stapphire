@@ -9,10 +9,10 @@
 .areaPickerButton{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:5px;background:#fff;color:var(--deep);font-size:10.5px;font-weight:700;text-align:left}
 .areaPickerButton:hover{border-color:var(--sapphire);background:var(--sapphire-pale)}
 .selectWrap{position:relative;margin-bottom:8px}
-.questionTypeSelect{display:block;width:100%;margin:0;padding:8px 36px 8px 10px;border:1px solid var(--line-strong);border-radius:5px;appearance:none;background:#fff;color:var(--deep);font-size:10.5px;font-weight:700}
+.questionTypeSelect{display:block;width:100%;margin:0;padding:8px 32px 8px 10px;border:1px solid var(--line-strong);border-radius:5px;appearance:none;background:#fff;color:var(--deep);font-size:10.5px;font-weight:700}
 .questionTypeSelect:hover,.questionTypeSelect:focus{border-color:var(--sapphire);outline:none}
-.selectWrap .dropdownChevron{position:absolute;top:50%;right:10px;transform:translateY(-54%);pointer-events:none}
-.dropdownChevron{flex:0 0 auto;color:var(--faint);font-size:18px;font-weight:700;line-height:1}
+.selectWrap .dropdownChevron{position:absolute;top:50%;right:10px;transform:translateY(-50%);pointer-events:none}
+.dropdownChevron{flex:0 0 auto;color:var(--faint);font-size:14px;font-weight:700;line-height:1}
 .areaMenu{position:absolute;left:0;right:0;top:calc(100% + 5px);z-index:30;max-height:320px;overflow-y:auto;padding:6px;border:1px solid var(--line-strong);border-radius:6px;background:#fff;box-shadow:0 10px 24px rgba(12,18,32,.14)}
 .areaOption{display:flex;align-items:center;gap:8px;padding:6px 7px;border-radius:4px;color:var(--ink);font-size:10.5px;cursor:pointer}
 .areaOption:hover{background:var(--wash)}
@@ -47,6 +47,7 @@
 .drag{padding-top:2px;color:var(--faint);font:700 14px/1 var(--mono)}
 .question p{margin:0;color:var(--ink);font-size:11.5px;font-weight:600;line-height:1.4}
 .chips{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0 0}
+.generator>.chips{width:calc(100% - 38px)}
 .chips span{padding:4px 6px;border-radius:999px;background:var(--sapphire-pale);color:var(--deep);font-size:9.5px;font-weight:700}
 .wildcard{border-style:dashed;border-color:var(--sapphire-2);background:var(--sapphire-pale)}
 .wildcardCopy{display:block;margin-top:3px;color:var(--muted);font-size:10.5px;line-height:1.35}
