@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { buildQuestionBank, INTERVIEW_STAGES, type InterviewStageId } from '@/lib/interviewQuestionBank';
 
-const ALLOWED_STAGES = new Set(['phone-screen', 'round-1', 'round-2', 'final']);
+const LEGACY_STAGES = new Set(['phone-screen', 'round-1', 'round-2', 'final']);
 
 type InvitationRow = {
   id: string;
@@ -17,10 +17,10 @@ type InvitationRow = {
 
 function summarize(rows: InvitationRow[]) {
   const result: Record<string, { participants: number; submitted: number }> = {};
-  for (const stage of ALLOWED_STAGES) result[stage] = { participants: 0, submitted: 0 };
 
   for (const row of rows) {
-    if (row.status === 'revoked' || !result[row.stage]) continue;
+    if (row.status === 'revoked') continue;
+    if (!result[row.stage]) result[row.stage] = { participants: 0, submitted: 0 };
     result[row.stage].participants += 1;
     if (row.status === 'submitted') result[row.stage].submitted += 1;
   }
@@ -62,8 +62,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   try {
     const body = await request.json();
     const stage = String(body?.stage ?? '').trim();
-    if (!ALLOWED_STAGES.has(stage)) {
-      return NextResponse.json({ error: 'Interview stage is invalid.' }, { status: 400 });
+    if (!stage || stage.length > 120) {
+      return NextResponse.json({ error: 'Interview key is invalid.' }, { status: 400 });
     }
 
     const { data: candidate, error: candidateError } = await supabaseAdmin
@@ -110,7 +110,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         .maybeSingle();
 
       if (roundError) throw roundError;
-      if (!round) return NextResponse.json({ error: 'Interview round not found.' }, { status: 404 });
+      if (!round) return NextResponse.json({ error: 'Interview not found in this plan.' }, { status: 404 });
 
       const { data: questions, error: questionsError } = await supabaseAdmin
         .from('phase1_interview_questions')
@@ -134,6 +134,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
         }))
       };
     } else {
+      if (!LEGACY_STAGES.has(stage)) {
+        return NextResponse.json({ error: 'Save the Interview Plan before sharing this interview.' }, { status: 409 });
+      }
+
       const fallbackQuestions = buildQuestionBank(requisition.title)
         .filter((question) => question.stage === stage as InterviewStageId)
         .map((question) => ({
