@@ -17,30 +17,75 @@ type InvitationRow = {
 
 function summarize(rows: InvitationRow[]) {
   const result: Record<string, { participants: number; submitted: number }> = {};
-
   for (const row of rows) {
     if (row.status === 'revoked') continue;
     if (!result[row.stage]) result[row.stage] = { participants: 0, submitted: 0 };
     result[row.stage].participants += 1;
     if (row.status === 'submitted') result[row.stage].submitted += 1;
   }
-
   return result;
 }
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('phase1_interview_invitations')
-      .select('id, stage, round_title, status, participant_name, invited_at, opened_at, submitted_at')
-      .eq('candidate_id', params.id)
-      .order('invited_at', { ascending: true });
+    const [{ data: invitationsData, error: invitationsError }, { data: candidate, error: candidateError }] = await Promise.all([
+      supabaseAdmin
+        .from('phase1_interview_invitations')
+        .select('id, stage, round_title, status, participant_name, invited_at, opened_at, submitted_at')
+        .eq('candidate_id', params.id)
+        .order('invited_at', { ascending: true }),
+      supabaseAdmin
+        .from('phase1_candidates')
+        .select('requisition_id')
+        .eq('id', params.id)
+        .maybeSingle()
+    ]);
 
-    if (error) throw error;
-    const invitations = (data ?? []) as InvitationRow[];
+    if (invitationsError) throw invitationsError;
+    if (candidateError) throw candidateError;
+    const invitations = (invitationsData ?? []) as InvitationRow[];
+
+    let rounds: Array<{ stage: string; title: string; areas: string[] }> = [];
+    if (candidate) {
+      const { data: plan, error: planError } = await supabaseAdmin
+        .from('phase1_interview_plans')
+        .select('id')
+        .eq('requisition_id', candidate.requisition_id)
+        .maybeSingle();
+      if (planError) throw planError;
+
+      if (plan) {
+        const { data: planRounds, error: roundsError } = await supabaseAdmin
+          .from('phase1_interview_rounds')
+          .select('id, stage, title, sort_order')
+          .eq('plan_id', plan.id)
+          .order('sort_order', { ascending: true });
+        if (roundsError) throw roundsError;
+
+        const roundIds = (planRounds ?? []).map((round) => round.id);
+        let questionRows: Array<{ round_id: string; areas: string[] }> = [];
+        if (roundIds.length > 0) {
+          const { data, error } = await supabaseAdmin
+            .from('phase1_interview_questions')
+            .select('round_id, areas')
+            .in('round_id', roundIds);
+          if (error) throw error;
+          questionRows = data ?? [];
+        }
+
+        rounds = (planRounds ?? []).map((round) => ({
+          stage: round.stage,
+          title: round.title,
+          areas: Array.from(new Set(
+            questionRows.filter((question) => question.round_id === round.id).flatMap((question) => question.areas ?? [])
+          ))
+        }));
+      }
+    }
 
     return NextResponse.json({
       counts: summarize(invitations),
+      rounds,
       invitations: invitations.map((row) => ({
         id: row.id,
         stage: row.stage,
@@ -140,18 +185,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
       const fallbackQuestions = buildQuestionBank(requisition.title)
         .filter((question) => question.stage === stage as InterviewStageId)
-        .map((question) => ({
-          id: question.id,
-          sourceId: question.id,
-          text: question.text,
-          areas: question.areas
-        }));
+        .map((question) => ({ id: question.id, sourceId: question.id, text: question.text, areas: question.areas }));
 
-      snapshot = {
-        stage,
-        title: roundTitle,
-        questions: fallbackQuestions
-      };
+      snapshot = { stage, title: roundTitle, questions: fallbackQuestions };
     }
 
     const { data: invitation, error: invitationError } = await supabaseAdmin
