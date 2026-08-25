@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { AREAS_OF_EVALUATION, buildQuestionBank } from '@/lib/interviewQuestionBank';
+import { buildQuestionBank } from '@/lib/interviewQuestionBank';
+import { activeAoeAreas, DEFAULT_AOE_PREFERENCES, type AoePreferences } from '@/lib/aoePreferences';
 import { generateInterviewQuestions } from '@/lib/interviewQuestionGenerator';
 import { resolveCurrentEvaluationBasis } from '@/lib/evaluationBasis';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
@@ -65,15 +66,40 @@ async function loadPlanQuestionTexts(requisitionId: string) {
   return (questions || []).map((question) => String(question.question_text || '').trim()).filter(Boolean);
 }
 
+async function resolveOrganization() {
+  const { data, error } = await supabaseAdmin.from('organizations').select('id,credits_remaining').limit(2);
+  if (error) throw error;
+  return data && data.length === 1 ? data[0] : null;
+}
+
+async function loadAoePreferences(orgId: string | null): Promise<AoePreferences> {
+  if (!orgId) return DEFAULT_AOE_PREFERENCES;
+  const { data, error } = await supabaseAdmin
+    .from('phase1_aoe_preferences')
+    .select('hidden_standard_areas,custom_areas')
+    .eq('org_id', orgId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? {
+    hiddenStandardAreas: Array.isArray(data.hidden_standard_areas) ? data.hidden_standard_areas as string[] : [],
+    customAreas: Array.isArray(data.custom_areas) ? data.custom_areas as string[] : []
+  } : DEFAULT_AOE_PREFERENCES;
+}
+
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
-    const requisition = await loadRequisition(params.id);
+    const [requisition, organization] = await Promise.all([loadRequisition(params.id), resolveOrganization()]);
     if (!requisition) return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 });
-    const persisted = await loadPersistedQuestions(params.id);
+    const [persisted, aoePreferences] = await Promise.all([
+      loadPersistedQuestions(params.id),
+      loadAoePreferences(organization?.id ?? null)
+    ]);
     return NextResponse.json({
       positionTitle: requisition.title,
       starterQuestions: starterQuestions(requisition.title),
-      generatedQuestions: persisted
+      generatedQuestions: persisted,
+      aoePreferences,
+      availableAreas: activeAoeAreas(aoePreferences)
     });
   } catch (error) {
     console.error('Interview question bank load failed', { requisitionId: params.id, error });
@@ -84,34 +110,33 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
     const body = await request.json();
-    const selectedAreas = Array.isArray(body.selectedAreas)
-      ? body.selectedAreas.map((area: unknown) => String(area)).filter((area: string) => AREAS_OF_EVALUATION.includes(area as (typeof AREAS_OF_EVALUATION)[number]))
-      : [];
-    if (selectedAreas.length > 8) return NextResponse.json({ error: 'Select no more than 8 Areas of Evaluation.' }, { status: 400 });
-
     const requisition = await loadRequisition(params.id);
     if (!requisition) return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 });
 
-    const [basis, persisted, planQuestions, organizations] = await Promise.all([
+    const organization = await resolveOrganization();
+    if (!organization) return NextResponse.json({ error: 'QC billing is not configured for this workspace.' }, { status: 409 });
+    const aoePreferences = await loadAoePreferences(organization.id);
+    const availableAreas = activeAoeAreas(aoePreferences);
+    const availableAreaSet = new Set(availableAreas);
+    const selectedAreas = Array.isArray(body.selectedAreas)
+      ? body.selectedAreas.map((area: unknown) => String(area)).filter((area: string) => availableAreaSet.has(area))
+      : [];
+    if (selectedAreas.length > 8) return NextResponse.json({ error: 'Select no more than 8 Areas of Evaluation.' }, { status: 400 });
+    if ((organization.credits_remaining as number) < 1) return NextResponse.json({ error: 'No QC credits remain.' }, { status: 402 });
+
+    const [basis, persisted, planQuestions] = await Promise.all([
       resolveCurrentEvaluationBasis(params.id),
       loadPersistedQuestions(params.id),
-      loadPlanQuestionTexts(params.id),
-      supabaseAdmin.from('organizations').select('id,credits_remaining').limit(2)
+      loadPlanQuestionTexts(params.id)
     ]);
     if (!basis) return NextResponse.json({ error: 'Apply a Job Description or Hiring Criteria basis before generating questions.' }, { status: 409 });
-    if (organizations.error) throw organizations.error;
-    if (!organizations.data || organizations.data.length !== 1) {
-      return NextResponse.json({ error: 'QC billing is not configured for this workspace.' }, { status: 409 });
-    }
-    const organization = organizations.data[0];
-    if ((organization.credits_remaining as number) < 1) return NextResponse.json({ error: 'No QC credits remain.' }, { status: 402 });
 
     const existingQuestions = [
       ...starterQuestions(requisition.title).map((question) => question.text),
       ...persisted.map((question) => question.text),
       ...planQuestions
     ];
-    const questions = await generateInterviewQuestions({ basis, selectedAreas, existingQuestions });
+    const questions = await generateInterviewQuestions({ basis, selectedAreas, existingQuestions, availableAreas });
 
     const { data, error } = await supabaseAdmin.rpc('consume_qc_and_add_interview_questions', {
       p_org_id: organization.id,
