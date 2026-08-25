@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent, type
 import { buildQuestionBank } from '@/lib/interviewQuestionBank';
 import styles from './CandidateInterviewRounds.module.css';
 
-type StageId = 'phone-screen' | 'round-1' | 'round-2';
-type ViewId = 'evaluation' | StageId | null;
+type ViewId = 'evaluation' | string | null;
 type InvitationCount = { participants: number; submitted: number };
 
 type AggregateRow = {
@@ -21,7 +20,7 @@ type ParticipantAssessment = {
 };
 
 type InterviewRound = {
-  id: StageId;
+  id: string;
   title: string;
   participants: number;
   submitted: number;
@@ -30,20 +29,26 @@ type InterviewRound = {
   assessments: ParticipantAssessment[];
 };
 
-const EMPTY_COUNTS: Record<StageId, InvitationCount> = {
-  'phone-screen': { participants: 0, submitted: 0 },
-  'round-1': { participants: 0, submitted: 0 },
-  'round-2': { participants: 0, submitted: 0 }
-};
+type PlanRound = { stage: string; title: string; areas: string[] };
 
-function buildStageRows(stage: StageId, positionTitle: string): AggregateRow[] {
-  const areas = Array.from(new Set(
-    buildQuestionBank(positionTitle)
-      .filter((question) => question.stage === stage)
-      .flatMap((question) => question.areas)
-  ));
-
-  return areas.map((area) => ({ area, timesRated: 0, average: null }));
+function legacyRounds(positionTitle: string): PlanRound[] {
+  return [
+    {
+      stage: 'phone-screen',
+      title: `Phone Screen — ${positionTitle}`,
+      areas: Array.from(new Set(buildQuestionBank(positionTitle).filter((q) => q.stage === 'phone-screen').flatMap((q) => q.areas)))
+    },
+    {
+      stage: 'round-1',
+      title: 'Round 1 — Hiring Manager',
+      areas: Array.from(new Set(buildQuestionBank(positionTitle).filter((q) => q.stage === 'round-1').flatMap((q) => q.areas)))
+    },
+    {
+      stage: 'round-2',
+      title: 'Round 2 — Panel Interview',
+      areas: Array.from(new Set(buildQuestionBank(positionTitle).filter((q) => q.stage === 'round-2').flatMap((q) => q.areas)))
+    }
+  ];
 }
 
 export function CandidateInterviewRounds({
@@ -58,12 +63,9 @@ export function CandidateInterviewRounds({
   evaluationContent: ReactNode;
 }) {
   const [view, setView] = useState<ViewId>(null);
-  const [invitationCounts, setInvitationCounts] = useState<Record<StageId, InvitationCount>>(EMPTY_COUNTS);
-  const [assessmentOpen, setAssessmentOpen] = useState<Record<StageId, boolean>>({
-    'phone-screen': false,
-    'round-1': false,
-    'round-2': false
-  });
+  const [invitationCounts, setInvitationCounts] = useState<Record<string, InvitationCount>>({});
+  const [planRounds, setPlanRounds] = useState<PlanRound[]>(() => legacyRounds(positionTitle));
+  const [assessmentOpen, setAssessmentOpen] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let active = true;
@@ -73,15 +75,15 @@ export function CandidateInterviewRounds({
         const response = await fetch(`/api/candidates/${candidateId}/interview-invitations`, { cache: 'no-store' });
         if (!response.ok) return;
         const payload = await response.json();
-        if (!active || !payload?.counts) return;
-
-        setInvitationCounts({
-          'phone-screen': payload.counts['phone-screen'] ?? { participants: 0, submitted: 0 },
-          'round-1': payload.counts['round-1'] ?? { participants: 0, submitted: 0 },
-          'round-2': payload.counts['round-2'] ?? { participants: 0, submitted: 0 }
-        });
+        if (!active) return;
+        setInvitationCounts(payload?.counts ?? {});
+        if (Array.isArray(payload?.rounds) && payload.rounds.length > 0) {
+          setPlanRounds(payload.rounds);
+        } else {
+          setPlanRounds(legacyRounds(positionTitle));
+        }
       } catch {
-        // Keep the existing zero state if invitation metadata cannot be loaded.
+        // Keep the current plan/count state if invitation metadata cannot be loaded.
       }
     }
 
@@ -91,45 +93,25 @@ export function CandidateInterviewRounds({
       active = false;
       window.removeEventListener('focus', loadInvitationCounts);
     };
-  }, [candidateId]);
+  }, [candidateId, positionTitle]);
 
-  const rounds = useMemo<InterviewRound[]>(() => [
-    {
-      id: 'phone-screen',
-      title: `Phone Screen — ${positionTitle}`,
-      participants: invitationCounts['phone-screen'].participants,
-      submitted: invitationCounts['phone-screen'].submitted,
-      overall: null,
-      rows: buildStageRows('phone-screen', positionTitle),
-      assessments: []
-    },
-    {
-      id: 'round-1',
-      title: 'Round 1 — Hiring Manager',
-      participants: invitationCounts['round-1'].participants,
-      submitted: invitationCounts['round-1'].submitted,
-      overall: null,
-      rows: buildStageRows('round-1', positionTitle),
-      assessments: []
-    },
-    {
-      id: 'round-2',
-      title: 'Round 2 — Panel Interview',
-      participants: invitationCounts['round-2'].participants,
-      submitted: invitationCounts['round-2'].submitted,
-      overall: null,
-      rows: buildStageRows('round-2', positionTitle),
-      assessments: []
-    }
-  ], [invitationCounts, positionTitle]);
+  const rounds = useMemo<InterviewRound[]>(() => planRounds.map((round) => ({
+    id: round.stage,
+    title: round.title,
+    participants: invitationCounts[round.stage]?.participants ?? 0,
+    submitted: invitationCounts[round.stage]?.submitted ?? 0,
+    overall: null,
+    rows: (round.areas ?? []).map((area) => ({ area, timesRated: 0, average: null })),
+    assessments: []
+  })), [invitationCounts, planRounds]);
 
-  function interviewUrl(stage: StageId) {
+  function interviewUrl(stage: string) {
     const params = new URLSearchParams({
       candidate: candidateName,
       role: positionTitle,
       candidateId
     });
-    return `/interview/preview/${stage}?${params.toString()}`;
+    return `/interview/preview/${encodeURIComponent(stage)}?${params.toString()}`;
   }
 
   function toggleRound(round: InterviewRound, selected: boolean) {
@@ -186,11 +168,11 @@ export function CandidateInterviewRounds({
         <button type="button" className={styles.bar} onClick={() => setView('evaluation')}>
           <span>Evaluation</span>
         </button>
-        {/* Keep this production helper copy literal; it explains link versus bar behavior. */}
         <p className={styles.interviewHelper}>
-          Click the round name to open the evaluation form and share it with interview participants from there. Once results come in, click the bar to expand and view them.
+          Click an interview name to open the evaluation form and share it with participants. Once results come in, click the bar to expand and view them.
         </p>
         {rounds.map((round) => renderInterviewBar(round))}
+        {rounds.length === 0 && <div className={styles.assessmentEmpty}>No interviews have been added to this requisition yet.</div>}
       </section>
     );
   }
@@ -206,8 +188,12 @@ export function CandidateInterviewRounds({
     );
   }
 
-  const round = rounds.find((item) => item.id === view)!;
-  const assessmentsVisible = assessmentOpen[round.id];
+  const round = rounds.find((item) => item.id === view);
+  if (!round) {
+    setView(null);
+    return null;
+  }
+  const assessmentsVisible = assessmentOpen[round.id] ?? false;
 
   return (
     <section className={styles.records}>
@@ -226,6 +212,7 @@ export function CandidateInterviewRounds({
               <strong>{row.average === null ? '—' : `★ ${row.average.toFixed(2)}`}</strong>
             </div>
           ))}
+          {round.rows.length === 0 && <div className={styles.assessmentEmpty}>No Areas of Evaluation configured yet.</div>}
         </div>
         <div className={styles.overall}>
           <span>Overall Interview Average</span>
