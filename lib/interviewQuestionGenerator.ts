@@ -84,17 +84,27 @@ export async function generateInterviewQuestions({
     }
   });
 
-  if (response.status !== 'completed' || response.incomplete_details || !response.output_text) {
-    const reason = response.incomplete_details?.reason || response.status || 'unknown';
+  const outputText = response.output_text?.trim();
+  if (response.status !== 'completed' || response.incomplete_details || !outputText) {
+    const reason = response.incomplete_details?.reason || response.status || 'empty_output';
     throw new Error(`Interview question generation was incomplete (${reason}).`);
   }
 
-  const parsed = JSON.parse(response.output_text) as { questions?: Array<{ text?: string; areas?: string[] }> };
+  let parsed: { questions?: Array<{ text?: string; areas?: string[] }> };
+  try {
+    parsed = JSON.parse(outputText) as { questions?: Array<{ text?: string; areas?: string[] }> };
+  } catch {
+    throw new Error('Interview question generation returned malformed structured output.');
+  }
   if (!Array.isArray(parsed.questions) || parsed.questions.length !== 5) throw new Error('AI did not return five interview questions.');
 
-  return parsed.questions.map((question) => ({
+  const questions = parsed.questions.map((question) => ({
     id: `ai-${crypto.randomUUID()}`,
     text: String(question.text || '').trim(),
     areas: Array.isArray(question.areas) ? question.areas : []
   }));
+  if (questions.some((question) => !question.text || question.areas.length === 0)) {
+    throw new Error('Interview question generation returned incomplete question data.');
+  }
+  return questions;
 }
