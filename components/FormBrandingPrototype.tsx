@@ -40,7 +40,9 @@ function readableText(hex: string) {
 export function FormBrandingPrototype() {
   const searchParams = useSearchParams();
   const requisitionId = searchParams.get('requisitionId');
-  const backHref = requisitionId ? `/requisitions/${encodeURIComponent(requisitionId)}` : '/';
+  const backHref = requisitionId
+    ? `/requisitions/${encodeURIComponent(requisitionId)}?view=requisition&tab=interviews`
+    : '/';
   const [primary, setPrimary] = useState(PALETTES[0].primary);
   const [accent, setAccent] = useState(PALETTES[0].accent);
   const [paletteName, setPaletteName] = useState(PALETTES[0].name);
