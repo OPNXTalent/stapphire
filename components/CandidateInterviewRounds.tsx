@@ -77,8 +77,8 @@ export function CandidateInterviewRounds({
         const payload = await response.json();
         if (!active) return;
         setInvitationCounts(payload?.counts ?? {});
-        if (Array.isArray(payload?.rounds) && payload.rounds.length > 0) {
-          setPlanRounds(payload.rounds);
+        if (payload?.hasPlan) {
+          setPlanRounds(Array.isArray(payload?.rounds) ? payload.rounds : []);
         } else {
           setPlanRounds(legacyRounds(positionTitle));
         }
@@ -189,10 +189,7 @@ export function CandidateInterviewRounds({
   }
 
   const round = rounds.find((item) => item.id === view);
-  if (!round) {
-    setView(null);
-    return null;
-  }
+  if (!round) return null;
   const assessmentsVisible = assessmentOpen[round.id] ?? false;
 
   return (
