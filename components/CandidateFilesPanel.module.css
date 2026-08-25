@@ -1,14 +1,31 @@
 .panel{display:flex;min-height:0;height:100%;flex-direction:column;padding:16px 16px 20px;background:var(--paper)}
 .header{padding:0 0 14px;border-bottom:1px solid var(--line)}
 .eyebrow{display:block;margin-bottom:4px;color:var(--faint);font:600 9px var(--mono);letter-spacing:.08em;text-transform:uppercase}
-.header h2{margin:0;color:var(--ink);font:700 23px/1.15 var(--display)}
+.headerRow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.header h2{min-width:0;margin:0;color:var(--ink);font:700 23px/1.15 var(--display)}
 .headerCopy{margin:6px 0 0;color:var(--muted);font-size:11.5px;line-height:1.4}
+.newFolderButton{flex:none;padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:#fff;color:var(--sapphire);font-size:10.5px;font-weight:700;cursor:pointer}
+.newFolderButton:hover{background:var(--sapphire-pale)}
+.newFolderForm{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;margin-top:10px}
+.newFolderForm input{min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:5px;background:#fff;color:var(--ink);font:inherit;font-size:12px}
+.newFolderForm button{padding:7px 8px;border:1px solid var(--line);border-radius:5px;background:#fff;color:var(--deep);font-size:10.5px;font-weight:700;cursor:pointer}
+.newFolderForm button[type="submit"]{border-color:var(--sapphire);background:var(--sapphire);color:#fff}
+.newFolderForm button:disabled{cursor:default;opacity:.5}
 .folders{display:flex;min-height:0;flex:1;flex-direction:column;gap:8px;padding-top:12px;overflow-y:auto}
+.folderShell{position:relative;border-radius:6px}
+.folderShell.dragging{opacity:.55}
 .folder{border:1px solid var(--line);border-radius:6px;background:#fff;overflow:hidden}
-.folder summary{cursor:pointer;list-style-position:inside;padding:10px 11px;color:var(--deep);font-size:12.5px;font-weight:700;user-select:none}
+.folder summary{cursor:pointer;list-style-position:inside;padding:10px 92px 10px 11px;color:var(--deep);font-size:12.5px;font-weight:700;user-select:none}
 .folder summary:hover{background:var(--wash)}
 .folder[open] summary{border-bottom:1px solid var(--line)}
 .folderBody{padding:7px}
+.folderControls{position:absolute;top:5px;right:5px;display:flex;align-items:center;gap:2px;z-index:2}
+.folderControls button,.dragHandle{display:grid;width:27px;height:27px;place-items:center;border:0;border-radius:4px;background:transparent;color:var(--muted);font:700 12px var(--mono)}
+.folderControls button{cursor:pointer}
+.folderControls button:hover:not(:disabled),.dragHandle:hover{background:var(--wash);color:var(--deep)}
+.folderControls button:disabled{opacity:.25;cursor:default}
+.dragHandle{cursor:grab;letter-spacing:-3px;user-select:none}
+.dragHandle:active{cursor:grabbing}
 .fileRow{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border:0;border-radius:5px;background:transparent;color:var(--ink);font:inherit;text-align:left;text-decoration:none;cursor:pointer}
 .fileRow:hover:not(:disabled){background:var(--sapphire-pale)}
 .fileRow:focus-visible{outline:2px solid var(--sapphire);outline-offset:-2px}
@@ -17,6 +34,12 @@
 .fileAction{flex:none;color:var(--sapphire);font-size:10.5px;font-weight:700}
 .interviewInfo{display:flex;min-width:0;flex:1;flex-direction:column;gap:2px}
 .fileMeta{overflow:hidden;color:var(--muted);font-size:10px;line-height:1.3;text-overflow:ellipsis;white-space:nowrap}
+.customFolderBody{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.deleteFolder{flex:none;padding:5px 7px;border:0;border-radius:4px;background:transparent;color:var(--red);font-size:10px;font-weight:700;cursor:pointer}
+.deleteFolder:hover{background:var(--wash)}
+.deleteFolder:disabled{opacity:.4;cursor:default}
 .empty{margin:0;padding:8px 10px;color:var(--muted);font-size:11.5px;line-height:1.45}
+.saving{margin:8px 0 0;color:var(--muted);font-size:10.5px}
 .error{margin:10px 0 0;color:var(--red);font-size:11.5px}
 .teamworkBody{display:flex;min-height:0;flex:1;padding-top:12px}
+@media(max-width:420px){.headerRow{align-items:flex-start;flex-direction:column}.newFolderForm{grid-template-columns:1fr 1fr}.newFolderForm input{grid-column:1/-1}}
