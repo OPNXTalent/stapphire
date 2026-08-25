@@ -1,0 +1,115 @@
+import { notFound } from 'next/navigation';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import styles from './readOnlyInterview.module.css';
+
+export const dynamic = 'force-dynamic';
+
+type SnapshotQuestion = {
+  id: string;
+  text: string;
+  areas: string[];
+};
+
+type RoundSnapshot = {
+  title?: string;
+  questions?: SnapshotQuestion[];
+};
+
+type SubmissionPayload = {
+  ratings?: Record<string, number>;
+  comments?: string;
+  recommendation?: string;
+};
+
+function submittedTimestamp(iso: string | null) {
+  if (!iso) return '';
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  }).format(new Date(iso));
+}
+
+export default async function CompletedInterviewPage({
+  params
+}: {
+  params: { id: string; invitationId: string };
+}) {
+  const { data: invitation, error } = await supabaseAdmin
+    .from('phase1_interview_invitations')
+    .select('id, candidate_id, requisition_id, round_title, round_snapshot, participant_name, submission_payload, status, submitted_at')
+    .eq('id', params.invitationId)
+    .eq('candidate_id', params.id)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!invitation || invitation.status !== 'submitted') notFound();
+
+  const [{ data: candidate }, { data: requisition }] = await Promise.all([
+    supabaseAdmin.from('phase1_candidates').select('full_name').eq('id', invitation.candidate_id).maybeSingle(),
+    supabaseAdmin.from('phase1_requisitions').select('title').eq('id', invitation.requisition_id).maybeSingle()
+  ]);
+
+  if (!candidate || !requisition) notFound();
+
+  const snapshot = (invitation.round_snapshot ?? {}) as RoundSnapshot;
+  const submission = (invitation.submission_payload ?? {}) as SubmissionPayload;
+  const questions = Array.isArray(snapshot.questions) ? snapshot.questions : [];
+  const ratings = submission.ratings ?? {};
+
+  return (
+    <main className={styles.page}>
+      <div className={styles.topRow}>
+        <a href={`/candidates/${params.id}`} className={styles.back}>← Back to candidate</a>
+        <span className={styles.locked}>READ ONLY</span>
+      </div>
+
+      <header className={styles.header}>
+        <span className={styles.eyebrow}>Completed interview assessment</span>
+        <h1>{invitation.round_title || snapshot.title || 'Interview'}</h1>
+        <div className={styles.meta}>
+          <span><strong>Candidate</strong>{candidate.full_name}</span>
+          <span><strong>Position</strong>{requisition.title}</span>
+          <span><strong>Participant</strong>{invitation.participant_name || 'Not recorded'}</span>
+          <span><strong>Submitted</strong>{submittedTimestamp(invitation.submitted_at)}</span>
+        </div>
+      </header>
+
+      <section className={styles.questions}>
+        {questions.map((question, index) => (
+          <article className={styles.question} key={question.id}>
+            <div className={styles.questionHead}>
+              <span>Q{index + 1}</span>
+              <h2>{question.text}</h2>
+            </div>
+            <div className={styles.ratings}>
+              {(question.areas ?? []).map((area) => {
+                const value = Number(ratings[`${question.id}:${area}`] ?? 0);
+                return (
+                  <div className={styles.ratingRow} key={area}>
+                    <span>{area}</span>
+                    <strong>{value > 0 ? `${value} / 5` : 'Not rated'}</strong>
+                  </div>
+                );
+              })}
+            </div>
+          </article>
+        ))}
+      </section>
+
+      <section className={styles.assessment}>
+        <h2>Interview Assessment</h2>
+        <div className={styles.assessmentBlock}>
+          <strong>Overall Comments</strong>
+          <p>{submission.comments || 'No comments recorded.'}</p>
+        </div>
+        <div className={styles.assessmentBlock}>
+          <strong>Recommendation</strong>
+          <p>{submission.recommendation || 'No recommendation recorded.'}</p>
+        </div>
+      </section>
+    </main>
+  );
+}
