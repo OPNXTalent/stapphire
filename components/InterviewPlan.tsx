@@ -123,6 +123,7 @@ export function InterviewPlan({
   const [draggedQuestionId, setDraggedQuestionId] = useState<string | null>(null);
   const [draggedRoundId, setDraggedRoundId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [dropRoundId, setDropRoundId] = useState<string | null>(null);
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [hydrated, setHydrated] = useState(false);
   const latestPayloadRef = useRef('');
@@ -133,8 +134,13 @@ export function InterviewPlan({
   const questions = selectedRound ? questionsByRound[selectedRound.id] || [] : [];
   const serializedPlan = useMemo(() => serializePlan(rounds, questionsByRound), [rounds, questionsByRound]);
   const usedSourceIds = useMemo(
-    () => new Set(questions.map((question) => question.sourceId).filter(Boolean) as string[]),
-    [questions]
+    () => new Set(
+      Object.values(questionsByRound)
+        .flatMap((roundQuestions) => roundQuestions)
+        .map((question) => question.sourceId)
+        .filter(Boolean) as string[]
+    ),
+    [questionsByRound]
   );
 
   useEffect(() => {
@@ -289,11 +295,11 @@ export function InterviewPlan({
   }, []);
 
   useEffect(() => {
-    if (!selectedRound) return;
+    if (!hydrated) return;
     window.dispatchEvent(new CustomEvent(INTERVIEW_BANK_USED_EVENT, {
       detail: { sourceIds: Array.from(usedSourceIds) }
     }));
-  }, [selectedRound, usedSourceIds]);
+  }, [hydrated, usedSourceIds]);
 
   useEffect(() => {
     function addFromBankPanel(event: Event) {
@@ -348,9 +354,9 @@ export function InterviewPlan({
     });
   }
 
-  function addBankQuestion(source: BankQuestion, targetId?: string) {
-    if (!selectedRoundId) return;
-    patchQuestions(selectedRoundId, (current) => {
+  function addBankQuestionToRound(roundId: string, source: BankQuestion, targetId?: string) {
+    if (usedSourceIds.has(source.id)) return;
+    patchQuestions(roundId, (current) => {
       if (current.some((question) => question.sourceId === source.id)) return current;
       const next = cloneBankQuestion(source);
       if (!targetId) return [...current, next];
@@ -360,6 +366,11 @@ export function InterviewPlan({
       result.splice(targetIndex, 0, next);
       return result;
     });
+  }
+
+  function addBankQuestion(source: BankQuestion, targetId?: string) {
+    if (!selectedRoundId) return;
+    addBankQuestionToRound(selectedRoundId, source, targetId);
   }
 
   function addManualQuestion() {
@@ -460,14 +471,26 @@ export function InterviewPlan({
           {rounds.map((round) => (
             <div
               key={round.id}
-              className={styles.roundShell}
+              className={`${styles.roundShell} ${dropRoundId === round.id ? styles.roundDropTarget : ''}`}
               onDragOver={(event) => {
+                if (event.dataTransfer.types.includes(INTERVIEW_BANK_DRAG_MIME)) {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'copy';
+                  setDropRoundId(round.id);
+                  return;
+                }
                 if (draggedRoundId && draggedRoundId !== round.id) event.preventDefault();
+              }}
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropRoundId(null);
               }}
               onDrop={(event) => {
                 event.preventDefault();
-                if (draggedRoundId) reorderInterview(draggedRoundId, round.id);
+                const bankQuestion = parseBankQuestion(event);
+                if (bankQuestion) addBankQuestionToRound(round.id, bankQuestion);
+                else if (draggedRoundId) reorderInterview(draggedRoundId, round.id);
                 setDraggedRoundId(null);
+                setDropRoundId(null);
               }}
             >
               <span
@@ -479,7 +502,7 @@ export function InterviewPlan({
                   event.dataTransfer.setData('text/plain', round.id);
                   setDraggedRoundId(round.id);
                 }}
-                onDragEnd={() => setDraggedRoundId(null)}
+                onDragEnd={() => { setDraggedRoundId(null); setDropRoundId(null); }}
               >⠿</span>
               {renderRoundBar(round)}
             </div>
