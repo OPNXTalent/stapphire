@@ -298,18 +298,22 @@ export function InterviewQuestionBankPanel({
             </button>
           </div>
 
-          <select
-            className={styles.questionTypeSelect}
-            value={selectedQuestionType}
-            onChange={(event) => setSelectedQuestionType(event.target.value as InterviewQuestionType | '')}
-            aria-label="Question Type"
-          >
-            <option value="">All Question Types</option>
-            {INTERVIEW_QUESTION_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-          </select>
+          <div className={styles.selectWrap}>
+            <select
+              className={styles.questionTypeSelect}
+              value={selectedQuestionType}
+              onChange={(event) => setSelectedQuestionType(event.target.value as InterviewQuestionType | '')}
+              aria-label="Question Type"
+            >
+              <option value="">All Question Types</option>
+              {INTERVIEW_QUESTION_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+            </select>
+            <span className={styles.dropdownChevron} aria-hidden="true">⌄</span>
+          </div>
 
           <button type="button" className={styles.areaPickerButton} onClick={() => { setManagingAreas(false); setAreaPickerOpen((open) => !open); }} aria-expanded={areaPickerOpen && !managingAreas}>
-            {selectedAreas.length ? `AOE (${selectedAreas.length})` : 'AOE (optional)'} ▾
+            <span>{selectedAreas.length ? `AOE (${selectedAreas.length})` : 'AOE (optional)'}</span>
+            <span className={styles.dropdownChevron} aria-hidden="true">⌄</span>
           </button>
           {areaPickerOpen && (
             <div className={styles.areaMenu}>
