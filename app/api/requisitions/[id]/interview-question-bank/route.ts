@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { buildQuestionBank } from '@/lib/interviewQuestionBank';
 import { activeAoeAreas, DEFAULT_AOE_PREFERENCES, type AoePreferences } from '@/lib/aoePreferences';
 import { generateInterviewQuestions } from '@/lib/interviewQuestionGenerator';
+import { isInterviewQuestionType, type InterviewQuestionType } from '@/lib/interviewQuestionTypes';
 import { resolveCurrentEvaluationBasis } from '@/lib/evaluationBasis';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -122,6 +123,15 @@ export async function POST(request: Request, { params }: { params: { id: string 
       ? body.selectedAreas.map((area: unknown) => String(area)).filter((area: string) => availableAreaSet.has(area))
       : [];
     if (selectedAreas.length > 8) return NextResponse.json({ error: 'Select no more than 8 Areas of Evaluation.' }, { status: 400 });
+
+    let questionType: InterviewQuestionType | null = null;
+    if (body.questionType != null && body.questionType !== '') {
+      if (!isInterviewQuestionType(body.questionType)) {
+        return NextResponse.json({ error: 'Select a valid Question Type.' }, { status: 400 });
+      }
+      questionType = body.questionType;
+    }
+
     if ((organization.credits_remaining as number) < 1) return NextResponse.json({ error: 'No QC credits remain.' }, { status: 402 });
 
     const [basis, persisted, planQuestions] = await Promise.all([
@@ -136,7 +146,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       ...persisted.map((question) => question.text),
       ...planQuestions
     ];
-    const questions = await generateInterviewQuestions({ basis, selectedAreas, existingQuestions, availableAreas });
+    const questions = await generateInterviewQuestions({ basis, selectedAreas, questionType, existingQuestions, availableAreas });
 
     const { data, error } = await supabaseAdmin.rpc('consume_qc_and_add_interview_questions', {
       p_org_id: organization.id,
