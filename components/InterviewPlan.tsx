@@ -31,6 +31,7 @@ type Question = {
   sourceId?: string;
   text: string;
   areas: string[];
+  commentBox?: boolean;
 };
 
 type PersistedRound = {
@@ -404,6 +405,13 @@ export function InterviewPlan({
     }));
   }
 
+  function toggleCommentBox(questionId: string) {
+    if (!selectedRoundId) return;
+    patchQuestions(selectedRoundId, (current) => current.map((question) =>
+      question.id === questionId ? { ...question, commentBox: !question.commentBox } : question
+    ));
+  }
+
   function reorderQuestion(sourceId: string, targetId: string) {
     if (!selectedRoundId || sourceId === targetId) return;
     patchQuestions(selectedRoundId, (current) => {
@@ -568,8 +576,15 @@ export function InterviewPlan({
                       {question.areas.map((area) => (
                         <span className={styles.areaChip} key={area}>{area}<button type="button" onClick={() => toggleArea(question.id, area)} aria-label={`Remove ${area}`}>×</button></span>
                       ))}
+                      {question.commentBox && (
+                        <span className={`${styles.areaChip} ${styles.commentChip}`}>Comment Box<button type="button" onClick={() => toggleCommentBox(question.id)} aria-label="Remove Comment Box">×</button></span>
+                      )}
                       {openAreaId === question.id && (
                         <div className={styles.areaMenu}>
+                          <label className={`${styles.areaOption} ${styles.commentOption}`}>
+                            <input type="checkbox" checked={Boolean(question.commentBox)} onChange={() => toggleCommentBox(question.id)} />
+                            <span>Comment Box</span>
+                          </label>
                           {availableAreas.map((area) => {
                             const checked = question.areas.includes(area);
                             return (
@@ -604,6 +619,12 @@ export function InterviewPlan({
                             </div>
                           );
                         })}
+                      </div>
+                    )}
+                    {question.commentBox && (
+                      <div className={styles.commentBoxPreview}>
+                        <label htmlFor={`question-comment-${question.id}`}>Comments</label>
+                        <textarea id={`question-comment-${question.id}`} placeholder="Add comments…" />
                       </div>
                     )}
                   </div>
