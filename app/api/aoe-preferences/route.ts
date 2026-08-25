@@ -3,6 +3,8 @@ import { AREAS_OF_EVALUATION } from '@/lib/interviewQuestionBank';
 import { DEFAULT_AOE_PREFERENCES, activeAoeAreas, type AoePreferences } from '@/lib/aoePreferences';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
+export const dynamic = 'force-dynamic';
+
 function canonicalArea(value: string) {
   return AREAS_OF_EVALUATION.includes(value as (typeof AREAS_OF_EVALUATION)[number]);
 }
