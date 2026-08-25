@@ -32,6 +32,10 @@
 .fileRow:disabled{cursor:default;opacity:.65}
 .fileName{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600}
 .fileAction{flex:none;color:var(--sapphire);font-size:10.5px;font-weight:700}
+.interviewRow{display:flex;align-items:center;gap:4px;border-radius:5px}
+.interviewRow:hover{background:var(--sapphire-pale)}
+.interviewView{display:flex;min-width:0;flex:1;align-items:center;justify-content:space-between;gap:10px;padding:9px 8px;color:var(--ink);text-decoration:none}
+.interviewView:focus-visible{border-radius:5px;outline:2px solid var(--sapphire);outline-offset:-2px}
 .interviewInfo{display:flex;min-width:0;flex:1;flex-direction:column;gap:2px}
 .fileMeta{overflow:hidden;color:var(--muted);font-size:10px;line-height:1.3;text-overflow:ellipsis;white-space:nowrap}
 .customFolderBody{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -42,4 +46,4 @@
 .saving{margin:8px 0 0;color:var(--muted);font-size:10.5px}
 .error{margin:10px 0 0;color:var(--red);font-size:11.5px}
 .teamworkBody{display:flex;min-height:0;flex:1;padding-top:12px}
-@media(max-width:420px){.headerRow{align-items:flex-start;flex-direction:column}.newFolderForm{grid-template-columns:1fr 1fr}.newFolderForm input{grid-column:1/-1}}
+@media(max-width:420px){.headerRow{align-items:flex-start;flex-direction:column}.newFolderForm{grid-template-columns:1fr 1fr}.newFolderForm input{grid-column:1/-1}.interviewRow{align-items:flex-start;flex-direction:column}.interviewView{width:100%;box-sizing:border-box}}
