@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ChangeEvent, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
 import styles from './FormBrandingPrototype.module.css';
 
@@ -8,6 +8,14 @@ type Palette = {
   name: string;
   primary: string;
   accent: string;
+};
+
+type SavedBranding = {
+  paletteName?: string;
+  primary?: string;
+  accent?: string;
+  logoUrl?: string;
+  logoName?: string;
 };
 
 const PALETTES: Palette[] = [
@@ -40,6 +48,7 @@ function readableText(hex: string) {
 export function FormBrandingPrototype() {
   const searchParams = useSearchParams();
   const requisitionId = searchParams.get('requisitionId');
+  const stage = searchParams.get('stage') || 'round-1';
   const backHref = requisitionId
     ? `/requisitions/${encodeURIComponent(requisitionId)}?view=requisition&tab=interviews`
     : '/';
@@ -48,6 +57,10 @@ export function FormBrandingPrototype() {
   const [paletteName, setPaletteName] = useState(PALETTES[0].name);
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [logoName, setLogoName] = useState('');
+  const [interviewTitle, setInterviewTitle] = useState('Interview Form 1');
+  const [loading, setLoading] = useState(Boolean(requisitionId));
+  const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle');
 
   const primaryText = useMemo(() => readableText(primary), [primary]);
   const previewStyle = {
@@ -56,10 +69,49 @@ export function FormBrandingPrototype() {
     '--form-primary-text': primaryText
   } as CSSProperties;
 
+  useEffect(() => {
+    if (!requisitionId) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    async function loadDesign() {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/requisitions/${encodeURIComponent(requisitionId!)}/interview-branding?stage=${encodeURIComponent(stage)}`, { cache: 'no-store' });
+        if (!response.ok) throw new Error('Unable to load saved design.');
+        const result = await response.json();
+        if (cancelled) return;
+        const branding = (result?.interview?.branding ?? {}) as SavedBranding;
+        setInterviewTitle(String(result?.interview?.title || 'Interview Form 1'));
+        if (branding.primary && branding.accent) {
+          setPrimary(branding.primary);
+          setAccent(branding.accent);
+          setPaletteName(branding.paletteName || 'Custom Colors');
+          setLogoUrl(branding.logoUrl || '');
+          setLogoName(branding.logoName || '');
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void loadDesign();
+    return () => { cancelled = true; };
+  }, [requisitionId, stage]);
+
+  function markChanged() {
+    setSaveState('idle');
+  }
+
   function choosePalette(palette: Palette) {
     setPaletteName(palette.name);
     setPrimary(palette.primary);
     setAccent(palette.accent);
+    markChanged();
   }
 
   function onLogo(event: ChangeEvent<HTMLInputElement>) {
@@ -71,6 +123,7 @@ export function FormBrandingPrototype() {
       if (typeof reader.result === 'string') {
         setLogoUrl(reader.result);
         setLogoName(file.name);
+        markChanged();
       }
     };
     reader.readAsDataURL(file);
@@ -80,6 +133,31 @@ export function FormBrandingPrototype() {
     choosePalette(PALETTES[0]);
     setLogoUrl('');
     setLogoName('');
+    markChanged();
+  }
+
+  async function saveDesign() {
+    if (!requisitionId || saving) return;
+    setSaving(true);
+    setSaveState('idle');
+    try {
+      const response = await fetch(`/api/requisitions/${encodeURIComponent(requisitionId)}/interview-branding`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stage,
+          branding: { paletteName, primary, accent, logoUrl, logoName }
+        })
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error || 'Unable to save design.');
+      setSaveState('saved');
+    } catch (error) {
+      console.error(error);
+      setSaveState('error');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -87,23 +165,29 @@ export function FormBrandingPrototype() {
       <section className={styles.intro}>
         <div className={styles.introRow}>
           <div>
-            <span className={styles.eyebrow}>PRE-PRODUCTION EXPERIMENT</span>
+            <span className={styles.eyebrow}>INTERVIEW FORM DESIGN</span>
             <h1>Interview Form Designer</h1>
           </div>
           <a className={styles.backLink} href={backHref}>← Back to Interviews</a>
         </div>
-        <p>Customize this interview form only. Nothing here changes the Stapphire workspace or your production interview setup.</p>
+        <p>Customize this interview form only. Your design is applied to this form, not the Stapphire workspace.</p>
       </section>
 
       <div className={styles.workspace}>
         <aside className={styles.controls}>
           <div className={styles.controlHeader}>
             <div>
-              <span className={styles.eyebrow}>INTERVIEW FORM 1</span>
+              <span className={styles.eyebrow}>{interviewTitle.toUpperCase()}</span>
               <h2>Designer</h2>
             </div>
-            <button type="button" className={styles.reset} onClick={reset}>Reset</button>
+            <div className={styles.controlActions}>
+              <button type="button" className={styles.reset} onClick={reset} disabled={loading || saving}>Reset</button>
+              <button type="button" className={styles.saveDesign} onClick={saveDesign} disabled={!requisitionId || loading || saving}>
+                {saving ? 'Saving…' : saveState === 'saved' ? '✓ Design Saved' : 'Save Design'}
+              </button>
+            </div>
           </div>
+          {saveState === 'error' && <p className={styles.saveError}>Design could not be saved. Please try again.</p>}
 
           <div className={styles.controlGroup}>
             <label>Logo</label>
@@ -113,7 +197,7 @@ export function FormBrandingPrototype() {
               <span>{logoName || 'Upload logo'}</span>
               <small>PNG, JPG, WEBP or SVG</small>
             </label>
-            {logoUrl && <button type="button" className={styles.removeLogo} onClick={() => { setLogoUrl(''); setLogoName(''); }}>Remove logo</button>}
+            {logoUrl && <button type="button" className={styles.removeLogo} onClick={() => { setLogoUrl(''); setLogoName(''); markChanged(); }}>Remove logo</button>}
           </div>
 
           <div className={styles.controlGroup}>
@@ -149,14 +233,14 @@ export function FormBrandingPrototype() {
               <label>
                 <span>Primary</span>
                 <div className={styles.colorInput}>
-                  <input type="color" value={primary} onChange={(event) => { setPaletteName('Custom Colors'); setPrimary(event.target.value); }} />
+                  <input type="color" value={primary} onChange={(event) => { setPaletteName('Custom Colors'); setPrimary(event.target.value); markChanged(); }} />
                   <code>{primary.toUpperCase()}</code>
                 </div>
               </label>
               <label>
                 <span>Accent</span>
                 <div className={styles.colorInput}>
-                  <input type="color" value={accent} onChange={(event) => { setPaletteName('Custom Colors'); setAccent(event.target.value); }} />
+                  <input type="color" value={accent} onChange={(event) => { setPaletteName('Custom Colors'); setAccent(event.target.value); markChanged(); }} />
                   <code>{accent.toUpperCase()}</code>
                 </div>
               </label>
@@ -175,7 +259,7 @@ export function FormBrandingPrototype() {
               <span className={styles.eyebrow}>LIVE PREVIEW</span>
               <strong>What the interviewer will see</strong>
             </div>
-            <span className={styles.previewBadge}>Preview only</span>
+            <span className={styles.previewBadge}>{saveState === 'saved' ? 'Saved' : 'Preview'}</span>
           </div>
 
           <div className={styles.formPage} style={previewStyle}>
@@ -188,7 +272,7 @@ export function FormBrandingPrototype() {
                 )}
                 <span className={styles.formPreviewLabel}>INTERVIEW EVALUATION</span>
               </div>
-              <h2>Interview Form 1 — Financial Analyst</h2>
+              <h2>{interviewTitle} — Financial Analyst</h2>
               <div className={styles.formContext}>
                 <span><strong>Candidate</strong> Jordan Taylor</span>
                 <span><strong>Progress</strong> 0 of 4 ratings</span>
