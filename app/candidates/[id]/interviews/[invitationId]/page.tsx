@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { CompletedInterviewActions } from '@/components/CompletedInterviewActions';
+import { AutoPrint } from '@/components/AutoPrint';
 import styles from './readOnlyInterview.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -33,9 +35,11 @@ function submittedTimestamp(iso: string | null) {
 }
 
 export default async function CompletedInterviewPage({
-  params
+  params,
+  searchParams
 }: {
   params: { id: string; invitationId: string };
+  searchParams?: { print?: string };
 }) {
   const { data: invitation, error } = await supabaseAdmin
     .from('phase1_interview_invitations')
@@ -58,12 +62,17 @@ export default async function CompletedInterviewPage({
   const submission = (invitation.submission_payload ?? {}) as SubmissionPayload;
   const questions = Array.isArray(snapshot.questions) ? snapshot.questions : [];
   const ratings = submission.ratings ?? {};
+  const href = `/candidates/${params.id}/interviews/${params.invitationId}`;
 
   return (
     <main className={styles.page}>
+      {searchParams?.print === '1' && <AutoPrint />}
       <div className={styles.topRow}>
         <a href={`/candidates/${params.id}`} className={styles.back}>← Back to candidate</a>
-        <span className={styles.locked}>READ ONLY</span>
+        <div className={styles.topActions}>
+          <CompletedInterviewActions href={href} />
+          <span className={styles.locked}>READ ONLY</span>
+        </div>
       </div>
 
       <header className={styles.header}>
