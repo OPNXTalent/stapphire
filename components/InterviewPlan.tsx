@@ -65,7 +65,7 @@ function cloneBankQuestion(question: BankQuestion): Question {
 
 function starterRounds(): InterviewRound[] {
   return [
-    { id: 'round-1', stage: 'round-1', title: 'Interview', bankStage: 'round-1' }
+    { id: 'round-1', stage: 'round-1', title: 'Interview Form 1', bankStage: 'round-1' }
   ];
 }
 
