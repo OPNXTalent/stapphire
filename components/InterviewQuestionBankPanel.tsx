@@ -273,14 +273,20 @@ export function InterviewQuestionBankPanel({
               type="button"
               className={styles.headerManageButton}
               onClick={() => {
-                setAreaPickerOpen(true);
-                setManagingAreas(true);
+                if (managingAreas && areaPickerOpen) {
+                  setManagingAreas(false);
+                  setAreaPickerOpen(false);
+                } else {
+                  setAreaPickerOpen(true);
+                  setManagingAreas(true);
+                }
               }}
+              aria-pressed={managingAreas && areaPickerOpen}
             >
               Manage AOE
             </button>
           </div>
-          <button type="button" className={styles.areaPickerButton} onClick={() => { setManagingAreas(false); setAreaPickerOpen((open) => !open); }} aria-expanded={areaPickerOpen}>
+          <button type="button" className={styles.areaPickerButton} onClick={() => { setManagingAreas(false); setAreaPickerOpen((open) => !open); }} aria-expanded={areaPickerOpen && !managingAreas}>
             {selectedAreas.length ? `AOE (${selectedAreas.length})` : 'AOE (optional)'} ▾
           </button>
           {areaPickerOpen && (
@@ -298,7 +304,6 @@ export function InterviewQuestionBankPanel({
                 <div className={styles.manager}>
                   <div className={styles.managerHeading}>
                     <strong>Manage AOE</strong>
-                    <button type="button" onClick={() => setManagingAreas(false)}>Back</button>
                   </div>
                   <p>Standard AOE can be hidden or restored. Custom AOE can be added or removed.</p>
                   <div className={styles.customAdd}>
