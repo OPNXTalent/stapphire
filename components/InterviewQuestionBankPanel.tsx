@@ -276,7 +276,7 @@ export function InterviewQuestionBankPanel({
       <div className={styles.generator}>
         <div className={styles.areaPicker} ref={pickerRef}>
           <div className={styles.panelHeader}>
-            <h3>Question Bank</h3>
+            <h3>Question Bank <span className={styles.bankCount}>{availableQuestions.length}</span></h3>
             <button
               type="button"
               className={styles.headerManageButton}
