@@ -7,6 +7,7 @@ import {
   type BankQuestion,
   type InterviewStageId
 } from '@/lib/interviewQuestionBank';
+import { AOE_PREFERENCES_CHANGED_EVENT } from '@/lib/aoePreferences';
 import {
   INTERVIEW_BANK_ADD_EVENT,
   INTERVIEW_BANK_DRAG_MIME,
@@ -117,6 +118,7 @@ export function InterviewPlan({
   const [rounds, setRounds] = useState<InterviewRound[]>(() => starterRounds());
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
   const [questionsByRound, setQuestionsByRound] = useState<Record<string, Question[]>>(() => starterQuestions(bank));
+  const [availableAreas, setAvailableAreas] = useState<string[]>([...AREAS_OF_EVALUATION]);
   const [openAreaId, setOpenAreaId] = useState<string | null>(null);
   const [draggedQuestionId, setDraggedQuestionId] = useState<string | null>(null);
   const [draggedRoundId, setDraggedRoundId] = useState<string | null>(null);
@@ -134,6 +136,30 @@ export function InterviewPlan({
     () => new Set(questions.map((question) => question.sourceId).filter(Boolean) as string[]),
     [questions]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadAreas() {
+      try {
+        const response = await fetch('/api/aoe-preferences', { cache: 'no-store' });
+        if (!response.ok) return;
+        const result = await response.json();
+        if (!cancelled && Array.isArray(result.activeAreas)) setAvailableAreas(result.activeAreas);
+      } catch {
+        // Canonical AOE remain available if preferences cannot be loaded.
+      }
+    }
+    function syncAreas(event: Event) {
+      const detail = (event as CustomEvent<{ activeAreas?: string[] }>).detail;
+      if (Array.isArray(detail?.activeAreas)) setAvailableAreas(detail.activeAreas);
+    }
+    void loadAreas();
+    window.addEventListener(AOE_PREFERENCES_CHANGED_EVENT, syncAreas);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(AOE_PREFERENCES_CHANGED_EVENT, syncAreas);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -521,7 +547,7 @@ export function InterviewPlan({
                       ))}
                       {openAreaId === question.id && (
                         <div className={styles.areaMenu}>
-                          {AREAS_OF_EVALUATION.map((area) => {
+                          {availableAreas.map((area) => {
                             const checked = question.areas.includes(area);
                             return (
                               <label className={styles.areaOption} key={area}>
