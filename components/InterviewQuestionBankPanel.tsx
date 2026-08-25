@@ -308,12 +308,12 @@ export function InterviewQuestionBankPanel({
               <option value="">All Question Types</option>
               {INTERVIEW_QUESTION_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
             </select>
-            <span className={styles.dropdownChevron} aria-hidden="true">⌄</span>
+            <span className={styles.dropdownChevron} aria-hidden="true">▾</span>
           </div>
 
           <button type="button" className={styles.areaPickerButton} onClick={() => { setManagingAreas(false); setAreaPickerOpen((open) => !open); }} aria-expanded={areaPickerOpen && !managingAreas}>
             <span>{selectedAreas.length ? `AOE (${selectedAreas.length})` : 'AOE (optional)'}</span>
-            <span className={styles.dropdownChevron} aria-hidden="true">⌄</span>
+            <span className={styles.dropdownChevron} aria-hidden="true">▾</span>
           </button>
           {areaPickerOpen && (
             <div className={styles.areaMenu}>
@@ -357,15 +357,14 @@ export function InterviewQuestionBankPanel({
           )}
         </div>
 
-        <button type="button" className={styles.generateButton} onClick={generateMore} disabled={generating}>
-          {generating ? 'Generating…' : 'Generate 5 Questions · 1 QC'}
-        </button>
-        {selectedQuestionType && <p className={styles.generatorHint}>{selectedQuestionType}</p>}
         {selectedAreas.length > 0 && (
           <div className={styles.chips}>
             {selectedAreas.map((area) => <span key={area}>{area}</span>)}
           </div>
         )}
+        <button type="button" className={styles.generateButton} onClick={generateMore} disabled={generating}>
+          {generating ? 'Generating…' : 'Generate 5 Questions · 1 QC'}
+        </button>
         {error && <p className={styles.error}>{error}</p>}
       </div>
 
