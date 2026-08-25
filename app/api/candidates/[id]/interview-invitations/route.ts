@@ -15,6 +15,14 @@ type InvitationRow = {
   submitted_at: string | null;
 };
 
+type FormBranding = {
+  paletteName?: string;
+  primary?: string;
+  accent?: string;
+  logoUrl?: string;
+  logoName?: string;
+};
+
 function summarize(rows: InvitationRow[]) {
   const result: Record<string, { participants: number; submitted: number }> = {};
   for (const row of rows) {
@@ -146,13 +154,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
     let snapshot: {
       stage: string;
       title: string;
+      branding?: FormBranding;
       questions: Array<{ id: string; sourceId?: string; text: string; areas: string[] }>;
     };
 
     if (plan) {
       const { data: round, error: roundError } = await supabaseAdmin
         .from('phase1_interview_rounds')
-        .select('id, stage, title')
+        .select('id, stage, title, branding')
         .eq('plan_id', plan.id)
         .eq('stage', stage)
         .maybeSingle();
@@ -174,6 +183,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       snapshot = {
         stage: round.stage,
         title: round.title,
+        branding: (round.branding ?? {}) as FormBranding,
         questions: (questions ?? []).map((question) => ({
           id: question.id,
           ...(question.source_id ? { sourceId: question.source_id } : {}),
