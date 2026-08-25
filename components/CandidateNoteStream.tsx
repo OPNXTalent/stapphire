@@ -31,14 +31,9 @@ export function CandidateNoteStream({
   fill?: boolean;
 }) {
   const [notes, setNotes] = useState<Note[] | null>(null);
-  const [authorName, setAuthorName] = useState('');
   const [body, setBody] = useState('');
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setAuthorName(localStorage.getItem('stapphire-note-author') || '');
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,9 +60,8 @@ export function CandidateNoteStream({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const trimmedName = authorName.trim();
     const trimmedBody = body.trim();
-    if (!trimmedName || !trimmedBody) return;
+    if (!trimmedBody) return;
 
     setPosting(true);
     setError(null);
@@ -75,13 +69,12 @@ export function CandidateNoteStream({
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ author_name: trimmedName, body: trimmedBody })
+        body: JSON.stringify({ body: trimmedBody })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Unable to post note.');
       setNotes((current) => [...(current ?? []), data.note]);
       setBody('');
-      localStorage.setItem('stapphire-note-author', trimmedName);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to post note.');
     } finally {
@@ -107,14 +100,6 @@ export function CandidateNoteStream({
       </div>
 
       <form className={styles.form} onSubmit={submit}>
-        <input
-          type="text"
-          placeholder="Your name"
-          value={authorName}
-          onChange={(event) => setAuthorName(event.target.value)}
-          maxLength={80}
-          required
-        />
         <textarea
           placeholder={placeholder}
           value={body}
