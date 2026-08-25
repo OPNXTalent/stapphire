@@ -28,7 +28,13 @@ export default async function RequisitionPage({params}:{params:{id:string}}){
   const dnsCandidates:DNSCandidate[]=(dnsList||[]).map(c=>({id:c.id,name:c.full_name,deletedAt:c.deleted_at as string}));
 
   const hiringCriteriaView = <HiringCriteria model={hiringCriteria} requisitionId={req.id} sourceIsStale={sourceIsNewer(req.job_description_updated_at,hiringCriteria?.generatedAt)}/>;
-  const interviewsView = <InterviewPlan requisitionId={req.id} positionTitle={req.title} candidateNames={matrixCandidates.map(candidate=>candidate.name)}/>;
+  const interviewsView = (
+    <div style={{position:'relative'}}>
+      <style>{`.formDesignerLink{position:absolute;right:0;top:2px;z-index:2;padding:6px 8px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--muted);font-size:10.5px;font-weight:700;text-decoration:none;transition:border-color .15s ease,background .15s ease,color .15s ease}.formDesignerLink:hover,.formDesignerLink:focus-visible{border-color:var(--sapphire-2);background:#fff;color:var(--sapphire);outline:none}`}</style>
+      <a href={`/form-branding-preview?requisitionId=${encodeURIComponent(req.id)}`} className="formDesignerLink">Form Designer</a>
+      <InterviewPlan requisitionId={req.id} positionTitle={req.title} candidateNames={matrixCandidates.map(candidate=>candidate.name)}/>
+    </div>
+  );
   const candidatesView = <CandidateMatrix candidates={matrixCandidates} positionTitle={req.title} requisitionId={req.id}/>;
 
   return <RequisitionViewToggle title={req.title} requisitionId={req.id} jobDescription={req.job_description} dnsAction={<DNSBin candidates={dnsCandidates}/>} hiringCriteriaView={hiringCriteriaView} interviewsView={interviewsView} candidatesView={candidatesView}/>;
