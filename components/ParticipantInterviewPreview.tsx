@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { buildQuestionBank, INTERVIEW_STAGES, type InterviewStageId } from '@/lib/interviewQuestionBank';
+import { buildQuestionBank, INTERVIEW_STAGES } from '@/lib/interviewQuestionBank';
 import { StapphireBrand } from '@/components/StapphireBrand';
 import styles from './ParticipantInterviewPreview.module.css';
 
@@ -10,6 +10,7 @@ type FormQuestion = { id: string; text: string; areas: string[] };
 
 export function ParticipantInterviewPreview({
   stage,
+  interviewTitle,
   candidateName,
   positionTitle,
   candidateId,
@@ -18,7 +19,8 @@ export function ParticipantInterviewPreview({
   participantName = '',
   shareEnabled = true
 }: {
-  stage: InterviewStageId;
+  stage: string;
+  interviewTitle?: string;
   candidateName: string;
   positionTitle: string;
   candidateId?: string;
@@ -34,7 +36,7 @@ export function ParticipantInterviewPreview({
       .map((question) => ({ id: question.id, text: question.text, areas: question.areas }));
   }, [positionTitle, questions, stage]);
 
-  const stageLabel = INTERVIEW_STAGES.find((item) => item.id === stage)?.label || 'Interview';
+  const stageLabel = interviewTitle || INTERVIEW_STAGES.find((item) => item.id === stage)?.label || 'Interview';
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [comments, setComments] = useState('');
   const [recommendation, setRecommendation] = useState<InterviewRecommendation>('');
