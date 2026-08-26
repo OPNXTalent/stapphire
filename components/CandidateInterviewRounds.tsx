@@ -17,8 +17,9 @@ type AggregateRow = {
 
 type ParticipantAssessment = {
   contributor: string;
-  recommendation: 'Proceed' | 'Decline' | 'Undecided - Need more information';
+  recommendation: 'Proceed' | 'Decline' | 'Undecided - Need more information' | '';
   comments: string;
+  questionComments: Array<{ question: string; comment: string }>;
 };
 
 type InterviewRound = {
@@ -31,7 +32,17 @@ type InterviewRound = {
   assessments: ParticipantAssessment[];
 };
 
-type PlanRound = { stage: string; title: string; areas: string[] };
+type PlanRound = {
+  stage: string;
+  title: string;
+  areas: string[];
+  participants?: number;
+  submitted?: number;
+  overall?: number | null;
+  rows?: AggregateRow[];
+  assessments?: ParticipantAssessment[];
+};
+
 type PrintBrandingPayload = {
   defaultBranding?: ClientPrintBranding;
   byStage?: Record<string, ClientPrintBranding>;
@@ -83,7 +94,7 @@ export function CandidateInterviewRounds({
   useEffect(() => {
     let active = true;
 
-    async function loadInvitationCounts() {
+    async function loadInvitationResults() {
       try {
         const response = await fetch(`/api/candidates/${candidateId}/interview-invitations`, { cache: 'no-store' });
         if (!response.ok) return;
@@ -96,15 +107,15 @@ export function CandidateInterviewRounds({
           setPlanRounds(legacyRounds(positionTitle));
         }
       } catch {
-        // Keep the current plan/count state if invitation metadata cannot be loaded.
+        // Keep the current interview record if results cannot be refreshed.
       }
     }
 
-    void loadInvitationCounts();
-    window.addEventListener('focus', loadInvitationCounts);
+    void loadInvitationResults();
+    window.addEventListener('focus', loadInvitationResults);
     return () => {
       active = false;
-      window.removeEventListener('focus', loadInvitationCounts);
+      window.removeEventListener('focus', loadInvitationResults);
     };
   }, [candidateId, positionTitle]);
 
@@ -127,11 +138,13 @@ export function CandidateInterviewRounds({
   const rounds = useMemo<InterviewRound[]>(() => planRounds.map((round) => ({
     id: round.stage,
     title: round.title,
-    participants: invitationCounts[round.stage]?.participants ?? 0,
-    submitted: invitationCounts[round.stage]?.submitted ?? 0,
-    overall: null,
-    rows: (round.areas ?? []).map((area) => ({ area, timesRated: 0, average: null })),
-    assessments: []
+    participants: round.participants ?? invitationCounts[round.stage]?.participants ?? 0,
+    submitted: round.submitted ?? invitationCounts[round.stage]?.submitted ?? 0,
+    overall: typeof round.overall === 'number' ? round.overall : null,
+    rows: Array.isArray(round.rows)
+      ? round.rows
+      : (round.areas ?? []).map((area) => ({ area, timesRated: 0, average: null })),
+    assessments: Array.isArray(round.assessments) ? round.assessments : []
   })), [invitationCounts, planRounds]);
 
   function interviewUrl(stage: string) {
@@ -191,6 +204,28 @@ export function CandidateInterviewRounds({
     );
   }
 
+  function renderAssessment(assessment: ParticipantAssessment, key: string) {
+    return (
+      <article className={styles.assessment} key={key}>
+        <div className={styles.assessmentHeader}>
+          <strong>{assessment.contributor}</strong>
+          <span>{assessment.recommendation || 'No recommendation'}</span>
+        </div>
+        {assessment.comments && <p>{assessment.comments}</p>}
+        {assessment.questionComments.length > 0 && (
+          <div className={styles.questionCommentList}>
+            {assessment.questionComments.map((item, index) => (
+              <div className={styles.questionCommentItem} key={`${key}-comment-${index}`}>
+                <strong>{item.question}</strong>
+                <p>{item.comment}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </article>
+    );
+  }
+
   if (view === null) {
     return (
       <section className={styles.records} aria-label={`${candidateName} candidate record`}>
@@ -214,7 +249,7 @@ export function CandidateInterviewRounds({
           <span>Evaluation</span>
         </button>
         <div className="candidate-record-actions">
-          <button type="button" className="candidate-record-print-action" onClick={() => printStapphireDocument('candidate-evaluation')}>Print / PDF</button>
+          <button type="button" className="candidate-record-print-action" onClick={() => printStapphireDocument('candidate-evaluation')}>Print</button>
         </div>
         <div className={`${styles.canvas} client-branded-evaluation-print`} style={brandingStyle(branding)}>
           <ClientPrintHeader branding={branding} documentTitle="Candidate Evaluation" />
@@ -233,7 +268,7 @@ export function CandidateInterviewRounds({
     <section className={styles.records}>
       {renderInterviewBar(round, true)}
       <div className="candidate-record-actions">
-        <button type="button" className="candidate-record-print-action" onClick={() => printStapphireDocument('interview-summary')}>Print / PDF</button>
+        <button type="button" className="candidate-record-print-action" onClick={() => printStapphireDocument('interview-summary')}>Print</button>
       </div>
       <div className={`${styles.aggregateCanvas} interview-summary-print-document print-document`} style={brandingStyle(branding)}>
         <ClientPrintHeader branding={branding} documentTitle="Interview Summary" />
@@ -276,15 +311,7 @@ export function CandidateInterviewRounds({
           {assessmentsVisible && (
             round.assessments.length > 0 ? (
               <div className={styles.assessmentList}>
-                {round.assessments.map((assessment) => (
-                  <article className={styles.assessment} key={assessment.contributor}>
-                    <div className={styles.assessmentHeader}>
-                      <strong>{assessment.contributor}</strong>
-                      <span>{assessment.recommendation}</span>
-                    </div>
-                    <p>{assessment.comments}</p>
-                  </article>
-                ))}
+                {round.assessments.map((assessment, index) => renderAssessment(assessment, `${assessment.contributor}-${index}`))}
               </div>
             ) : (
               <div className={styles.assessmentEmpty}>No participant assessments submitted yet.</div>
@@ -293,15 +320,9 @@ export function CandidateInterviewRounds({
         </section>
         <div className="interview-summary-print-assessments">
           <h2>Participant Assessments</h2>
-          {round.assessments.length > 0 ? round.assessments.map((assessment) => (
-            <article className={styles.assessment} key={`print-${assessment.contributor}`}>
-              <div className={styles.assessmentHeader}>
-                <strong>{assessment.contributor}</strong>
-                <span>{assessment.recommendation}</span>
-              </div>
-              <p>{assessment.comments}</p>
-            </article>
-          )) : <p>No participant assessments submitted yet.</p>}
+          {round.assessments.length > 0
+            ? round.assessments.map((assessment, index) => renderAssessment(assessment, `print-${assessment.contributor}-${index}`))
+            : <p>No participant assessments submitted yet.</p>}
         </div>
       </div>
     </section>
