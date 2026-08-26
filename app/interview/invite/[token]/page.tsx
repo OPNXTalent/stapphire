@@ -8,6 +8,7 @@ type SnapshotQuestion = {
   id: string;
   text: string;
   areas: string[];
+  commentBox?: boolean;
 };
 
 type FormBranding = {
