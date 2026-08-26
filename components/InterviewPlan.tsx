@@ -42,6 +42,7 @@ type PersistedRound = {
     sourceId?: string;
     text: string;
     areas: string[];
+    commentBox?: boolean;
   }>;
 };
 
@@ -85,7 +86,8 @@ function serializePlan(rounds: InterviewRound[], questionsByRound: Record<string
       questions: (questionsByRound[round.id] || []).map((question) => ({
         ...(question.sourceId ? { sourceId: question.sourceId } : {}),
         text: question.text,
-        areas: question.areas
+        areas: question.areas,
+        commentBox: Boolean(question.commentBox)
       }))
     }))
   });
@@ -196,7 +198,8 @@ export function InterviewPlan({
                   id: question.id || localId(),
                   ...(question.sourceId ? { sourceId: question.sourceId } : {}),
                   text: String(question.text ?? ''),
-                  areas: Array.isArray(question.areas) ? [...question.areas] : []
+                  areas: Array.isArray(question.areas) ? [...question.areas] : [],
+                  commentBox: Boolean(question.commentBox)
                 }))
               : [];
           }
@@ -521,6 +524,8 @@ export function InterviewPlan({
     );
   }
 
+  const formDesignerHref = `/form-branding-preview?requisitionId=${encodeURIComponent(requisitionId)}&stage=${encodeURIComponent(selectedRound.stage)}`;
+
   return (
     <section className={styles.plan} data-requisition-id={requisitionId} data-interview-plan="selected">
       {renderHeading()}
@@ -531,6 +536,7 @@ export function InterviewPlan({
           <div className={styles.roundSetup}>
             <label htmlFor="interview-name">Interview name</label>
             <input id="interview-name" value={selectedRound.title} maxLength={200} onChange={(event) => renameInterview(event.target.value)} />
+            <a className={styles.formDesignerLink} href={formDesignerHref}>Form Designer</a>
             <button type="button" className={styles.removeInterview} onClick={removeInterview}>Remove Interview</button>
           </div>
 
