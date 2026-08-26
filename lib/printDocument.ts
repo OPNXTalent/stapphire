@@ -1,4 +1,4 @@
-export type StapphirePrintDocument = 'candidate-evaluation' | 'job-description';
+export type StapphirePrintDocument = 'candidate-evaluation' | 'job-description' | 'interview-summary';
 
 export function printStapphireDocument(documentType: StapphirePrintDocument): void {
   document.body.dataset.printDocument = documentType;
