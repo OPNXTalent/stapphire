@@ -17,14 +17,9 @@ function timeAgo(iso: string): string {
 
 export function RequisitionNotes({ requisitionId }: { requisitionId: string }) {
   const [notes, setNotes] = useState<Note[] | null>(null);
-  const [authorName, setAuthorName] = useState('');
   const [body, setBody] = useState('');
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setAuthorName(localStorage.getItem('stapphire-note-author') || '');
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,9 +38,8 @@ export function RequisitionNotes({ requisitionId }: { requisitionId: string }) {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const trimmedName = authorName.trim();
     const trimmedBody = body.trim();
-    if (!trimmedName || !trimmedBody) return;
+    if (!trimmedBody) return;
 
     setPosting(true);
     setError(null);
@@ -53,13 +47,12 @@ export function RequisitionNotes({ requisitionId }: { requisitionId: string }) {
       const res = await fetch(`/api/requisitions/${requisitionId}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ author_name: trimmedName, body: trimmedBody })
+        body: JSON.stringify({ author_name: 'Team member', body: trimmedBody })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Unable to post note.');
       setNotes((prev) => [...(prev ?? []), data.note]);
       setBody('');
-      localStorage.setItem('stapphire-note-author', trimmedName);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to post note.');
     } finally {
@@ -86,14 +79,6 @@ export function RequisitionNotes({ requisitionId }: { requisitionId: string }) {
       </div>
 
       <form className="requisition-notes-form" onSubmit={submit}>
-        <input
-          type="text"
-          placeholder="Your name"
-          value={authorName}
-          onChange={(e) => setAuthorName(e.target.value)}
-          maxLength={80}
-          required
-        />
         <textarea
           placeholder="Leave a note for the hiring team…"
           value={body}
