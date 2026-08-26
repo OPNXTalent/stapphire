@@ -5,7 +5,8 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
-type FormQuestion = { id: string; text: string; areas: string[] };
+type FormQuestion = { id: string; text: string; areas: string[]; commentBox?: boolean };
+type FormBranding = { paletteName?: string; primary?: string; accent?: string; logoUrl?: string; logoName?: string };
 
 export default async function InterviewPreviewPage({
   params,
@@ -19,6 +20,7 @@ export default async function InterviewPreviewPage({
 
   let interviewTitle = INTERVIEW_STAGES.find((item) => item.id === stage)?.label || 'Interview';
   let questions: FormQuestion[] | undefined;
+  let branding: FormBranding | undefined;
 
   if (searchParams.candidateId) {
     const { data: candidate } = await supabaseAdmin
@@ -37,17 +39,18 @@ export default async function InterviewPreviewPage({
       if (plan) {
         const { data: round } = await supabaseAdmin
           .from('phase1_interview_rounds')
-          .select('id, title')
+          .select('id, title, branding')
           .eq('plan_id', plan.id)
           .eq('stage', stage)
           .maybeSingle();
 
         if (!round) notFound();
         interviewTitle = round.title;
+        branding = (round.branding ?? {}) as FormBranding;
 
         const { data: savedQuestions, error } = await supabaseAdmin
           .from('phase1_interview_questions')
-          .select('id, question_text, areas, sort_order')
+          .select('id, question_text, areas, comment_box, sort_order')
           .eq('round_id', round.id)
           .order('sort_order', { ascending: true });
         if (error) throw error;
@@ -55,7 +58,8 @@ export default async function InterviewPreviewPage({
         questions = (savedQuestions ?? []).map((question) => ({
           id: question.id,
           text: question.question_text,
-          areas: question.areas ?? []
+          areas: question.areas ?? [],
+          commentBox: Boolean(question.comment_box)
         }));
       }
     }
@@ -64,7 +68,7 @@ export default async function InterviewPreviewPage({
   if (!questions) {
     const fallback = buildQuestionBank(searchParams.role || 'Position').filter((question) => question.stage === stage);
     if (fallback.length === 0 && !INTERVIEW_STAGES.some((item) => item.id === stage)) notFound();
-    questions = fallback.map((question) => ({ id: question.id, text: question.text, areas: question.areas }));
+    questions = fallback.map((question) => ({ id: question.id, text: question.text, areas: question.areas, commentBox: false }));
   }
 
   return (
@@ -75,6 +79,7 @@ export default async function InterviewPreviewPage({
       positionTitle={searchParams.role || 'Position'}
       candidateId={searchParams.candidateId}
       questions={questions}
+      branding={branding}
     />
   );
 }
