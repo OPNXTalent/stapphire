@@ -1,5 +1,28 @@
+@media screen{
+  .client-print-header,.interview-summary-print-meta,.interview-summary-print-assessments{display:none}
+  .candidate-record-actions{display:flex;justify-content:flex-end;margin:-1px 2px 2px}
+  .candidate-record-print-action{display:inline-flex;align-items:center;justify-content:center;padding:6px 9px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--muted);font-size:10.5px;font-weight:700;line-height:1.2;cursor:pointer}
+  .candidate-record-print-action:hover,.candidate-record-print-action:focus-visible{border-color:var(--sapphire-2);background:#fff;color:var(--sapphire);outline:none}
+}
+
 @media print{
-  .candidate-record-print-action{display:none!important}
+  .candidate-record-actions,.candidate-record-print-action{display:none!important}
+
+  .client-print-header{display:flex!important;visibility:visible!important;align-items:center;justify-content:space-between;gap:18px;margin:0 0 22px;padding:0 0 12px;border-bottom:3px solid var(--client-print-accent,#1e4fd8)}
+  .client-print-brand{display:flex;align-items:center;min-height:34px}
+  .client-print-brand img{display:block;max-width:190px;max-height:48px;width:auto;height:auto;object-fit:contain}
+  .client-print-brand-fallback{color:var(--client-print-primary,#030d26)!important;font:700 13px var(--display);letter-spacing:.04em}
+  .client-print-document-title{margin-left:auto;color:var(--client-print-primary,#030d26)!important;font:700 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+
+  body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print,
+  body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print *{visibility:visible!important}
+  body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print{display:block!important;position:static!important;width:auto!important;max-width:none!important;height:auto!important;min-height:0!important;overflow:visible!important;margin:0!important;padding:.65in .7in .7in!important;background:#fff!important;color:#111!important}
+  body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print .candidate-print-document{position:static!important;inset:auto!important;width:auto!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;box-shadow:none!important;background:#fff!important}
+  body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print .print-document-header{display:none!important}
+  body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print .hero{border-bottom-color:var(--client-print-accent,#1e4fd8)!important}
+  body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print .hero .muted,
+  body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print .match{color:var(--client-print-primary,#030d26)!important}
+
   body[data-print-document="interview-summary"] .candidate-print-document,
   body[data-print-document="interview-summary"] .candidate-print-document *{visibility:hidden!important}
   body[data-print-document="interview-summary"] .interview-summary-print-document,
@@ -7,15 +30,16 @@
   body[data-print-document="interview-summary"] .interview-summary-print-document{display:block!important;position:static!important;width:auto!important;max-width:none!important;height:auto!important;min-height:0!important;overflow:visible!important;margin:0!important;padding:.65in .7in .7in!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;color:#111!important;font-size:10.5pt!important;line-height:1.55!important}
   body[data-print-document="interview-summary"] .matrix-selected-banner,
   body[data-print-document="interview-summary"] .candidate-print-document{display:none!important}
-  .interview-summary-print-meta{display:block!important;margin:18px 0 16px;padding-bottom:14px;border-bottom:1px solid #d5dbea}
-  .interview-summary-print-meta h1{margin:0 0 4px;font-size:24px;line-height:1.2;color:#0b2e6b!important}
+  .interview-summary-print-meta{display:block!important;margin:0 0 18px;padding:0 0 14px;border-bottom:1px solid color-mix(in srgb,var(--client-print-primary,#030d26) 25%,#fff)}
+  .interview-summary-print-meta h1{margin:0 0 4px;font-size:24px;line-height:1.2;color:var(--client-print-primary,#030d26)!important}
   .interview-summary-print-meta p{margin:2px 0;color:#555!important}
+  .interview-summary-print-meta strong{display:block;margin-top:6px;color:var(--client-print-primary,#030d26)!important}
   .interview-summary-print-document [role="table"]{break-inside:avoid;page-break-inside:avoid}
   .interview-summary-print-document button{display:none!important}
   .interview-summary-print-document article{break-inside:avoid;page-break-inside:avoid}
-}
-@media screen{
-  .interview-summary-print-meta{display:none}
-  .candidate-record-print-action{display:inline-flex;align-items:center;justify-content:center;padding:6px 9px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--muted);font-size:10.5px;font-weight:700;line-height:1.2;cursor:pointer}
-  .candidate-record-print-action:hover,.candidate-record-print-action:focus-visible{border-color:var(--sapphire-2);background:#fff;color:var(--sapphire);outline:none}
+  .interview-summary-print-document [role="row"]{border-bottom-color:#d8dce7!important}
+  .interview-summary-print-document [role="row"] strong{color:var(--client-print-primary,#030d26)!important}
+  .interview-summary-print-document .interview-summary-print-assessments{display:block!important;margin-top:22px;border-top:2px solid var(--client-print-accent,#1e4fd8);padding-top:14px}
+  .interview-summary-print-assessments h2{margin:0 0 10px;color:var(--client-print-primary,#030d26)!important}
+  .interview-summary-print-document section[aria-label="Participant interview assessments"]{display:none!important}
 }
