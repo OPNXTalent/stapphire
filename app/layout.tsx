@@ -1,6 +1,7 @@
 import './globals.css';
 import './matrix.css';
 import './candidate-interview-scroll.css';
+import './bottom-clearance.css';
 import { cookies, headers } from 'next/headers';
 import { AppShell } from '@/components/AppShell';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
