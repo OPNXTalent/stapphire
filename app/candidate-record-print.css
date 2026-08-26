@@ -1,4 +1,4 @@
-@page{size:auto;margin:0}
+@page{size:auto;margin:.30in .72in .18in}
 
 @media screen{
   .client-print-header,.client-print-footer,.interview-summary-print-meta,.interview-summary-print-assessments{display:none}
@@ -14,14 +14,14 @@
 
   body[data-print-document="candidate-evaluation"] section:has(>.client-branded-evaluation-print)>:not(.client-branded-evaluation-print),
   body[data-print-document="interview-summary"] section:has(>.interview-summary-print-document)>:not(.interview-summary-print-document){display:none!important}
-  .client-print-frame{display:table!important;width:calc(100% - 1.44in)!important;margin:0 .72in!important;border:0!important;border-collapse:collapse!important;table-layout:fixed!important}
+  .client-print-frame{display:table!important;width:100%!important;margin:0!important;border:0!important;border-collapse:collapse!important;table-layout:fixed!important}
   .client-print-frame>thead{display:table-header-group!important}
   .client-print-frame>tfoot{display:table-footer-group!important}
   .client-print-frame>tbody{display:table-row-group!important}
   .client-print-frame>thead>tr>td,.client-print-frame>tbody>tr>td,.client-print-frame>tfoot>tr>td{padding:0!important;border:0!important;vertical-align:top!important}
   .client-print-frame>thead>tr>td{padding-bottom:.32in!important}
   .client-print-frame>tbody>tr>.client-print-body{padding-top:0!important;padding-bottom:.14in!important}
-  .client-print-header{display:flex!important;visibility:visible!important;height:.78in;box-sizing:border-box;align-items:flex-end;justify-content:space-between;gap:18px;margin:0;padding:.30in 0 10px;border-bottom:2px solid var(--client-print-accent,#1e4fd8)}
+  .client-print-header{display:flex!important;visibility:visible!important;height:.48in;box-sizing:border-box;align-items:flex-end;justify-content:space-between;gap:18px;margin:0;padding:0 0 10px;border-bottom:2px solid var(--client-print-accent,#1e4fd8)}
   .client-print-brand{display:flex;align-items:center;min-height:34px}
   .client-print-brand img{display:block;max-width:170px;max-height:.32in;width:auto;height:auto;object-fit:contain}
   .client-print-brand-fallback{color:var(--client-print-primary,#030d26)!important;font:700 13px var(--display);letter-spacing:.04em}
