@@ -1,0 +1,25 @@
+:root{--workspace-bottom-clearance:72px}
+
+/* Keep the final content of full-height workspaces comfortably above the viewport edge. */
+.workspace-content{padding-bottom:max(110px,calc(var(--workspace-bottom-clearance) + env(safe-area-inset-bottom)))}
+
+.matrix-list,
+.matrix-selected-detail,
+.requisition-tab-panel:not(.job-description-panel),
+.job-description-scroll{
+  padding-bottom:var(--workspace-bottom-clearance);
+  scroll-padding-bottom:var(--workspace-bottom-clearance);
+}
+
+.side-content{
+  padding-bottom:max(32px,calc(20px + env(safe-area-inset-bottom)));
+  scroll-padding-bottom:32px;
+}
+
+@media(max-width:860px){
+  .workspace-content{padding-bottom:max(90px,calc(var(--workspace-bottom-clearance) + env(safe-area-inset-bottom)))}
+}
+
+@media(max-width:560px){
+  .workspace-content{padding-bottom:max(80px,calc(56px + env(safe-area-inset-bottom)))}
+}
