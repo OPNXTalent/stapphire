@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { buildQuestionBank } from '@/lib/interviewQuestionBank';
 import { printStapphireDocument } from '@/lib/printDocument';
-import { ClientPrintHeader, type ClientPrintBranding } from '@/components/ClientPrintHeader';
+import { ClientPrintFrame, type ClientPrintBranding } from '@/components/ClientPrintHeader';
 import styles from './CandidateInterviewRounds.module.css';
 
 type ViewId = 'evaluation' | string | null;
@@ -263,8 +263,7 @@ export function CandidateInterviewRounds({
           <button type="button" className="candidate-record-print-action" onClick={() => printStapphireDocument('candidate-evaluation')}>Print</button>
         </div>
         <div className={`${styles.canvas} client-branded-evaluation-print`} style={brandingStyle(branding)}>
-          <ClientPrintHeader branding={branding} documentTitle="Candidate Evaluation" />
-          {evaluationContent}
+          <ClientPrintFrame branding={branding} documentTitle="Candidate Evaluation">{evaluationContent}</ClientPrintFrame>
         </div>
       </section>
     );
@@ -282,7 +281,7 @@ export function CandidateInterviewRounds({
         <button type="button" className="candidate-record-print-action" onClick={() => printStapphireDocument('interview-summary')}>Print</button>
       </div>
       <div className={`${styles.aggregateCanvas} interview-summary-print-document print-document`} style={brandingStyle(branding)}>
-        <ClientPrintHeader branding={branding} documentTitle="Interview Summary" />
+        <ClientPrintFrame branding={branding} documentTitle="Interview Summary">
         <div className="interview-summary-print-meta">
           <h1>{candidateName}</h1>
           <p>{positionTitle}</p>
@@ -335,6 +334,7 @@ export function CandidateInterviewRounds({
             ? round.assessments.map((assessment, index) => renderAssessment(assessment, `print-${assessment.contributor}-${index}`))
             : <p>No participant assessments submitted yet.</p>}
         </div>
+        </ClientPrintFrame>
       </div>
     </section>
   );
