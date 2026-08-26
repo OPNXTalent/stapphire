@@ -1,7 +1,7 @@
-@page{margin:.7in .7in .8in}
+@page candidate-record{size:auto;margin:.78in .72in .82in}
 
 @media screen{
-  .client-print-header,.interview-summary-print-meta,.interview-summary-print-assessments{display:none}
+  .client-print-header,.client-print-footer,.interview-summary-print-meta,.interview-summary-print-assessments{display:none}
   .candidate-record-actions{display:flex;justify-content:flex-end;margin:-1px 2px 2px}
   .candidate-record-print-action{display:inline-flex;align-items:center;justify-content:center;padding:6px 9px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--muted);font-size:10.5px;font-weight:700;line-height:1.2;cursor:pointer}
   .candidate-record-print-action:hover,.candidate-record-print-action:focus-visible{border-color:var(--sapphire-2);background:#fff;color:var(--sapphire);outline:none}
@@ -10,15 +10,20 @@
 @media print{
   .candidate-record-actions,.candidate-record-print-action{display:none!important}
 
-  .client-print-header{display:flex!important;visibility:visible!important;align-items:center;justify-content:space-between;gap:18px;margin:0 0 22px;padding:0 0 12px;border-bottom:3px solid var(--client-print-accent,#1e4fd8);break-after:avoid;page-break-after:avoid}
+  .client-branded-evaluation-print,.interview-summary-print-document{page:candidate-record}
+  body[data-print-document="candidate-evaluation"] section:has(>.client-branded-evaluation-print)>:not(.client-branded-evaluation-print),
+  body[data-print-document="interview-summary"] section:has(>.interview-summary-print-document)>:not(.interview-summary-print-document){display:none!important}
+  .client-print-header{display:flex!important;visibility:visible!important;position:fixed;top:-.56in;right:0;left:0;height:.38in;box-sizing:border-box;align-items:center;justify-content:space-between;gap:18px;margin:0;padding:0 0 8px;border-bottom:2px solid var(--client-print-accent,#1e4fd8)}
   .client-print-brand{display:flex;align-items:center;min-height:34px}
-  .client-print-brand img{display:block;max-width:190px;max-height:48px;width:auto;height:auto;object-fit:contain}
+  .client-print-brand img{display:block;max-width:170px;max-height:.32in;width:auto;height:auto;object-fit:contain}
   .client-print-brand-fallback{color:var(--client-print-primary,#030d26)!important;font:700 13px var(--display);letter-spacing:.04em}
   .client-print-document-title{margin-left:auto;color:var(--client-print-primary,#030d26)!important;font:700 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+  .client-print-footer{display:flex!important;visibility:visible!important;position:fixed;right:0;bottom:-.58in;left:0;height:.25in;box-sizing:border-box;align-items:flex-end;justify-content:space-between;gap:18px;padding-top:7px;border-top:1px solid color-mix(in srgb,var(--client-print-primary,#030d26) 24%,#fff);color:#666!important;font:600 8px var(--mono);letter-spacing:.05em;text-transform:uppercase}
 
   body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print,
   body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print *{visibility:visible!important}
-  body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print{display:block!important;position:absolute!important;inset:0 auto auto 0!important;width:100%!important;max-width:none!important;height:auto!important;min-height:0!important;overflow:visible!important;margin:0!important;padding:0!important;background:#fff!important;color:#111!important}
+  body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print{display:block!important;position:static!important;inset:auto!important;width:auto!important;max-width:none!important;height:auto!important;min-height:0!important;overflow:visible!important;margin:0!important;padding:0!important;background:#fff!important;color:#111!important}
+  body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print~*{display:none!important}
   body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print .candidate-print-document{position:static!important;inset:auto!important;width:auto!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;box-shadow:none!important;background:#fff!important}
   body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print .print-document-header{display:none!important}
   body[data-print-document="candidate-evaluation"] .client-branded-evaluation-print .hero{border-bottom-color:var(--client-print-accent,#1e4fd8)!important;break-after:avoid;page-break-after:avoid}
