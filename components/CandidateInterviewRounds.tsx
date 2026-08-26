@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { buildQuestionBank } from '@/lib/interviewQuestionBank';
+import { printStapphireDocument } from '@/lib/printDocument';
+import { ClientPrintHeader, type ClientPrintBranding } from '@/components/ClientPrintHeader';
 import styles from './CandidateInterviewRounds.module.css';
 
 type ViewId = 'evaluation' | string | null;
@@ -30,6 +32,10 @@ type InterviewRound = {
 };
 
 type PlanRound = { stage: string; title: string; areas: string[] };
+type PrintBrandingPayload = {
+  defaultBranding?: ClientPrintBranding;
+  byStage?: Record<string, ClientPrintBranding>;
+};
 
 function legacyRounds(positionTitle: string): PlanRound[] {
   return [
@@ -51,6 +57,12 @@ function legacyRounds(positionTitle: string): PlanRound[] {
   ];
 }
 
+function brandingStyle(branding?: ClientPrintBranding): CSSProperties {
+  const primary = /^#[0-9a-fA-F]{6}$/.test(branding?.primary ?? '') ? branding!.primary! : '#030d26';
+  const accent = /^#[0-9a-fA-F]{6}$/.test(branding?.accent ?? '') ? branding!.accent! : '#1e4fd8';
+  return { '--client-print-primary': primary, '--client-print-accent': accent } as CSSProperties;
+}
+
 export function CandidateInterviewRounds({
   candidateId,
   candidateName,
@@ -66,6 +78,7 @@ export function CandidateInterviewRounds({
   const [invitationCounts, setInvitationCounts] = useState<Record<string, InvitationCount>>({});
   const [planRounds, setPlanRounds] = useState<PlanRound[]>(() => legacyRounds(positionTitle));
   const [assessmentOpen, setAssessmentOpen] = useState<Record<string, boolean>>({});
+  const [printBranding, setPrintBranding] = useState<PrintBrandingPayload>({});
 
   useEffect(() => {
     let active = true;
@@ -94,6 +107,22 @@ export function CandidateInterviewRounds({
       window.removeEventListener('focus', loadInvitationCounts);
     };
   }, [candidateId, positionTitle]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadPrintBranding() {
+      try {
+        const response = await fetch(`/api/candidates/${candidateId}/print-branding`, { cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json() as PrintBrandingPayload;
+        if (active) setPrintBranding(payload ?? {});
+      } catch {
+        // Printing remains available with neutral fallback styling.
+      }
+    }
+    void loadPrintBranding();
+    return () => { active = false; };
+  }, [candidateId]);
 
   const rounds = useMemo<InterviewRound[]>(() => planRounds.map((round) => ({
     id: round.stage,
@@ -178,12 +207,19 @@ export function CandidateInterviewRounds({
   }
 
   if (view === 'evaluation') {
+    const branding = printBranding.defaultBranding;
     return (
       <section className={styles.records}>
         <button type="button" className={`${styles.bar} ${styles.selectedBar}`} onClick={() => setView(null)} aria-expanded="true">
           <span>Evaluation</span>
         </button>
-        <div className={styles.canvas}>{evaluationContent}</div>
+        <div className="candidate-record-actions">
+          <button type="button" className="candidate-record-print-action" onClick={() => printStapphireDocument('candidate-evaluation')}>Print / PDF</button>
+        </div>
+        <div className={`${styles.canvas} client-branded-evaluation-print`} style={brandingStyle(branding)}>
+          <ClientPrintHeader branding={branding} documentTitle="Candidate Evaluation" />
+          {evaluationContent}
+        </div>
       </section>
     );
   }
@@ -191,11 +227,21 @@ export function CandidateInterviewRounds({
   const round = rounds.find((item) => item.id === view);
   if (!round) return null;
   const assessmentsVisible = assessmentOpen[round.id] ?? false;
+  const branding = printBranding.byStage?.[round.id] ?? printBranding.defaultBranding;
 
   return (
     <section className={styles.records}>
       {renderInterviewBar(round, true)}
-      <div className={styles.aggregateCanvas}>
+      <div className="candidate-record-actions">
+        <button type="button" className="candidate-record-print-action" onClick={() => printStapphireDocument('interview-summary')}>Print / PDF</button>
+      </div>
+      <div className={`${styles.aggregateCanvas} interview-summary-print-document print-document`} style={brandingStyle(branding)}>
+        <ClientPrintHeader branding={branding} documentTitle="Interview Summary" />
+        <div className="interview-summary-print-meta">
+          <h1>{candidateName}</h1>
+          <p>{positionTitle}</p>
+          <strong>{round.title}</strong>
+        </div>
         <div className={styles.aggregateTable} role="table" aria-label={`${round.title} aggregate results`}>
           <div className={`${styles.aggregateRow} ${styles.headerRow}`} role="row">
             <span>Area of Evaluation</span>
@@ -245,6 +291,18 @@ export function CandidateInterviewRounds({
             )
           )}
         </section>
+        <div className="interview-summary-print-assessments">
+          <h2>Participant Assessments</h2>
+          {round.assessments.length > 0 ? round.assessments.map((assessment) => (
+            <article className={styles.assessment} key={`print-${assessment.contributor}`}>
+              <div className={styles.assessmentHeader}>
+                <strong>{assessment.contributor}</strong>
+                <span>{assessment.recommendation}</span>
+              </div>
+              <p>{assessment.comments}</p>
+            </article>
+          )) : <p>No participant assessments submitted yet.</p>}
+        </div>
       </div>
     </section>
   );
