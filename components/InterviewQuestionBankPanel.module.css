@@ -46,7 +46,7 @@
 .question:hover{border-color:var(--sapphire-2);box-shadow:0 2px 7px rgba(12,18,32,.05)}
 .questionTop{display:grid;grid-template-columns:18px minmax(0,1fr);gap:6px;align-items:start}
 .drag{padding-top:2px;color:var(--faint);font:700 14px/1 var(--mono)}
-.question p{margin:0;color:var(--ink);font-size:11.5px;font-weight:600;line-height:1.4}
+.question p{margin:0;color:#2b3548;font-size:11.5px;font-weight:600;line-height:1.5}
 .chips{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0 0}
 .generator>.chips{width:calc(100% - 38px)}
 .chips span{padding:4px 6px;border-radius:999px;background:var(--sapphire-pale);color:var(--deep);font-size:9.5px;font-weight:700}
