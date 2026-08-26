@@ -12,6 +12,9 @@ export async function PATCH(request: Request, { params }: { params: { token: str
       const ratings = body?.ratings && typeof body.ratings === 'object' && !Array.isArray(body.ratings)
         ? body.ratings as Record<string, unknown>
         : {};
+      const questionCommentsInput = body?.questionComments && typeof body.questionComments === 'object' && !Array.isArray(body.questionComments)
+        ? body.questionComments as Record<string, unknown>
+        : {};
 
       if (!participantName || participantName.length > 200) {
         return NextResponse.json({ error: 'Participant name is required.' }, { status: 400 });
@@ -38,11 +41,15 @@ export async function PATCH(request: Request, { params }: { params: { token: str
         return NextResponse.json({ error: 'Interview has already been submitted.' }, { status: 409 });
       }
 
-      const snapshot = invitation.round_snapshot as { questions?: Array<{ id?: string; areas?: string[] }> } | null;
+      const snapshot = invitation.round_snapshot as {
+        questions?: Array<{ id?: string; areas?: string[]; commentBox?: boolean }>;
+      } | null;
       const expectedKeys: string[] = [];
+      const commentQuestionIds = new Set<string>();
       for (const question of snapshot?.questions ?? []) {
         if (!question?.id) continue;
         for (const area of question.areas ?? []) expectedKeys.push(`${question.id}:${area}`);
+        if (question.commentBox) commentQuestionIds.add(question.id);
       }
 
       for (const key of expectedKeys) {
@@ -52,12 +59,22 @@ export async function PATCH(request: Request, { params }: { params: { token: str
         }
       }
 
+      const questionComments: Record<string, string> = {};
+      for (const [questionId, rawValue] of Object.entries(questionCommentsInput)) {
+        if (!commentQuestionIds.has(questionId)) continue;
+        const value = String(rawValue ?? '').trim();
+        if (value.length > 4000) {
+          return NextResponse.json({ error: 'A question comment is too long.' }, { status: 400 });
+        }
+        if (value) questionComments[questionId] = value;
+      }
+
       const now = new Date().toISOString();
       const { data, error } = await supabaseAdmin
         .from('phase1_interview_invitations')
         .update({
           participant_name: participantName,
-          submission_payload: { ratings, comments, recommendation },
+          submission_payload: { ratings, questionComments, comments, recommendation },
           status: 'submitted',
           submitted_at: now,
           updated_at: now
