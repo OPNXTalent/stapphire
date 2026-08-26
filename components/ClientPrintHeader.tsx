@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 export type ClientPrintBranding = {
   paletteName?: string;
   primary?: string;
@@ -17,7 +19,7 @@ export function ClientPrintHeader({ branding, documentTitle }: { branding?: Clie
   return (
     <header
       className="client-print-header"
-      style={{ '--client-print-primary': primary, '--client-print-accent': accent } as React.CSSProperties}
+      style={{ '--client-print-primary': primary, '--client-print-accent': accent } as CSSProperties}
     >
       <div className="client-print-brand">
         {branding?.logoUrl ? (
