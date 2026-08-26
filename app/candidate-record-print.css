@@ -1,0 +1,21 @@
+@media print{
+  .candidate-record-print-action{display:none!important}
+  body[data-print-document="interview-summary"] .candidate-print-document,
+  body[data-print-document="interview-summary"] .candidate-print-document *{visibility:hidden!important}
+  body[data-print-document="interview-summary"] .interview-summary-print-document,
+  body[data-print-document="interview-summary"] .interview-summary-print-document *{visibility:visible!important}
+  body[data-print-document="interview-summary"] .interview-summary-print-document{display:block!important;position:static!important;width:auto!important;max-width:none!important;height:auto!important;min-height:0!important;overflow:visible!important;margin:0!important;padding:.65in .7in .7in!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;color:#111!important;font-size:10.5pt!important;line-height:1.55!important}
+  body[data-print-document="interview-summary"] .matrix-selected-banner,
+  body[data-print-document="interview-summary"] .candidate-print-document{display:none!important}
+  .interview-summary-print-meta{display:block!important;margin:18px 0 16px;padding-bottom:14px;border-bottom:1px solid #d5dbea}
+  .interview-summary-print-meta h1{margin:0 0 4px;font-size:24px;line-height:1.2;color:#0b2e6b!important}
+  .interview-summary-print-meta p{margin:2px 0;color:#555!important}
+  .interview-summary-print-document [role="table"]{break-inside:avoid;page-break-inside:avoid}
+  .interview-summary-print-document button{display:none!important}
+  .interview-summary-print-document article{break-inside:avoid;page-break-inside:avoid}
+}
+@media screen{
+  .interview-summary-print-meta{display:none}
+  .candidate-record-print-action{display:inline-flex;align-items:center;justify-content:center;padding:6px 9px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--muted);font-size:10.5px;font-weight:700;line-height:1.2;cursor:pointer}
+  .candidate-record-print-action:hover,.candidate-record-print-action:focus-visible{border-color:var(--sapphire-2);background:#fff;color:var(--sapphire);outline:none}
+}
