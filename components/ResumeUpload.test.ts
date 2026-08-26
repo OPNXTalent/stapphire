@@ -121,3 +121,32 @@ test('the component unmounting does not endanger durable work - the cleanup only
   assert.ok(cleanupMatch, 'expected to find the effect cleanup');
   assert.doesNotMatch(cleanupMatch[0], /fetch\(|dismiss|cancel.*operation/i, 'unmount cleanup must only stop this component\'s own local polling, never cancel or otherwise affect the persisted durable operation');
 });
+
+test('adding and submitting another selection stays available while a local batch is uploading', () => {
+  assert.match(source, /className="upload-add-btn"[^>]*onClick=\{\(\) => inputRef\.current\?\.click\(\)\}>/);
+  assert.doesNotMatch(source, /className="upload-add-btn"[^>]*disabled=\{localUploading\}/);
+  assert.match(source, /\{staged\.length > 0 && <button[^>]*onClick=\{beginUpload\}/);
+  assert.doesNotMatch(source, /staged\.length > 0 && !localUploading/);
+});
+
+test('the same rendered staged selection can be handed off only once without blocking a later selection', () => {
+  const beginUpload = source.match(/function beginUpload\(\) \{([\s\S]*?)\n  \}/);
+  assert.ok(beginUpload);
+  assert.match(beginUpload[1], /handedOffStagedRef\.current === staged/, 'a re-entrant click from the same render must be rejected');
+  assert.match(beginUpload[1], /handedOffStagedRef\.current = staged/, 'the current staged-array identity must be claimed synchronously before dispatch');
+  assert.match(beginUpload[1], /void startUpload\(requisitionId, files\)/);
+  assert.doesNotMatch(beginUpload[1], /localUploading|\.finally\(/, 'the handoff guard must not wait for prior upload work to finish');
+});
+
+test('all retained local batches render instead of replacing the visible queue with only the newest batch', () => {
+  assert.match(source, /const visibleLocalBatches = localBatches\.filter/);
+  assert.match(source, /visibleLocalBatches\.map/);
+  assert.match(source, /batch\.items\.map/);
+});
+
+test('durable operations are accumulated and rendered so prior processing, completed, and failed items remain visible', () => {
+  assert.match(source, /setKnownOperations\(\(current\) =>/);
+  assert.match(source, /knownOperations\.filter\(\(operation\) => operation\.id !== trackedOperation\?\.id\)\.map/);
+  assert.match(source, /item\.status === 'failed'/);
+  assert.match(source, /item\.status === 'completed'/);
+});

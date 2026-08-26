@@ -8,6 +8,59 @@ export function sanitizeExtractedText(text: string): string {
   return text.replaceAll('\0', '');
 }
 
+type PdfExtractionDependencies = {
+  parse(buffer: Buffer): Promise<{ text: string }>;
+  normalize(buffer: Buffer): Promise<Buffer>;
+  log(message: string, detail?: unknown): void;
+};
+
+function isRepairablePdfStructureError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /xref|cross-reference|trailer|invalid pdf|bad object|invalid object|object stream|startxref/i.test(message);
+}
+
+async function defaultPdfDependencies(): Promise<PdfExtractionDependencies> {
+  const pdfParse = (await import('pdf-parse')).default;
+  return {
+    parse: (buffer) => pdfParse(buffer),
+    normalize: async (buffer) => {
+      const { PDFDocument } = await import('pdf-lib');
+      const document = await PDFDocument.load(buffer, {
+        ignoreEncryption: false,
+        updateMetadata: false,
+        throwOnInvalidObject: false
+      });
+      return Buffer.from(await document.save({ useObjectStreams: false, updateFieldAppearances: false }));
+    },
+    log: (message, detail) => console.warn(message, detail)
+  };
+}
+
+export async function extractPdfTextWithRepair(
+  buffer: Buffer,
+  dependencies?: PdfExtractionDependencies
+): Promise<string> {
+  const pdf = dependencies || await defaultPdfDependencies();
+  try {
+    return sanitizeExtractedText((await pdf.parse(buffer)).text);
+  } catch (originalError) {
+    if (!isRepairablePdfStructureError(originalError)) throw originalError;
+    pdf.log('PDF extraction failed structurally; attempting temporary normalization.', originalError);
+    try {
+      const repaired = await pdf.normalize(buffer);
+      const text = sanitizeExtractedText((await pdf.parse(repaired)).text);
+      pdf.log('PDF extraction succeeded after temporary normalization.');
+      return text;
+    } catch (repairError) {
+      pdf.log('PDF extraction failed after temporary normalization.', repairError);
+      throw new AggregateError(
+        [originalError, repairError],
+        'Unable to read this PDF after attempting structural repair.'
+      );
+    }
+  }
+}
+
 export async function extractTextFromBuffer(
   buffer: Buffer,
   filename: string,
@@ -16,9 +69,7 @@ export async function extractTextFromBuffer(
   const name = filename.toLowerCase();
 
   if (mimeType === 'application/pdf' || name.endsWith('.pdf')) {
-    const pdfParse = (await import('pdf-parse')).default;
-    const parsed = await pdfParse(buffer);
-    return sanitizeExtractedText(parsed.text);
+    return extractPdfTextWithRepair(buffer);
   }
 
   if (

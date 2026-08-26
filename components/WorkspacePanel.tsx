@@ -34,7 +34,7 @@ export function WorkspacePanel({
   const { state, update } = useRequisitionViewState(requisitionId || '');
   const tab = state.panelTab;
   const [candidate, setCandidate] = useState<CandidateFilesSelection | null>(null);
-  const [candidatePanelTab, setCandidatePanelTab] = useState<'upload' | 'files' | 'teamwork'>('files');
+  const [candidatePanelTab, setCandidatePanelTab] = useState<'files' | 'teamwork'>('files');
   const [interviewContext, setInterviewContext] = useState<InterviewWorkspaceFocusDetail | null>(null);
 
   useEffect(() => {
@@ -94,7 +94,7 @@ export function WorkspacePanel({
     const collapsedLabel = showQuestionBank
       ? 'Generated Questions'
       : showCandidateFiles
-        ? (candidatePanelTab === 'upload' ? 'Resume Upload' : candidatePanelTab === 'teamwork' ? 'Teamwork' : 'Candidate Files')
+        ? (candidatePanelTab === 'teamwork' ? 'Teamwork' : 'Candidate Files')
         : showCandidateWorkspace
           ? (tab === 'teamwork' ? 'Teamwork' : 'Resume Upload')
           : showRequisitionNotes
@@ -120,12 +120,9 @@ export function WorkspacePanel({
           initialStage={interviewContext?.stage}
           initialPositionTitle={interviewContext?.positionTitle}
         />
-      ) : showCandidateFiles && candidate && requisitionId ? (
+      ) : showCandidateFiles && candidate ? (
         <>
           <div className="side-tabs">
-            <button type="button" className={`side-tab ${candidatePanelTab === 'upload' ? 'active' : ''}`} onClick={() => setCandidatePanelTab('upload')}>
-              Resume Upload
-            </button>
             <button type="button" className={`side-tab ${candidatePanelTab === 'files' ? 'active' : ''}`} onClick={() => setCandidatePanelTab('files')}>
               Candidate Files
             </button>
@@ -133,14 +130,8 @@ export function WorkspacePanel({
               Teamwork
             </button>
           </div>
-          <div className="side-content" style={{ padding: candidatePanelTab === 'upload' ? undefined : 0 }}>
-            {candidatePanelTab === 'upload' ? (
-              <ResumeUpload requisitionId={requisitionId} />
-            ) : candidatePanelTab === 'files' ? (
-              <CandidateFilesPanel candidate={candidate} />
-            ) : (
-              <CandidateTeamworkPanel candidate={candidate} />
-            )}
+          <div className="side-content" style={{ padding: 0 }}>
+            {candidatePanelTab === 'files' ? <CandidateFilesPanel candidate={candidate} /> : <CandidateTeamworkPanel candidate={candidate} />}
           </div>
         </>
       ) : showCandidateWorkspace && requisitionId ? (
