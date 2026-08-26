@@ -6,7 +6,7 @@ import { StapphireBrand } from '@/components/StapphireBrand';
 import styles from './ParticipantInterviewPreview.module.css';
 
 type InterviewRecommendation = '' | 'Proceed' | 'Decline' | 'Undecided - Need more information';
-type FormQuestion = { id: string; text: string; areas: string[] };
+type FormQuestion = { id: string; text: string; areas: string[]; commentBox?: boolean };
 type FormBranding = { paletteName?: string; primary?: string; accent?: string; logoUrl?: string; logoName?: string };
 
 function readableText(hex: string) {
@@ -45,7 +45,7 @@ export function ParticipantInterviewPreview({
     if (questions) return questions;
     return buildQuestionBank(positionTitle)
       .filter((question) => question.stage === stage)
-      .map((question) => ({ id: question.id, text: question.text, areas: question.areas }));
+      .map((question) => ({ id: question.id, text: question.text, areas: question.areas, commentBox: false }));
   }, [positionTitle, questions, stage]);
 
   const stageLabel = interviewTitle || INTERVIEW_STAGES.find((item) => item.id === stage)?.label || 'Interview';
@@ -61,6 +61,7 @@ export function ParticipantInterviewPreview({
   } as CSSProperties;
 
   const [ratings, setRatings] = useState<Record<string, number>>({});
+  const [questionComments, setQuestionComments] = useState<Record<string, string>>({});
   const [comments, setComments] = useState('');
   const [recommendation, setRecommendation] = useState<InterviewRecommendation>('');
   const [shareStatus, setShareStatus] = useState('');
@@ -157,6 +158,11 @@ export function ParticipantInterviewPreview({
           submit: true,
           participantName: participantNameValue.trim(),
           ratings,
+          questionComments: Object.fromEntries(
+            Object.entries(questionComments)
+              .map(([questionId, value]) => [questionId, value.trim()])
+              .filter(([, value]) => value.length > 0)
+          ),
           comments: comments.trim(),
           recommendation
         })
@@ -264,6 +270,17 @@ export function ParticipantInterviewPreview({
                       );
                     })}
                   </div>
+                  {question.commentBox && (
+                    <div className={styles.questionComment}>
+                      <label htmlFor={`participant-question-comment-${question.id}`}>Comments</label>
+                      <textarea
+                        id={`participant-question-comment-${question.id}`}
+                        value={questionComments[question.id] ?? ''}
+                        onChange={(event) => setQuestionComments((current) => ({ ...current, [question.id]: event.target.value }))}
+                        placeholder="Add comments…"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </section>
