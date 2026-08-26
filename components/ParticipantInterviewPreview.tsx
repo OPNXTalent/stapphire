@@ -67,7 +67,8 @@ export function ParticipantInterviewPreview({
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(formQuestions[0]?.id ?? null);
 
   const progress = interviewProgress(formQuestions, { ratings, questionComments, yesNoResponses });
-  const assessmentComplete = participantNameValue.trim().length > 0 && comments.trim().length > 0 && recommendation !== '';
+  const internalSubmission = !invitationToken && Boolean(candidateId);
+  const assessmentComplete = (internalSubmission || participantNameValue.trim().length > 0) && comments.trim().length > 0 && recommendation !== '';
   const assessmentReady = progress.complete && assessmentComplete;
 
   function setRating(questionId: string, area: string, value: number) {
@@ -140,16 +141,35 @@ export function ParticipantInterviewPreview({
   }
 
   async function submitInterview() {
-    if (!invitationToken || !assessmentReady || submitted) return;
+    if (!assessmentReady || submitted || (!invitationToken && !candidateId)) return;
 
     try {
       setSubmitStatus('Submitting…');
-      const response = await fetch(`/api/interview-invitations/${invitationToken}`, {
+      let submissionToken = invitationToken;
+
+      if (!submissionToken && candidateId) {
+        const invitationResponse = await fetch(`/api/candidates/${candidateId}/interview-invitations`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ stage })
+        });
+        const invitationPayload = await invitationResponse.json();
+        const invitationUrl = invitationPayload?.invitation?.url as string | undefined;
+        if (!invitationResponse.ok || !invitationUrl) {
+          throw new Error(invitationPayload?.error || 'Unable to prepare interview submission.');
+        }
+        submissionToken = invitationUrl.split('/').filter(Boolean).pop();
+        if (!submissionToken) throw new Error('Unable to prepare interview submission.');
+      }
+
+      if (!submissionToken) throw new Error('Unable to prepare interview submission.');
+
+      const response = await fetch(`/api/interview-invitations/${submissionToken}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           submit: true,
-          participantName: participantNameValue.trim(),
+          participantName: participantNameValue.trim() || 'Stapphire reviewer',
           ratings,
           yesNoResponses,
           questionComments: Object.fromEntries(
@@ -326,8 +346,8 @@ export function ParticipantInterviewPreview({
         </section>
 
         <div className={styles.submitRow}>
-          <span>{submitStatus || (assessmentReady ? 'Interview assessment complete — ready to submit' : 'Complete all required responses, your name, comments, and recommendation')}</span>
-          <button type="button" disabled={!invitationToken || !assessmentReady || submitted} onClick={submitInterview}>
+          <span>{submitStatus || (assessmentReady ? 'Interview assessment complete — ready to submit' : internalSubmission ? 'Complete all required responses, comments, and recommendation' : 'Complete all required responses, your name, comments, and recommendation')}</span>
+          <button type="button" disabled={(!invitationToken && !candidateId) || !assessmentReady || submitted} onClick={submitInterview}>
             {submitted ? 'Submitted' : 'Submit Interview'}
           </button>
         </div>
