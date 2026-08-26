@@ -10,6 +10,8 @@ type SnapshotQuestion = {
   id: string;
   text: string;
   areas: string[];
+  commentBox?: boolean;
+  yesNo?: boolean;
 };
 
 type RoundSnapshot = {
@@ -19,6 +21,8 @@ type RoundSnapshot = {
 
 type SubmissionPayload = {
   ratings?: Record<string, number>;
+  questionComments?: Record<string, string>;
+  yesNoResponses?: Record<string, 'yes' | 'no'>;
   comments?: string;
   recommendation?: string;
 };
@@ -62,6 +66,8 @@ export default async function CompletedInterviewPage({
   const submission = (invitation.submission_payload ?? {}) as SubmissionPayload;
   const questions = Array.isArray(snapshot.questions) ? snapshot.questions : [];
   const ratings = submission.ratings ?? {};
+  const questionComments = submission.questionComments ?? {};
+  const yesNoResponses = submission.yesNoResponses ?? {};
   const href = `/candidates/${params.id}/interviews/${params.invitationId}`;
 
   return (
@@ -93,7 +99,7 @@ export default async function CompletedInterviewPage({
               <span>Q{index + 1}</span>
               <h2>{question.text}</h2>
             </div>
-            <div className={styles.ratings}>
+            {(question.areas ?? []).length > 0 && <div className={styles.ratings}>
               {(question.areas ?? []).map((area) => {
                 const value = Number(ratings[`${question.id}:${area}`] ?? 0);
                 return (
@@ -103,7 +109,19 @@ export default async function CompletedInterviewPage({
                   </div>
                 );
               })}
-            </div>
+            </div>}
+            {question.yesNo && (
+              <div className={styles.ratingRow}>
+                <span>Response</span>
+                <strong>{yesNoResponses[question.id] === 'yes' ? 'Yes' : yesNoResponses[question.id] === 'no' ? 'No' : 'Not answered'}</strong>
+              </div>
+            )}
+            {question.commentBox && questionComments[question.id]?.trim() && (
+              <div className={styles.assessmentBlock}>
+                <strong>Comments</strong>
+                <p>{questionComments[question.id]}</p>
+              </div>
+            )}
           </article>
         ))}
       </section>

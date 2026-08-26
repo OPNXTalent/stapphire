@@ -1,0 +1,13 @@
+.headerAdaptive{isolation:isolate;color:var(--form-primary-text)}
+.headerAdaptive::before{content:"";position:absolute;z-index:-2;top:-32px;right:-18px;bottom:-18px;left:-18px;background:#f7f9fc}
+.headerAdaptive::after{content:"";position:absolute;z-index:-1;inset:0;border-radius:inherit;background:var(--form-primary)}
+.headerAdaptive h1,.headerAdaptive .headerText{color:var(--form-primary-text)}
+.headerAdaptive .headerMuted{color:color-mix(in srgb,var(--form-primary-text) 62%,transparent)}
+.headerAdaptive .headerBorder{border-color:color-mix(in srgb,var(--form-primary-text) 25%,transparent)}
+.headerAdaptive .headerText strong{color:color-mix(in srgb,var(--form-primary-text) 62%,transparent)}
+.headerAdaptive .shareAdaptive{border-color:color-mix(in srgb,var(--form-primary-text) 38%,transparent);background:color-mix(in srgb,var(--form-primary-text) 10%,transparent);color:var(--form-primary-text)}
+.headerAdaptive .shareAdaptive:hover{border-color:var(--form-primary-text);background:color-mix(in srgb,var(--form-primary-text) 18%,transparent)}
+.yesNoField{display:flex;align-items:center;gap:18px;margin:0;padding:14px 16px;border:0;border-top:1px solid var(--line)}
+.yesNoField legend{float:left;margin-right:8px;color:var(--muted);font-size:11px;font-weight:700}
+.yesNoField label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+@media(max-width:680px){.headerAdaptive::before{top:-22px;right:-12px;left:-12px}.yesNoField{align-items:flex-start;flex-wrap:wrap}}

@@ -4,19 +4,13 @@ import { useMemo, useState, type CSSProperties } from 'react';
 import { buildQuestionBank, INTERVIEW_STAGES } from '@/lib/interviewQuestionBank';
 import { StapphireBrand } from '@/components/StapphireBrand';
 import styles from './ParticipantInterviewPreview.module.css';
+import overrides from './ParticipantInterviewPreviewOverrides.module.css';
+import { interviewProgress, isQuestionComplete, type YesNoResponse } from '@/lib/interviewCompletion';
+import { readableHeaderText } from '@/lib/colorContrast';
 
 type InterviewRecommendation = '' | 'Proceed' | 'Decline' | 'Undecided - Need more information';
-type FormQuestion = { id: string; text: string; areas: string[]; commentBox?: boolean };
+type FormQuestion = { id: string; text: string; areas: string[]; commentBox?: boolean; yesNo?: boolean };
 type FormBranding = { paletteName?: string; primary?: string; accent?: string; logoUrl?: string; logoName?: string };
-
-function readableText(hex: string) {
-  const value = hex.replace('#', '');
-  if (value.length !== 6) return '#ffffff';
-  const r = parseInt(value.slice(0, 2), 16);
-  const g = parseInt(value.slice(2, 4), 16);
-  const b = parseInt(value.slice(4, 6), 16);
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? '#172033' : '#ffffff';
-}
 
 export function ParticipantInterviewPreview({
   stage,
@@ -45,7 +39,7 @@ export function ParticipantInterviewPreview({
     if (questions) return questions;
     return buildQuestionBank(positionTitle)
       .filter((question) => question.stage === stage)
-      .map((question) => ({ id: question.id, text: question.text, areas: question.areas, commentBox: false }));
+      .map((question) => ({ id: question.id, text: question.text, areas: question.areas, commentBox: true }));
   }, [positionTitle, questions, stage]);
 
   const stageLabel = interviewTitle || INTERVIEW_STAGES.find((item) => item.id === stage)?.label || 'Interview';
@@ -54,7 +48,7 @@ export function ParticipantInterviewPreview({
   const brandedStyle = {
     '--form-primary': primary,
     '--form-accent': accent,
-    '--form-primary-text': readableText(primary),
+    '--form-primary-text': readableHeaderText(primary),
     '--navy': primary,
     '--sapphire': accent,
     '--sapphire-2': accent
@@ -62,6 +56,7 @@ export function ParticipantInterviewPreview({
 
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [questionComments, setQuestionComments] = useState<Record<string, string>>({});
+  const [yesNoResponses, setYesNoResponses] = useState<Record<string, YesNoResponse>>({});
   const [comments, setComments] = useState('');
   const [recommendation, setRecommendation] = useState<InterviewRecommendation>('');
   const [shareStatus, setShareStatus] = useState('');
@@ -71,20 +66,18 @@ export function ParticipantInterviewPreview({
   const [submitted, setSubmitted] = useState(false);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(formQuestions[0]?.id ?? null);
 
-  const ratingCount = formQuestions.reduce((sum, question) => sum + question.areas.length, 0);
-  const completedCount = Object.keys(ratings).length;
+  const progress = interviewProgress(formQuestions, { ratings, questionComments, yesNoResponses });
   const assessmentComplete = participantNameValue.trim().length > 0 && comments.trim().length > 0 && recommendation !== '';
-  const assessmentReady = completedCount === ratingCount && assessmentComplete;
+  const assessmentReady = progress.complete && assessmentComplete;
 
   function setRating(questionId: string, area: string, value: number) {
     setRatings((current) => ({ ...current, [`${questionId}:${area}`]: value }));
   }
 
-  function questionProgress(questionId: string, areas: string[]) {
-    const rated = areas.filter((area) => ratings[`${questionId}:${area}`]).length;
-    if (rated === 0) return { rated, label: 'Not Rated' };
-    if (rated === areas.length) return { rated, label: 'Complete' };
-    return { rated, label: 'In Progress' };
+  function questionProgress(question: FormQuestion) {
+    if (isQuestionComplete(question, { ratings, questionComments, yesNoResponses })) return 'Complete';
+    const touched = question.areas.some((area) => ratings[`${question.id}:${area}`]) || Boolean(questionComments[question.id]?.trim()) || Boolean(yesNoResponses[question.id]);
+    return touched ? 'In Progress' : 'Not Complete';
   }
 
   async function shareInterview() {
@@ -158,6 +151,7 @@ export function ParticipantInterviewPreview({
           submit: true,
           participantName: participantNameValue.trim(),
           ratings,
+          yesNoResponses,
           questionComments: Object.fromEntries(
             Object.entries(questionComments)
               .map(([questionId, value]) => [questionId, value.trim()])
@@ -178,7 +172,7 @@ export function ParticipantInterviewPreview({
 
   return (
     <div className={styles.page} style={brandedStyle}>
-      <header className={styles.header}>
+      <header className={`${styles.header} ${overrides.headerAdaptive}`}>
         <div className={styles.headerTop}>
           <div className={styles.brand}>
             {branding?.logoUrl
@@ -187,19 +181,19 @@ export function ParticipantInterviewPreview({
           </div>
           {shareEnabled && (
             <div className={styles.shareWrap}>
-              <button type="button" className={styles.shareButton} onClick={shareInterview} aria-label="Share interview invitation">
+              <button type="button" className={`${styles.shareButton} ${overrides.shareAdaptive}`} onClick={shareInterview} aria-label="Share interview invitation">
                 <span aria-hidden="true">↗</span>
                 Share
               </button>
-              {shareStatus && <span className={styles.shareStatus} role="status">{shareStatus}</span>}
+              {shareStatus && <span className={`${styles.shareStatus} ${overrides.headerMuted}`} role="status">{shareStatus}</span>}
             </div>
           )}
         </div>
-        <span className={styles.preview}>INTERVIEW EVALUATION</span>
+        <span className={`${styles.preview} ${overrides.headerMuted}`}>INTERVIEW EVALUATION</span>
         <h1>{stageLabel} — {positionTitle}</h1>
-        <div className={styles.context}>
+        <div className={`${styles.context} ${overrides.headerText} ${overrides.headerBorder}`}>
           <span><strong>Candidate</strong>{candidateName}</span>
-          <span><strong>Progress</strong>{completedCount} of {ratingCount} ratings</span>
+          <span><strong>Progress</strong>{progress.completedQuestionCount} of {progress.questionCount} questions</span>
         </div>
       </header>
 
@@ -224,7 +218,7 @@ export function ParticipantInterviewPreview({
 
         {formQuestions.map((question, index) => {
           const isExpanded = expandedQuestionId === question.id;
-          const progress = questionProgress(question.id, question.areas);
+          const questionStatus = questionProgress(question);
           return (
             <section className={`${styles.question} ${isExpanded ? styles.questionExpanded : ''}`} key={question.id}>
               <button
@@ -236,12 +230,12 @@ export function ParticipantInterviewPreview({
               >
                 <span className={styles.questionNumber}>Q{index + 1}</span>
                 <span className={styles.questionText}>{question.text}</span>
-                <span className={styles.questionMeta}>{progress.label}</span>
+                <span className={styles.questionMeta}>{questionStatus}</span>
               </button>
 
               {isExpanded && (
                 <div className={styles.questionBody} id={`question-${question.id}`}>
-                  <div className={styles.ratingTable}>
+                  {question.areas.length > 0 && <div className={styles.ratingTable}>
                     <div className={`${styles.ratingRow} ${styles.tableHead}`}>
                       <span>Area of Evaluation</span>
                       <span>Rating</span>
@@ -269,7 +263,18 @@ export function ParticipantInterviewPreview({
                         </div>
                       );
                     })}
-                  </div>
+                  </div>}
+                  {question.yesNo && (
+                    <fieldset className={overrides.yesNoField}>
+                      <legend>Response</legend>
+                      {(['yes', 'no'] as const).map((value) => (
+                        <label key={value}>
+                          <input type="radio" name={`yes-no-${question.id}`} checked={yesNoResponses[question.id] === value} onChange={() => setYesNoResponses((current) => ({ ...current, [question.id]: value }))} />
+                          {value === 'yes' ? 'Yes' : 'No'}
+                        </label>
+                      ))}
+                    </fieldset>
+                  )}
                   {question.commentBox && (
                     <div className={styles.questionComment}>
                       <label htmlFor={`participant-question-comment-${question.id}`}>Comments</label>
@@ -321,7 +326,7 @@ export function ParticipantInterviewPreview({
         </section>
 
         <div className={styles.submitRow}>
-          <span>{submitStatus || (assessmentReady ? 'Interview assessment complete — ready to submit' : 'Complete all ratings, your name, comments, and recommendation')}</span>
+          <span>{submitStatus || (assessmentReady ? 'Interview assessment complete — ready to submit' : 'Complete all required responses, your name, comments, and recommendation')}</span>
           <button type="button" disabled={!invitationToken || !assessmentReady || submitted} onClick={submitInterview}>
             {submitted ? 'Submitted' : 'Submit Interview'}
           </button>

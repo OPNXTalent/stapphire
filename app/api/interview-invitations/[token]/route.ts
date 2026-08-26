@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { interviewProgress, isYesNoResponse } from '@/lib/interviewCompletion';
 
 export async function PATCH(request: Request, { params }: { params: { token: string } }) {
   try {
@@ -14,6 +15,9 @@ export async function PATCH(request: Request, { params }: { params: { token: str
         : {};
       const questionCommentsInput = body?.questionComments && typeof body.questionComments === 'object' && !Array.isArray(body.questionComments)
         ? body.questionComments as Record<string, unknown>
+        : {};
+      const yesNoResponsesInput = body?.yesNoResponses && typeof body.yesNoResponses === 'object' && !Array.isArray(body.yesNoResponses)
+        ? body.yesNoResponses as Record<string, unknown>
         : {};
 
       if (!participantName || participantName.length > 200) {
@@ -42,21 +46,12 @@ export async function PATCH(request: Request, { params }: { params: { token: str
       }
 
       const snapshot = invitation.round_snapshot as {
-        questions?: Array<{ id?: string; areas?: string[]; commentBox?: boolean }>;
+        questions?: Array<{ id?: string; areas?: string[]; commentBox?: boolean; yesNo?: boolean }>;
       } | null;
-      const expectedKeys: string[] = [];
+      const questions = (snapshot?.questions ?? []).filter((question): question is { id: string; areas?: string[]; commentBox?: boolean; yesNo?: boolean } => Boolean(question?.id));
       const commentQuestionIds = new Set<string>();
-      for (const question of snapshot?.questions ?? []) {
-        if (!question?.id) continue;
-        for (const area of question.areas ?? []) expectedKeys.push(`${question.id}:${area}`);
+      for (const question of questions) {
         if (question.commentBox) commentQuestionIds.add(question.id);
-      }
-
-      for (const key of expectedKeys) {
-        const value = Number(ratings[key]);
-        if (!Number.isInteger(value) || value < 1 || value > 5) {
-          return NextResponse.json({ error: 'Complete all interview ratings before submitting.' }, { status: 400 });
-        }
       }
 
       const questionComments: Record<string, string> = {};
@@ -68,13 +63,18 @@ export async function PATCH(request: Request, { params }: { params: { token: str
         }
         if (value) questionComments[questionId] = value;
       }
+      const yesNoQuestionIds = new Set(questions.filter((question) => question.yesNo).map((question) => question.id));
+      const yesNoResponses = Object.fromEntries(Object.entries(yesNoResponsesInput).filter(([questionId, value]) => yesNoQuestionIds.has(questionId) && isYesNoResponse(value)));
+      if (!interviewProgress(questions, { ratings, questionComments, yesNoResponses }).complete) {
+        return NextResponse.json({ error: 'Complete all required interview responses before submitting.' }, { status: 400 });
+      }
 
       const now = new Date().toISOString();
       const { data, error } = await supabaseAdmin
         .from('phase1_interview_invitations')
         .update({
           participant_name: participantName,
-          submission_payload: { ratings, questionComments, comments, recommendation },
+          submission_payload: { ratings, yesNoResponses, questionComments, comments, recommendation },
           status: 'submitted',
           submitted_at: now,
           updated_at: now

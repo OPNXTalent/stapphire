@@ -32,6 +32,7 @@ type Question = {
   text: string;
   areas: string[];
   commentBox?: boolean;
+  yesNo?: boolean;
 };
 
 type PersistedRound = {
@@ -43,6 +44,7 @@ type PersistedRound = {
     text: string;
     areas: string[];
     commentBox?: boolean;
+    yesNo?: boolean;
   }>;
 };
 
@@ -63,7 +65,7 @@ function bankStageFor(stage: string): InterviewStageId {
 }
 
 function cloneBankQuestion(question: BankQuestion): Question {
-  return { id: localId(), sourceId: question.id, text: question.text, areas: [...question.areas] };
+  return { id: localId(), sourceId: question.id, text: question.text, areas: [...question.areas], commentBox: true };
 }
 
 function starterRounds(): InterviewRound[] {
@@ -87,7 +89,8 @@ function serializePlan(rounds: InterviewRound[], questionsByRound: Record<string
         ...(question.sourceId ? { sourceId: question.sourceId } : {}),
         text: question.text,
         areas: question.areas,
-        commentBox: Boolean(question.commentBox)
+        commentBox: Boolean(question.commentBox),
+        yesNo: Boolean(question.yesNo)
       }))
     }))
   });
@@ -199,7 +202,8 @@ export function InterviewPlan({
                   ...(question.sourceId ? { sourceId: question.sourceId } : {}),
                   text: String(question.text ?? ''),
                   areas: Array.isArray(question.areas) ? [...question.areas] : [],
-                  commentBox: Boolean(question.commentBox)
+                  commentBox: Boolean(question.commentBox),
+                  yesNo: Boolean(question.yesNo)
                 }))
               : [];
           }
@@ -380,7 +384,7 @@ export function InterviewPlan({
   function addManualQuestion() {
     if (!selectedRoundId) return;
     patchQuestions(selectedRoundId, (current) => [
-      { id: localId(), text: 'Add a new interview question…', areas: [] },
+      { id: localId(), text: 'Add a new interview question…', areas: [], commentBox: true },
       ...current
     ]);
   }
@@ -412,6 +416,13 @@ export function InterviewPlan({
     if (!selectedRoundId) return;
     patchQuestions(selectedRoundId, (current) => current.map((question) =>
       question.id === questionId ? { ...question, commentBox: !question.commentBox } : question
+    ));
+  }
+
+  function toggleYesNo(questionId: string) {
+    if (!selectedRoundId) return;
+    patchQuestions(selectedRoundId, (current) => current.map((question) =>
+      question.id === questionId ? { ...question, yesNo: !question.yesNo } : question
     ));
   }
 
@@ -585,11 +596,18 @@ export function InterviewPlan({
                       {question.commentBox && (
                         <span className={`${styles.areaChip} ${styles.commentChip}`}>Comment Box<button type="button" onClick={() => toggleCommentBox(question.id)} aria-label="Remove Comment Box">×</button></span>
                       )}
+                      {question.yesNo && (
+                        <span className={styles.areaChip}>Yes / No<button type="button" onClick={() => toggleYesNo(question.id)} aria-label="Remove Yes or No response">×</button></span>
+                      )}
                       {openAreaId === question.id && (
                         <div className={styles.areaMenu}>
                           <label className={`${styles.areaOption} ${styles.commentOption}`}>
                             <input type="checkbox" checked={Boolean(question.commentBox)} onChange={() => toggleCommentBox(question.id)} />
                             <span>Comment Box</span>
+                          </label>
+                          <label className={`${styles.areaOption} ${styles.commentOption}`}>
+                            <input type="checkbox" checked={Boolean(question.yesNo)} onChange={() => toggleYesNo(question.id)} />
+                            <span>Yes / No</span>
                           </label>
                           {availableAreas.map((area) => {
                             const checked = question.areas.includes(area);
@@ -625,6 +643,13 @@ export function InterviewPlan({
                             </div>
                           );
                         })}
+                      </div>
+                    )}
+                    {question.yesNo && (
+                      <div className={styles.commentBoxPreview}>
+                        <strong>Response</strong>
+                        <label><input type="radio" name={`builder-yes-no-${question.id}`} /> Yes</label>
+                        <label><input type="radio" name={`builder-yes-no-${question.id}`} /> No</label>
                       </div>
                     )}
                     {question.commentBox && (

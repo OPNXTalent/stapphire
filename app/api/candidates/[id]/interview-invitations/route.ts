@@ -10,6 +10,7 @@ type SnapshotQuestion = {
   text: string;
   areas: string[];
   commentBox?: boolean;
+  yesNo?: boolean;
 };
 
 type RoundSnapshot = {
@@ -45,6 +46,7 @@ type ParticipantAssessment = {
   recommendation: string;
   comments: string;
   questionComments: Array<{ question: string; comment: string }>;
+  yesNoResponses: Array<{ question: string; response: 'Yes' | 'No' }>;
 };
 
 function object(value: unknown): Record<string, unknown> {
@@ -75,6 +77,7 @@ function buildRoundResults(stage: string, rows: InvitationRow[], configuredAreas
     const payload = object(row.submission_payload);
     const ratings = object(payload.ratings);
     const questionComments = object(payload.questionComments);
+    const yesNoResponses = object(payload.yesNoResponses);
     const snapshot = object(row.round_snapshot) as RoundSnapshot;
     const questions = Array.isArray(snapshot.questions) ? snapshot.questions : [];
     const questionById = new Map(questions.map((question) => [question.id, question]));
@@ -104,12 +107,20 @@ function buildRoundResults(stage: string, rows: InvitationRow[], configuredAreas
         comment: String(questionComments[question.id] ?? '').trim()
       }))
       .filter((item) => item.comment.length > 0);
+    const assessmentYesNoResponses = questions
+      .filter((question) => question.yesNo)
+      .map((question) => ({
+        question: question.text,
+        response: yesNoResponses[question.id] === 'yes' ? 'Yes' as const : yesNoResponses[question.id] === 'no' ? 'No' as const : null
+      }))
+      .filter((item): item is { question: string; response: 'Yes' | 'No' } => item.response !== null);
 
     assessments.push({
       contributor: row.participant_name || 'Interview participant',
       recommendation: String(payload.recommendation ?? ''),
       comments: String(payload.comments ?? ''),
-      questionComments: assessmentQuestionComments
+      questionComments: assessmentQuestionComments,
+      yesNoResponses: assessmentYesNoResponses
     });
   }
 
@@ -285,7 +296,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
       const { data: questions, error: questionsError } = await supabaseAdmin
         .from('phase1_interview_questions')
-        .select('id, source_id, question_text, areas, comment_box, sort_order')
+        .select('id, source_id, question_text, areas, comment_box, yes_no, sort_order')
         .eq('round_id', round.id)
         .order('sort_order', { ascending: true });
 
@@ -303,7 +314,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
           ...(question.source_id ? { sourceId: question.source_id } : {}),
           text: question.question_text,
           areas: question.areas ?? [],
-          commentBox: Boolean(question.comment_box)
+          commentBox: Boolean(question.comment_box),
+          yesNo: Boolean(question.yes_no)
         }))
       };
     } else {
@@ -313,7 +325,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
       const fallbackQuestions = buildQuestionBank(requisition.title)
         .filter((question) => question.stage === stage as InterviewStageId)
-        .map((question) => ({ id: question.id, sourceId: question.id, text: question.text, areas: question.areas, commentBox: false }));
+        .map((question) => ({ id: question.id, sourceId: question.id, text: question.text, areas: question.areas, commentBox: true, yesNo: false }));
 
       snapshot = { stage, title: roundTitle, questions: fallbackQuestions };
     }

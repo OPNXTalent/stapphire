@@ -5,7 +5,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
-type FormQuestion = { id: string; text: string; areas: string[]; commentBox?: boolean };
+type FormQuestion = { id: string; text: string; areas: string[]; commentBox?: boolean; yesNo?: boolean };
 type FormBranding = { paletteName?: string; primary?: string; accent?: string; logoUrl?: string; logoName?: string };
 
 export default async function InterviewPreviewPage({
@@ -50,7 +50,7 @@ export default async function InterviewPreviewPage({
 
         const { data: savedQuestions, error } = await supabaseAdmin
           .from('phase1_interview_questions')
-          .select('id, question_text, areas, comment_box, sort_order')
+          .select('id, question_text, areas, comment_box, yes_no, sort_order')
           .eq('round_id', round.id)
           .order('sort_order', { ascending: true });
         if (error) throw error;
@@ -59,7 +59,8 @@ export default async function InterviewPreviewPage({
           id: question.id,
           text: question.question_text,
           areas: question.areas ?? [],
-          commentBox: Boolean(question.comment_box)
+          commentBox: Boolean(question.comment_box),
+          yesNo: Boolean(question.yes_no)
         }));
       }
     }
@@ -68,7 +69,7 @@ export default async function InterviewPreviewPage({
   if (!questions) {
     const fallback = buildQuestionBank(searchParams.role || 'Position').filter((question) => question.stage === stage);
     if (fallback.length === 0 && !INTERVIEW_STAGES.some((item) => item.id === stage)) notFound();
-    questions = fallback.map((question) => ({ id: question.id, text: question.text, areas: question.areas, commentBox: false }));
+    questions = fallback.map((question) => ({ id: question.id, text: question.text, areas: question.areas, commentBox: true, yesNo: false }));
   }
 
   return (

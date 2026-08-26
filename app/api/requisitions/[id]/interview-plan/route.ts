@@ -6,6 +6,7 @@ type PlanQuestionInput = {
   text: string;
   areas: string[];
   commentBox: boolean;
+  yesNo: boolean;
 };
 
 type PlanRoundInput = {
@@ -53,6 +54,7 @@ function normalizeRounds(value: unknown): PlanRoundInput[] {
       const sourceId = String(question.sourceId ?? '').trim();
       const rawAreas = question.areas;
       const commentBox = question.commentBox === true;
+      const yesNo = question.yesNo === true;
 
       if (text.length > 1000) {
         throw new Error('Interview question is too long.');
@@ -70,7 +72,8 @@ function normalizeRounds(value: unknown): PlanRoundInput[] {
         ...(sourceId ? { sourceId } : {}),
         text,
         areas,
-        commentBox
+        commentBox,
+        yesNo
       };
     });
 
@@ -105,13 +108,14 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       question_text: string;
       areas: string[];
       comment_box: boolean;
+      yes_no: boolean;
       sort_order: number;
     }> = [];
 
     if (roundIds.length > 0) {
       const { data, error } = await supabaseAdmin
         .from('phase1_interview_questions')
-        .select('id, round_id, source_id, question_text, areas, comment_box, sort_order')
+        .select('id, round_id, source_id, question_text, areas, comment_box, yes_no, sort_order')
         .in('round_id', roundIds)
         .order('sort_order', { ascending: true });
       if (error) throw error;
@@ -134,7 +138,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
               ...(question.source_id ? { sourceId: question.source_id } : {}),
               text: question.question_text,
               areas: question.areas ?? [],
-              commentBox: Boolean(question.comment_box)
+              commentBox: Boolean(question.comment_box),
+              yesNo: Boolean(question.yes_no)
             }))
         }))
       }

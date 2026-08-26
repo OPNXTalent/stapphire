@@ -20,6 +20,7 @@ type ParticipantAssessment = {
   recommendation: 'Proceed' | 'Decline' | 'Undecided - Need more information' | '';
   comments: string;
   questionComments: Array<{ question: string; comment: string }>;
+  yesNoResponses: Array<{ question: string; response: 'Yes' | 'No' }>;
 };
 
 type InterviewRound = {
@@ -218,6 +219,16 @@ export function CandidateInterviewRounds({
               <div className={styles.questionCommentItem} key={`${key}-comment-${index}`}>
                 <strong>{item.question}</strong>
                 <p>{item.comment}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {assessment.yesNoResponses.length > 0 && (
+          <div className={styles.questionCommentList}>
+            {assessment.yesNoResponses.map((item, index) => (
+              <div className={styles.questionCommentItem} key={`${key}-yes-no-${index}`}>
+                <strong>{item.question}</strong>
+                <p>{item.response}</p>
               </div>
             ))}
           </div>
