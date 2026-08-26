@@ -4,6 +4,21 @@ import { buildQuestionBank, INTERVIEW_STAGES, type InterviewStageId } from '@/li
 
 const LEGACY_STAGES = new Set(['phone-screen', 'round-1', 'round-2', 'final']);
 
+type SnapshotQuestion = {
+  id: string;
+  sourceId?: string;
+  text: string;
+  areas: string[];
+  commentBox?: boolean;
+};
+
+type RoundSnapshot = {
+  stage?: string;
+  title?: string;
+  branding?: FormBranding;
+  questions?: SnapshotQuestion[];
+};
+
 type InvitationRow = {
   id: string;
   stage: string;
@@ -13,6 +28,8 @@ type InvitationRow = {
   invited_at: string;
   opened_at: string | null;
   submitted_at: string | null;
+  submission_payload: unknown;
+  round_snapshot: unknown;
 };
 
 type FormBranding = {
@@ -22,6 +39,19 @@ type FormBranding = {
   logoUrl?: string;
   logoName?: string;
 };
+
+type ParticipantAssessment = {
+  contributor: string;
+  recommendation: string;
+  comments: string;
+  questionComments: Array<{ question: string; comment: string }>;
+};
+
+function object(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
 
 function summarize(rows: InvitationRow[]) {
   const result: Record<string, { participants: number; submitted: number }> = {};
@@ -34,12 +64,78 @@ function summarize(rows: InvitationRow[]) {
   return result;
 }
 
+function buildRoundResults(stage: string, rows: InvitationRow[], configuredAreas: string[]) {
+  const areaTotals = new Map<string, { total: number; count: number }>();
+  const assessments: ParticipantAssessment[] = [];
+  let total = 0;
+  let ratingCount = 0;
+
+  for (const row of rows) {
+    if (row.stage !== stage || row.status !== 'submitted') continue;
+    const payload = object(row.submission_payload);
+    const ratings = object(payload.ratings);
+    const questionComments = object(payload.questionComments);
+    const snapshot = object(row.round_snapshot) as RoundSnapshot;
+    const questions = Array.isArray(snapshot.questions) ? snapshot.questions : [];
+    const questionById = new Map(questions.map((question) => [question.id, question]));
+
+    for (const [key, rawValue] of Object.entries(ratings)) {
+      const value = Number(rawValue);
+      if (!Number.isInteger(value) || value < 1 || value > 5) continue;
+      const separator = key.lastIndexOf(':');
+      if (separator < 0) continue;
+      const questionId = key.slice(0, separator);
+      const area = key.slice(separator + 1);
+      const question = questionById.get(questionId);
+      if (!question || !question.areas.includes(area)) continue;
+
+      const current = areaTotals.get(area) ?? { total: 0, count: 0 };
+      current.total += value;
+      current.count += 1;
+      areaTotals.set(area, current);
+      total += value;
+      ratingCount += 1;
+    }
+
+    const assessmentQuestionComments = questions
+      .filter((question) => question.commentBox)
+      .map((question) => ({
+        question: question.text,
+        comment: String(questionComments[question.id] ?? '').trim()
+      }))
+      .filter((item) => item.comment.length > 0);
+
+    assessments.push({
+      contributor: row.participant_name || 'Interview participant',
+      recommendation: String(payload.recommendation ?? ''),
+      comments: String(payload.comments ?? ''),
+      questionComments: assessmentQuestionComments
+    });
+  }
+
+  const areas = Array.from(new Set([...configuredAreas, ...areaTotals.keys()]));
+  return {
+    overall: ratingCount > 0 ? Math.round((total / ratingCount) * 100) / 100 : null,
+    rows: areas.map((area) => {
+      const aggregate = areaTotals.get(area);
+      return {
+        area,
+        timesRated: aggregate?.count ?? 0,
+        average: aggregate && aggregate.count > 0
+          ? Math.round((aggregate.total / aggregate.count) * 100) / 100
+          : null
+      };
+    }),
+    assessments
+  };
+}
+
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
     const [{ data: invitationsData, error: invitationsError }, { data: candidate, error: candidateError }] = await Promise.all([
       supabaseAdmin
         .from('phase1_interview_invitations')
-        .select('id, stage, round_title, status, participant_name, invited_at, opened_at, submitted_at')
+        .select('id, stage, round_title, status, participant_name, invited_at, opened_at, submitted_at, submission_payload, round_snapshot')
         .eq('candidate_id', params.id)
         .order('invited_at', { ascending: true }),
       supabaseAdmin
@@ -52,9 +148,20 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     if (invitationsError) throw invitationsError;
     if (candidateError) throw candidateError;
     const invitations = (invitationsData ?? []) as InvitationRow[];
+    const counts = summarize(invitations);
 
     let hasPlan = false;
-    let rounds: Array<{ stage: string; title: string; areas: string[] }> = [];
+    let rounds: Array<{
+      stage: string;
+      title: string;
+      areas: string[];
+      participants: number;
+      submitted: number;
+      overall: number | null;
+      rows: Array<{ area: string; timesRated: number; average: number | null }>;
+      assessments: ParticipantAssessment[];
+    }> = [];
+
     if (candidate) {
       const { data: plan, error: planError } = await supabaseAdmin
         .from('phase1_interview_plans')
@@ -83,18 +190,25 @@ export async function GET(_request: Request, { params }: { params: { id: string 
           questionRows = data ?? [];
         }
 
-        rounds = (planRounds ?? []).map((round) => ({
-          stage: round.stage,
-          title: round.title,
-          areas: Array.from(new Set(
+        rounds = (planRounds ?? []).map((round) => {
+          const areas = Array.from(new Set(
             questionRows.filter((question) => question.round_id === round.id).flatMap((question) => question.areas ?? [])
-          ))
-        }));
+          ));
+          const results = buildRoundResults(round.stage, invitations, areas);
+          return {
+            stage: round.stage,
+            title: round.title,
+            areas,
+            participants: counts[round.stage]?.participants ?? 0,
+            submitted: counts[round.stage]?.submitted ?? 0,
+            ...results
+          };
+        });
       }
     }
 
     return NextResponse.json({
-      counts: summarize(invitations),
+      counts,
       hasPlan,
       rounds,
       invitations: invitations.map((row) => ({
@@ -155,7 +269,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       stage: string;
       title: string;
       branding?: FormBranding;
-      questions: Array<{ id: string; sourceId?: string; text: string; areas: string[] }>;
+      questions: SnapshotQuestion[];
     };
 
     if (plan) {
@@ -171,7 +285,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
       const { data: questions, error: questionsError } = await supabaseAdmin
         .from('phase1_interview_questions')
-        .select('id, source_id, question_text, areas, sort_order')
+        .select('id, source_id, question_text, areas, comment_box, sort_order')
         .eq('round_id', round.id)
         .order('sort_order', { ascending: true });
 
@@ -188,7 +302,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
           id: question.id,
           ...(question.source_id ? { sourceId: question.source_id } : {}),
           text: question.question_text,
-          areas: question.areas ?? []
+          areas: question.areas ?? [],
+          commentBox: Boolean(question.comment_box)
         }))
       };
     } else {
@@ -198,7 +313,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
       const fallbackQuestions = buildQuestionBank(requisition.title)
         .filter((question) => question.stage === stage as InterviewStageId)
-        .map((question) => ({ id: question.id, sourceId: question.id, text: question.text, areas: question.areas }));
+        .map((question) => ({ id: question.id, sourceId: question.id, text: question.text, areas: question.areas, commentBox: false }));
 
       snapshot = { stage, title: roundTitle, questions: fallbackQuestions };
     }
