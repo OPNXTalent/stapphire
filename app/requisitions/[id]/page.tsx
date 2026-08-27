@@ -51,6 +51,16 @@ function sourceIsNewer(sourceTimestamp: unknown, analysisTimestamp: unknown): bo
   return new Date(String(sourceTimestamp)).getTime() > new Date(String(analysisTimestamp)).getTime();
 }
 
+function hasCompleteCustomRanking(candidates: MatrixCandidate[]): boolean {
+  if (candidates.length === 0) return false;
+  const ranks = candidates.map((candidate) => candidate.rankOrder);
+  if (ranks.some((rank) => rank === null)) return false;
+  return (ranks as number[])
+    .slice()
+    .sort((a, b) => a - b)
+    .every((rank, index) => rank === index + 1);
+}
+
 function buildInterviewAggregates(rows: InterviewSubmissionRow[]): Map<string, InterviewAggregate> {
   const working = new Map<string, { total: number; ratingCount: number; submitted: number }>();
 
@@ -152,7 +162,7 @@ export default async function RequisitionPage({ params }: { params: { id: string
     };
   });
 
-  const hasCustomRanking = matrixCandidates.some((candidate) => candidate.rankOrder !== null);
+  const hasCustomRanking = hasCompleteCustomRanking(matrixCandidates);
   matrixCandidates.sort((a, b) => hasCustomRanking
     ? (a.rankOrder === null ? 1 : b.rankOrder === null ? -1 : a.rankOrder - b.rankOrder)
       || (a.createdAt.localeCompare(b.createdAt))
