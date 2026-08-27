@@ -206,11 +206,11 @@ export function CandidateInterviewRounds({
     );
   }
 
-  function renderAssessment(assessment: ParticipantAssessment, key: string) {
+  function renderAssessment(assessment: ParticipantAssessment, key: string, contributorNumber: number) {
     return (
       <article className={styles.assessment} key={key}>
         <div className={styles.assessmentHeader}>
-          <strong>{assessment.contributor}</strong>
+          <strong>Panel Contributor {contributorNumber}</strong>
           <span>{assessment.recommendation || 'No recommendation'}</span>
         </div>
         {assessment.comments && <p>{assessment.comments}</p>}
@@ -328,7 +328,7 @@ export function CandidateInterviewRounds({
           {assessmentsVisible && (
             round.assessments.length > 0 ? (
               <div className={styles.assessmentList}>
-                {round.assessments.map((assessment, index) => renderAssessment(assessment, `${assessment.contributor}-${index}`))}
+                {round.assessments.map((assessment, index) => renderAssessment(assessment, `panel-${index}`, index + 1))}
               </div>
             ) : (
               <div className={styles.assessmentEmpty}>No participant assessments submitted yet.</div>
@@ -338,7 +338,7 @@ export function CandidateInterviewRounds({
         <div className="interview-summary-print-assessments">
           <h2>Participant Assessments</h2>
           {round.assessments.length > 0
-            ? round.assessments.map((assessment, index) => renderAssessment(assessment, `print-${assessment.contributor}-${index}`))
+            ? round.assessments.map((assessment, index) => renderAssessment(assessment, `print-panel-${index}`, index + 1))
             : <p>No participant assessments submitted yet.</p>}
         </div>
         </ClientPrintFrame>

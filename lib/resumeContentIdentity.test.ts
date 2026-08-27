@@ -36,6 +36,21 @@ test('a losing simultaneous duplicate leaves no extra durable item or empty oper
   assert.match(migration, /not exists \([\s\S]*public\.phase1_operation_items/i);
 });
 
+test('a durable claim follows the candidate resume rather than operation-history cleanup', () => {
+  const claimsTable = migration.match(/create table if not exists public\.phase1_resume_content_claims \([\s\S]*?\n\);/)?.[0] ?? '';
+  assert.match(claimsTable, /candidate_id uuid unique references public\.phase1_candidates\(id\) on delete cascade/);
+  assert.match(claimsTable, /operation_item_id uuid not null unique/);
+  assert.doesNotMatch(claimsTable, /operation_item_id[^\n]*references public\.phase1_operation_items/);
+  assert.match(migration, /after insert or update of operation_item_id on public\.phase1_candidates/);
+  assert.match(migration, /set candidate_id = new\.id[\s\S]*where operation_item_id = new\.operation_item_id/);
+});
+
+test('intentional candidate resume deletion releases only that requisition claim for re-upload', () => {
+  assert.match(migration, /primary key \(requisition_id, content_hash\)/i);
+  assert.match(migration, /candidate_id uuid unique references public\.phase1_candidates\(id\) on delete cascade/);
+  assert.doesNotMatch(migration, /references public\.phase1_operation_items\(id\) on delete cascade/);
+});
+
 test('a failed duplicate item does not stop valid items in the same batch', () => {
   assert.match(manager, /while \(cursor < descriptors\.length\)[\s\S]*try \{[\s\S]*fetch\([\s\S]*catch \(error\)[\s\S]*status: 'error'/);
   assert.match(manager, /Promise\.all\(Array\.from/);

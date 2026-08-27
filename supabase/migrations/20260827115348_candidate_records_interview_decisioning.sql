@@ -26,28 +26,54 @@ set public = excluded.public,
 create table if not exists public.phase1_resume_content_claims (
   requisition_id uuid not null references public.phase1_requisitions(id) on delete cascade,
   content_hash text not null check (content_hash ~ '^[0-9a-f]{64}$'),
-  operation_item_id uuid not null unique references public.phase1_operation_items(id) on delete cascade,
+  operation_item_id uuid not null unique,
+  candidate_id uuid unique references public.phase1_candidates(id) on delete cascade,
   created_at timestamptz not null default now(),
   primary key (requisition_id, content_hash)
 );
 
 alter table public.phase1_resume_content_claims enable row level security;
 revoke all on table public.phase1_resume_content_claims from public, anon, authenticated;
-grant select, insert, delete on table public.phase1_resume_content_claims to service_role;
+grant select, insert, update, delete on table public.phase1_resume_content_claims to service_role;
 
-insert into public.phase1_resume_content_claims (requisition_id, content_hash, operation_item_id, created_at)
+insert into public.phase1_resume_content_claims (requisition_id, content_hash, operation_item_id, candidate_id, created_at)
 select distinct on (operation.requisition_id, item.input_ref->>'contentHash')
   operation.requisition_id,
   item.input_ref->>'contentHash',
   item.id,
+  candidate.id,
   item.created_at
 from public.phase1_operation_items item
 join public.phase1_operations operation on operation.id = item.operation_id
+left join public.phase1_candidates candidate on candidate.operation_item_id = item.id
 where operation.operation_type = 'resume_batch_evaluation'
   and item.input_ref->>'uploaded' = 'true'
   and item.input_ref->>'contentHash' ~ '^[0-9a-f]{64}$'
 order by operation.requisition_id, item.input_ref->>'contentHash', item.created_at, item.id
 on conflict do nothing;
+
+create or replace function public.attach_phase1_resume_content_claim()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  update public.phase1_resume_content_claims
+  set candidate_id = new.id
+  where operation_item_id = new.operation_item_id;
+  return new;
+end;
+$$;
+
+revoke all on function public.attach_phase1_resume_content_claim() from public, anon, authenticated;
+
+drop trigger if exists attach_phase1_resume_content_claim on public.phase1_candidates;
+create trigger attach_phase1_resume_content_claim
+after insert or update of operation_item_id on public.phase1_candidates
+for each row
+when (new.operation_item_id is not null)
+execute function public.attach_phase1_resume_content_claim();
 
 drop function if exists public.mark_phase1_resume_item_uploaded(uuid, uuid, text);
 

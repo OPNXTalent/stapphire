@@ -47,7 +47,7 @@ export default async function CompletedInterviewPage({
 }) {
   const { data: invitation, error } = await supabaseAdmin
     .from('phase1_interview_invitations')
-    .select('id, candidate_id, requisition_id, round_title, round_snapshot, participant_name, submission_payload, status, submitted_at')
+    .select('id, candidate_id, requisition_id, stage, round_title, round_snapshot, participant_name, submission_payload, status, submitted_at')
     .eq('id', params.invitationId)
     .eq('candidate_id', params.id)
     .maybeSingle();
@@ -87,6 +87,7 @@ export default async function CompletedInterviewPage({
         <div className={styles.meta}>
           <span><strong>Candidate</strong>{candidate.full_name}</span>
           <span><strong>Position</strong>{requisition.title}</span>
+          <span><strong>Interview stage</strong>{invitation.stage}</span>
           <span><strong>Participant</strong>{invitation.participant_name || 'Not recorded'}</span>
           <span><strong>Submitted</strong>{submittedTimestamp(invitation.submitted_at)}</span>
         </div>
@@ -102,10 +103,13 @@ export default async function CompletedInterviewPage({
             {(question.areas ?? []).length > 0 && <div className={styles.ratings}>
               {(question.areas ?? []).map((area) => {
                 const value = Number(ratings[`${question.id}:${area}`] ?? 0);
+                const stars = Number.isInteger(value) && value >= 1 && value <= 5
+                  ? `${'★'.repeat(value)}${'☆'.repeat(5 - value)}`
+                  : '';
                 return (
                   <div className={styles.ratingRow} key={area}>
                     <span>{area}</span>
-                    <strong>{value > 0 ? `${value} / 5` : 'Not rated'}</strong>
+                    <strong>{stars ? `${stars} ${value} / 5` : 'Not rated'}</strong>
                   </div>
                 );
               })}
