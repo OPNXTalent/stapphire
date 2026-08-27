@@ -83,6 +83,14 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     let timer: ReturnType<typeof setTimeout> | null = null;
     let inFlight = false;
     let attemptedReconstruction = false;
+    // Set only once a target operation has actually been observed to
+    // exist in a poll response. Used below to tell "not created/visible
+    // yet" (never confirmed - keep waiting normally) apart from "existed,
+    // now gone" (confirmed, then absent - it was deleted server-side, e.g.
+    // every item in it was rejected as a duplicate and the durable
+    // operation was cleaned up along with them). Only the latter is safe
+    // to treat as resolved without ever having received a terminal status.
+    let confirmedTargetId: string | null = null;
 
     async function tick() {
       if (cancelled) return;
@@ -126,6 +134,16 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
         let found: ResumeOperationSummary | null = null;
         if (targetId) {
           found = list.find((operation) => operation.id === targetId) || null;
+          if (found) {
+            confirmedTargetId = targetId;
+          } else if (confirmedTargetId === targetId) {
+            // Confirmed to exist in an earlier tick, now missing - genuine
+            // deletion, not creation lag. Nothing further will ever appear
+            // for it; stop targeting it so the UI can settle instead of
+            // showing "Checking..." forever. Any rejection reason is
+            // already captured in the local per-item upload state.
+            targetOperationIdRef.current = null;
+          }
         } else if (!attemptedReconstruction) {
           // No current local batch (e.g. navigated here fresh) -
           // recover the latest durable operation directly from
@@ -255,9 +273,17 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     !allItemsDurablyUploaded &&
     !trackedOperationTerminal
   );
+  // A rejected item (e.g. an exact-duplicate résumé) is deleted outright
+  // server-side by the durable duplicate-protection RPC - there is no
+  // durable operation item left to ever report it as failed. Its local
+  // 'error' status is the only place that rejection is recorded, so once
+  // the batch finishes attempting every item, keep it visible as long as
+  // any item actually failed, instead of only while genuinely in flight.
+  const currentBatchHasLocalErrors = Boolean(currentLocalBatch?.items.some((item) => item.status === 'error'));
+  const localBatchNeedsAttention = Boolean(currentLocalBatch?.phase === 'accepted' && currentBatchHasLocalErrors);
   const visibleLocalBatches = localBatches.filter((batch) =>
     batch === currentLocalBatch
-      ? localUploading
+      ? (localUploading || localBatchNeedsAttention)
       : batch.phase === 'creating' || batch.phase === 'uploading'
   );
   const localAccepted = currentLocalBatch?.items.filter((item) => item.status === 'accepted').length || 0;
@@ -338,14 +364,20 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
 
       {visibleLocalBatches.map((batch) => {
         const accepted = batch.items.filter((item) => item.status === 'accepted').length;
+        const stillInFlight = batch.phase === 'creating' || batch.phase === 'uploading';
         return <div className="upload-durable-boundary" key={batch.clientBatchKey}>
-          <StapphireProcessing className="processing-compact" title="Uploading résumés…" detail={`${accepted} of ${batch.items.length} safely uploaded`}/>
+          {stillInFlight
+            ? <StapphireProcessing className="processing-compact" title="Uploading résumés…" detail={`${accepted} of ${batch.items.length} safely uploaded`}/>
+            : <p className="upload-summary">{accepted} of {batch.items.length} uploaded · {batch.items.length - accepted} need attention</p>}
           <ul className="upload-queue">{batch.items.map((item) => <li key={item.id} className={`upload-queue-item ${item.status === 'error' ? 'upload-queue-error' : 'upload-queue-processing'}`}>
             <span className="upload-queue-icon" aria-hidden="true">·</span>
             <span className="upload-queue-name">{item.filename}</span>
             <span className="upload-queue-status">{item.status === 'accepted' ? 'Uploaded' : item.status === 'error' ? 'Failed' : 'Uploading'}</span>
+            {item.status === 'error' && item.error && <span className="upload-queue-msg">{item.error}</span>}
           </li>)}</ul>
-          <small>Keep this browser open until upload completes.</small>
+          {stillInFlight
+            ? <small>Keep this browser open until upload completes.</small>
+            : <button type="button" className="upload-go-btn" onClick={() => dismissBatch(batch.clientBatchKey)}>Done</button>}
         </div>;
       })}
 

@@ -150,3 +150,43 @@ test('durable operations are accumulated and rendered so prior processing, compl
   assert.match(source, /item\.status === 'failed'/);
   assert.match(source, /item\.status === 'completed'/);
 });
+
+test('a target operation confirmed to exist and then missing is treated as deleted, not creation lag - polling stops instead of "Checking..." forever', () => {
+  const tickMatch = source.match(/async function tick\(\) \{([\s\S]*?)\n    \}\n/);
+  assert.ok(tickMatch, 'expected to find tick()');
+  assert.match(tickMatch[1], /confirmedTargetId = targetId/, 'expected a target to be marked confirmed once actually observed in a poll response');
+  const notFoundBranch = tickMatch[1].match(/else if \(confirmedTargetId === targetId\) \{([\s\S]*?)\n {10}\}/);
+  assert.ok(notFoundBranch, 'expected a branch distinguishing "confirmed, now missing" from "never confirmed yet"');
+  assert.match(notFoundBranch[1], /targetOperationIdRef\.current = null/, 'a confirmed-then-vanished operation must stop being targeted so the checking state can clear');
+});
+
+test('an operation never confirmed to exist is not declared gone - only creation lag is tolerated, never a false "gone"', () => {
+  const foundBlock = source.match(/if \(targetId\) \{\s*found = list\.find\(\(operation\) => operation\.id === targetId\) \|\| null;([\s\S]*?)\n {8}\} else if \(!attemptedReconstruction\)/);
+  assert.ok(foundBlock, 'expected the found/not-found branch for a known target');
+  assert.match(foundBlock[1], /confirmedTargetId === targetId/, 'must only ever declare "gone" relative to a target this loop previously confirmed existed');
+});
+
+test('a batch that finishes with a locally-failed item (e.g. an exact-duplicate résumé) stays visible after the batch settles, not only while genuinely uploading', () => {
+  assert.match(source, /const currentBatchHasLocalErrors = Boolean\(currentLocalBatch\?\.items\.some\(\(item\) => item\.status === 'error'\)\)/);
+  assert.match(source, /const localBatchNeedsAttention = Boolean\(currentLocalBatch\?\.phase === 'accepted' && currentBatchHasLocalErrors\)/);
+  const visibleMatch = source.match(/const visibleLocalBatches = localBatches\.filter\(\(batch\) =>([\s\S]*?)\n {2}\);/);
+  assert.ok(visibleMatch);
+  assert.match(visibleMatch[1], /localUploading \|\| localBatchNeedsAttention/, 'a batch with a failed item must remain visible once settled, not disappear the moment phase leaves creating/uploading');
+});
+
+test('the failed-item message is actually rendered, not just tracked in state', () => {
+  assert.match(source, /\{item\.status === 'error' && item\.error && <span className="upload-queue-msg">\{item\.error\}<\/span>\}/, 'expected the local per-item error message (e.g. "This resume has already been uploaded.") to render, matching how durable item.errorSummary already renders');
+});
+
+test('the uploading spinner stops once the batch has settled - only a genuinely in-flight batch shows the animation', () => {
+  const mapBlock = source.match(/\{visibleLocalBatches\.map\(\(batch\) => \{([\s\S]*?)\n {6}\}\)\}/);
+  assert.ok(mapBlock, 'expected to find the local batch render block');
+  assert.match(mapBlock[1], /const stillInFlight = batch\.phase === 'creating' \|\| batch\.phase === 'uploading'/);
+  assert.match(mapBlock[1], /stillInFlight\s*\n?\s*\? <StapphireProcessing/, 'the spinner must be conditioned on still being in flight, not shown unconditionally for every visible batch');
+});
+
+test('a settled batch with a failed item offers a way to dismiss it, mirroring the durable Done affordance', () => {
+  const mapBlock = source.match(/\{visibleLocalBatches\.map\(\(batch\) => \{([\s\S]*?)\n {6}\}\)\}/);
+  assert.ok(mapBlock);
+  assert.match(mapBlock[1], /onClick=\{\(\) => dismissBatch\(batch\.clientBatchKey\)\}/, 'expected a Done-style control that dismisses the settled local batch');
+});
