@@ -4,3 +4,4 @@
 .records:has(>.selectedBar){display:flex;flex:1;height:100%;min-height:0;flex-direction:column;gap:8px;overflow:hidden}
 .records:has(>.selectedBar)>.selectedBar{position:static;z-index:auto;flex:none;box-shadow:none}
 .records:has(>.selectedBar)>.aggregateCanvas,.records:has(>.selectedBar)>.canvas{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable}
+.decisionSummary{display:grid;gap:8px;margin-top:10px;padding:12px 8px;border-top:1px solid var(--line)}.decisionSummary>div{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;font-size:12px}.decisionSummary span{font-weight:700}.decisionSummary strong{text-align:right}.decisionSummary small{color:var(--muted);font-size:9.5px}

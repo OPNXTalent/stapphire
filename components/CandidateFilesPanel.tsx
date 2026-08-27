@@ -8,10 +8,23 @@ import styles from './CandidateFilesPanel.module.css';
 
 type SubmittedInterview = {
   id: string;
+  stage: string;
+  status: 'submitted';
   roundTitle: string;
   participantName: string | null;
   submittedAt: string | null;
 };
+
+type CandidateUpload = {
+  id: string;
+  folder_key: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: string;
+};
+
+type UploadTask = { id: string; folderKey: string; filename: string; status: 'uploading' | 'error'; error?: string };
 
 type FileSection = {
   key: string;
@@ -35,6 +48,8 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
   const [interviews, setInterviews] = useState<SubmittedInterview[] | null>(null);
+  const [uploads, setUploads] = useState<CandidateUpload[]>([]);
+  const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
   const [sections, setSections] = useState<FileSection[]>(DEFAULT_SECTIONS);
   const [layoutSaving, setLayoutSaving] = useState(false);
   const [draggedKey, setDraggedKey] = useState<string | null>(null);
@@ -59,6 +74,24 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
     return () => {
       cancelled = true;
     };
+  }, [candidate.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setUploads([]);
+    fetch(`/api/candidates/${candidate.id}/files`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to load candidate uploads.');
+        return data;
+      })
+      .then((data) => {
+        if (!cancelled) setUploads(Array.isArray(data.files) ? data.files : []);
+      })
+      .catch(() => {
+        if (!cancelled) setError('Unable to load candidate uploads.');
+      });
+    return () => { cancelled = true; };
   }, [candidate.id]);
 
   useEffect(() => {
@@ -174,8 +207,77 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
 
   async function deleteFolder(section: FileSection) {
     if (section.system || layoutSaving) return;
+    if (uploads.some((file) => file.folder_key === section.key)) {
+      setError('Move or delete this folder’s uploaded files before deleting the folder.');
+      return;
+    }
     if (!window.confirm(`Delete the “${section.name}” folder?`)) return;
     await persistSections(sections.filter((item) => item.key !== section.key));
+  }
+
+  async function uploadFiles(folderKey: string, selected: FileList | null) {
+    if (!selected?.length) return;
+    const tasks = Array.from(selected).map((file) => ({
+      id: crypto.randomUUID(),
+      folderKey,
+      filename: file.name,
+      status: 'uploading' as const,
+      file
+    }));
+    setUploadTasks((current) => [...current, ...tasks.map(({ file: _file, ...task }) => task)]);
+    await Promise.all(tasks.map(async (task) => {
+      try {
+        const form = new FormData();
+        form.append('file', task.file);
+        form.append('folderKey', folderKey);
+        const response = await fetch(`/api/candidates/${candidate.id}/files`, { method: 'POST', body: form });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Upload failed.');
+        setUploads((current) => [data.file as CandidateUpload, ...current]);
+        setUploadTasks((current) => current.filter((item) => item.id !== task.id));
+      } catch (uploadError) {
+        setUploadTasks((current) => current.map((item) => item.id === task.id
+          ? { ...item, status: 'error', error: uploadError instanceof Error ? uploadError.message : 'Upload failed.' }
+          : item));
+      }
+    }));
+  }
+
+  async function deleteUpload(file: CandidateUpload) {
+    if (!window.confirm(`Delete “${file.filename}”?`)) return;
+    const response = await fetch(`/api/candidates/${candidate.id}/files/${file.id}`, { method: 'DELETE' });
+    if (response.ok) {
+      setUploads((current) => current.filter((item) => item.id !== file.id));
+    } else {
+      const data = await response.json();
+      setError(data.error || 'Unable to delete this candidate file.');
+    }
+  }
+
+  function uploadedFiles(section: FileSection) {
+    const files = uploads.filter((file) => file.folder_key === section.key);
+    const tasks = uploadTasks.filter((task) => task.folderKey === section.key);
+    return (
+      <div className={styles.uploadFolder}>
+        <label className={styles.uploadButton}>
+          Upload files
+          <input type="file" multiple hidden onChange={(event) => { void uploadFiles(section.key, event.target.files); event.target.value = ''; }} />
+        </label>
+        {tasks.map((task) => (
+          <div className={styles.uploadTask} key={task.id}>
+            <span>{task.filename}</span>
+            <strong>{task.status === 'uploading' ? 'Uploading…' : task.error || 'Upload failed'}</strong>
+          </div>
+        ))}
+        {files.map((file) => (
+          <div className={styles.uploadedFile} key={file.id}>
+            <a href={`/api/candidates/${candidate.id}/files/${file.id}`}>{file.filename}</a>
+            <button type="button" onClick={() => void deleteUpload(file)}>Delete</button>
+          </div>
+        ))}
+        {files.length === 0 && tasks.length === 0 && <p className={styles.empty}>No files in this folder yet.</p>}
+      </div>
+    );
   }
 
   function sectionBody(section: FileSection) {
@@ -201,7 +303,7 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
     }
 
     if (section.key === 'uploads') {
-      return <p className={styles.empty}>No additional candidate files yet.</p>;
+      return uploadedFiles(section);
     }
 
     if (section.key === 'interviews') {
@@ -217,7 +319,7 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
                   <span className={styles.interviewInfo}>
                     <span className={styles.fileName}>{interview.roundTitle || 'Interview'}</span>
                     <span className={styles.fileMeta}>
-                      {[interview.participantName, submittedLabel(interview.submittedAt)].filter(Boolean).join(' · ')}
+                      {[`Submitted · ${interview.stage}`, interview.participantName || 'Interview participant', submittedLabel(interview.submittedAt)].filter(Boolean).join(' · ')}
                     </span>
                   </span>
                   <span className={styles.fileAction}>View</span>
@@ -232,7 +334,7 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
 
     return (
       <div className={styles.customFolderBody}>
-        <p className={styles.empty}>No files in this folder yet.</p>
+        {uploadedFiles(section)}
         <button type="button" className={styles.deleteFolder} onClick={() => void deleteFolder(section)} disabled={layoutSaving}>
           Delete folder
         </button>

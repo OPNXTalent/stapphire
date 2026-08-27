@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent, t
 import { buildQuestionBank } from '@/lib/interviewQuestionBank';
 import { printStapphireDocument } from '@/lib/printDocument';
 import { ClientPrintFrame, type ClientPrintBranding } from '@/components/ClientPrintHeader';
+import { summarizeInterviewDecision, type InterviewRecommendation } from '@/lib/interviewDecision';
 import styles from './CandidateInterviewRounds.module.css';
 
 type ViewId = 'evaluation' | string | null;
@@ -17,7 +18,7 @@ type AggregateRow = {
 
 type ParticipantAssessment = {
   contributor: string;
-  recommendation: 'Proceed' | 'Decline' | 'Undecided - Need more information' | '';
+  recommendation: InterviewRecommendation;
   comments: string;
   questionComments: Array<{ question: string; comment: string }>;
   yesNoResponses: Array<{ question: string; response: 'Yes' | 'No' }>;
@@ -273,6 +274,7 @@ export function CandidateInterviewRounds({
   if (!round) return null;
   const assessmentsVisible = assessmentOpen[round.id] ?? false;
   const branding = printBranding.byStage?.[round.id] ?? printBranding.defaultBranding;
+  const decisionSummary = summarizeInterviewDecision(round.overall, round.assessments.map((assessment) => assessment.recommendation));
 
   return (
     <section className={styles.records}>
@@ -305,6 +307,11 @@ export function CandidateInterviewRounds({
         <div className={styles.overall}>
           <span>Overall Interview Average</span>
           <strong>{round.overall === null ? '—' : `★ ${round.overall.toFixed(2)} / 5`}</strong>
+        </div>
+        <div className={styles.decisionSummary} aria-label="Advisory interview decision summary">
+          <div><span>Panel Recommendation</span><strong>{decisionSummary.composition}</strong></div>
+          <div><span>Suggested Decision</span><strong>{decisionSummary.label}</strong></div>
+          <small>Advisory only — not a final hiring decision.</small>
         </div>
 
         <section className={styles.participantAssessments} aria-label="Participant interview assessments">

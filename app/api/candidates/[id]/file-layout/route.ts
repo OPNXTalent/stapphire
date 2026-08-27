@@ -84,6 +84,36 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (candidateError) throw candidateError;
     if (!candidate) return NextResponse.json({ error: 'Candidate not found.' }, { status: 404 });
 
+    const { data: currentLayout, error: layoutError } = await supabaseAdmin
+      .from('phase1_candidate_file_layouts')
+      .select('sections')
+      .eq('candidate_id', params.id)
+      .maybeSingle();
+
+    if (layoutError) throw layoutError;
+    const nextKeys = new Set(sections.map((section) => section.key));
+    const removedCustomKeys = (validateSections(currentLayout?.sections) ?? defaultSections())
+      .filter((section) => !section.system && !nextKeys.has(section.key))
+      .map((section) => section.key);
+
+    if (removedCustomKeys.length > 0) {
+      const { data: containedUpload, error: uploadError } = await supabaseAdmin
+        .from('phase1_candidate_uploads')
+        .select('id')
+        .eq('candidate_id', params.id)
+        .in('folder_key', removedCustomKeys)
+        .limit(1)
+        .maybeSingle();
+
+      if (uploadError) throw uploadError;
+      if (containedUpload) {
+        return NextResponse.json(
+          { error: 'Move or delete uploaded files before removing this folder.' },
+          { status: 409 }
+        );
+      }
+    }
+
     const { error } = await supabaseAdmin
       .from('phase1_candidate_file_layouts')
       .upsert({

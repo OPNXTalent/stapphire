@@ -1,5 +1,5 @@
-import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
+import { resumeContentHash } from '@/lib/resumeContentIdentity';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getResumeSourceType, MAX_RESUME_SIZE } from '@/lib/resumeFiles';
 import { operationQueue } from '@/lib/operationQueue';
@@ -39,7 +39,7 @@ export async function POST(request: Request, { params }: { params: { operationId
     const sourceType = getResumeSourceType(file.name, file.type);
     if (!sourceType || sourceType.mimeType !== expectedMime) throw new Error('Resume must be a PDF, DOCX, or TXT file.');
     const buffer = Buffer.from(await file.arrayBuffer());
-    const contentHash = createHash('sha256').update(buffer).digest('hex');
+    const contentHash = resumeContentHash(buffer);
     const { error: storageError } = await supabaseAdmin.storage.from(RESUME_BUCKET).upload(storagePath, buffer, {
       contentType: sourceType.mimeType,
       upsert: false
@@ -48,12 +48,13 @@ export async function POST(request: Request, { params }: { params: { operationId
     storageAccepted = true;
     console.info('Resume upload item stored', { operationId: params.operationId, operationItemId: params.itemId });
 
-    const { error: uploadedError } = await supabaseAdmin.rpc('mark_phase1_resume_item_uploaded', {
+    const { data: uploaded, error: uploadedError } = await supabaseAdmin.rpc('mark_phase1_resume_item_uploaded', {
       p_operation_id: params.operationId,
       p_item_id: params.itemId,
       p_content_hash: contentHash
     });
     if (uploadedError) throw uploadedError;
+    if (!uploaded) throw new Error('This resume has already been uploaded.');
     itemAccepted = true;
     console.info('Resume upload item queued', { operationId: params.operationId, operationItemId: params.itemId });
     try {
