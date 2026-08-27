@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { CandidateReport } from '@/components/CandidateReport';
 import { CandidateDetailActions } from '@/components/CandidateDetailActions';
 import { CandidateInterviewRounds } from '@/components/CandidateInterviewRounds';
@@ -53,8 +53,12 @@ function categoryAssessment(score: number | null): string {
 
 export function CandidateMatrix({ candidates, positionTitle, requisitionId, headerAction }: { candidates: MatrixCandidate[]; positionTitle: string; requisitionId: string; headerAction?: ReactNode }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [orderedCandidates, setOrderedCandidates] = useState(candidates);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(() => {
+    const requestedId = searchParams.get('candidate');
+    return requestedId && candidates.some((c) => c.id === requestedId) ? requestedId : null;
+  });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [dispositions, setDispositions] = useState<Record<string, Disposition | null>>(() =>
     Object.fromEntries(candidates.map((c) => [c.id, c.disposition]))
@@ -149,9 +153,6 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
   function renderBanner(candidate: MatrixCandidate, isOpen: boolean, rank: number, extraClass = ''): ReactNode {
     const disposition = dispositions[candidate.id];
     const dispositionLabel = disposition ? DISPOSITION_LABEL[disposition] : 'No status';
-    const interviewLabel = candidate.interviewScore === null
-      ? `Interview — / 5 · ${candidate.interviewSubmitted} submitted`
-      : `Interview ${candidate.interviewScore.toFixed(2)} / 5 · ${candidate.interviewSubmitted} submitted`;
 
     return (
       <div
@@ -240,25 +241,6 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
           >
             {dispositionLabel}
           </span>
-          {candidate.interviewSubmitted > 0 && (
-            <span
-              aria-label={interviewLabel}
-              style={{
-                maxWidth: '100%',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                color: 'var(--sapphire)',
-                fontFamily: 'var(--mono)',
-                fontSize: '9px',
-                fontWeight: 700,
-                letterSpacing: '.02em',
-                lineHeight: 1.1
-              }}
-            >
-              {interviewLabel}
-            </span>
-          )}
         </span>
         <span className="facet-cell matrix-row-match">
           <span className="score-num">{candidate.match === null ? '—' : `${candidate.match}%`}</span>

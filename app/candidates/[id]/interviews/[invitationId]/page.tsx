@@ -69,12 +69,13 @@ export default async function CompletedInterviewPage({
   const questionComments = submission.questionComments ?? {};
   const yesNoResponses = submission.yesNoResponses ?? {};
   const href = `/candidates/${params.id}/interviews/${params.invitationId}`;
+  const backToCandidateHref = `/requisitions/${invitation.requisition_id}?view=candidates&candidate=${params.id}`;
 
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} print-document`}>
       {searchParams?.print === '1' && <AutoPrint />}
       <div className={styles.topRow}>
-        <a href={`/candidates/${params.id}`} className={styles.back}>← Back to candidate</a>
+        <a href={backToCandidateHref} className={styles.back}>← Back to candidate</a>
         <div className={styles.topActions}>
           <CompletedInterviewActions href={href} />
           <span className={styles.locked}>READ ONLY</span>
