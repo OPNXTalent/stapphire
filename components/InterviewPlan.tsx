@@ -74,7 +74,13 @@ type PersistedRound = {
 // A stage "card" descriptor unifies the four fixed stages with any
 // preserved legacy/additional round for rendering purposes (the list
 // view and the selected-stage header both need this for either kind).
-type StageCardInfo = { key: string; label: string; tagline: string; legacy?: boolean };
+// tagline is only ever rendered for a legacy round ("Needs stage
+// assignment"); a canonical stage instead renders its own
+// description - the QUALIFY/VALIDATE/DEMONSTRATE/DIFFERENTIATE
+// concept badge itself is presentation-only and no longer shown (the
+// underlying tagline classification in INTERVIEW_STAGES is preserved
+// and still available for future generator/workflow logic).
+type StageCardInfo = { key: string; label: string; tagline: string; description?: string; legacy?: boolean };
 
 function localId() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -102,7 +108,7 @@ function defaultTitles(): Record<InterviewStageId, string> {
 }
 
 function stageCardInfoFor(stage: typeof INTERVIEW_STAGES[number]): StageCardInfo {
-  return { key: stage.id, label: stage.label, tagline: stage.tagline };
+  return { key: stage.id, label: stage.label, tagline: stage.tagline, description: stage.description };
 }
 
 // A round whose persisted stage key isn't one of the four canonical
@@ -665,10 +671,17 @@ export function InterviewPlan({
         onClick={() => setSelectedKey(selected ? null : info.key)}
         aria-expanded={selected}
       >
-        <span className={styles.roundTitle}>
-          {info.label}
-          <span className={`${styles.stageTagline} ${info.legacy ? styles.legacyTagline : ''}`}>{info.tagline}</span>
-        </span>
+        {info.legacy ? (
+          <span className={styles.roundTitle}>
+            {info.label}
+            <span className={`${styles.stageTagline} ${styles.legacyTagline}`}>{info.tagline}</span>
+          </span>
+        ) : (
+          <span className={styles.roundTitleStack}>
+            <span className={styles.roundName}>{info.label}</span>
+            {info.description && <span className={styles.roundExplainer}>{info.description}</span>}
+          </span>
+        )}
         <span className={styles.roundMeta}>
           <span>{candidateNames.length} Candidates</span><span>•</span><span>{stageQuestions.length} Question{stageQuestions.length === 1 ? '' : 's'}</span>
         </span>

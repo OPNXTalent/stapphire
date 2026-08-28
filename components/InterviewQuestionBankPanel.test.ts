@@ -46,19 +46,23 @@ test('the stale pre-plan-load "already used" starter ids were updated to match t
   assert.doesNotMatch(source, /'phone-screen-1','phone-screen-2'/, 'the old buildQuestionBank-based ids must not remain, since they no longer correspond to what is actually pre-loaded onto a new Phone Screen');
 });
 
-test('the selected stage\'s name/tagline and its canonical explainer are computed once and shared between both branches, not duplicated', () => {
-  const stageContextMatches = source.match(/const stageContext = stageInfo && \(/g) || [];
-  assert.equal(stageContextMatches.length, 1, 'expected exactly one stageContext computation, reused by both the phone-screen and structured returns');
-  const usageMatches = source.match(/\{stageContext\}/g) || [];
-  assert.equal(usageMatches.length, 2, 'expected {stageContext} to be rendered in both the phone-screen and structured branches');
+test('the duplicated stage-context block (repeated stage name, concept badge, and explainer) is gone from the right panel - that context now lives only in the full-width stage bar', () => {
+  assert.doesNotMatch(source, /stageContext/, 'no trace of the stageContext computation or its usage should remain');
+  assert.doesNotMatch(source, /stageContextTitle|stageContextTagline|stageContextExplainer/, 'no trace of the stageContext CSS classes should remain');
+  assert.doesNotMatch(source, /\bINTERVIEW_STAGES\b/, 'INTERVIEW_STAGES is no longer needed in this file once stageContext is removed');
 });
 
-test('the stage explainer is system guidance, not user-editable - a <p>, not an input/textarea, sourced from INTERVIEW_STAGES rather than local state', () => {
-  const contextMatch = source.match(/const stageContext = stageInfo && \(([\s\S]*?)\n {2}\);/);
-  assert.ok(contextMatch, 'expected to find the stageContext JSX');
-  assert.match(contextMatch[1], /<h2 className=\{styles\.stageContextTitle\}>\{stageInfo\.label\} <span className=\{styles\.stageContextTagline\}>\{stageInfo\.tagline\}<\/span><\/h2>/);
-  assert.match(contextMatch[1], /<p className=\{styles\.stageContextExplainer\}>\{stageInfo\.description\}<\/p>/);
-  assert.doesNotMatch(contextMatch[1], /<input|<textarea|onChange/, 'the explainer must be static system text, never an editable field');
+test('the panel content begins directly with the .generator wrapper (Question Bank heading, count, and guidance) in both branches - nothing precedes it', () => {
+  const phoneScreenMatch = source.match(/if \(isPhoneScreen\) \{\s*\n\s*return \(\s*\n\s*<div className=\{styles\.panel\}>\s*\n\s*<div className=\{styles\.generator\}>/);
+  assert.ok(phoneScreenMatch, 'phone-screen branch: .panel must be followed immediately by .generator, with nothing in between');
+
+  const structuredMatch = source.match(/\n {2}return \(\s*\n\s*<div className=\{styles\.panel\}>\s*\n\s*<div className=\{styles\.generator\}>/);
+  assert.ok(structuredMatch, 'structured branch: .panel must be followed immediately by .generator, with nothing in between');
+});
+
+test('Question Bank remains the panel\'s functional heading, still showing its live count', () => {
+  const headingMatches = source.match(/<h3>Question Bank <span className=\{styles\.bankCount\}>/g) || [];
+  assert.equal(headingMatches.length, 2, 'expected the Question Bank heading in both the phone-screen and structured branches');
 });
 
 // --- Question Type organization ---
@@ -109,12 +113,3 @@ test('a wildcard-dragged custom question defaults to questionType Custom / cardT
   assert.match(blankDragMatch[1], /cardTitle: 'Custom Question',/);
 });
 
-test('the stage context (title + explainer) renders above the Question Bank heading in both branches', () => {
-  const phoneScreenIndex = source.indexOf('{stageContext}', source.indexOf('if (isPhoneScreen)'));
-  const phoneScreenBankHeadingIndex = source.indexOf('Question Bank <span', phoneScreenIndex);
-  assert.ok(phoneScreenIndex >= 0 && phoneScreenBankHeadingIndex > phoneScreenIndex, 'phone-screen branch: stageContext must precede the Question Bank heading');
-
-  const structuredIndex = source.indexOf('{stageContext}', phoneScreenBankHeadingIndex);
-  const structuredBankHeadingIndex = source.indexOf('Question Bank <span', structuredIndex);
-  assert.ok(structuredIndex >= 0 && structuredBankHeadingIndex > structuredIndex, 'structured branch: stageContext must precede the Question Bank heading');
-});

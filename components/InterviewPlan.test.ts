@@ -27,8 +27,37 @@ test('the not-selected view renders exactly the four fixed stages from INTERVIEW
   assert.match(source, /\{INTERVIEW_STAGES\.map\(\(stage\) => \(/, 'expected the stage list to map directly over the fixed INTERVIEW_STAGES constant');
 });
 
-test('each stage card shows its tagline (Qualify/Validate/Demonstrate/Differentiate) alongside its name', () => {
-  assert.match(source, /<span className=\{`\$\{styles\.stageTagline\} \$\{info\.legacy \? styles\.legacyTagline : ''\}`\}>\{info\.tagline\}<\/span>/);
+test('none of the four stage-concept badges (Qualify/Validate/Demonstrate/Differentiate) render anywhere in the stage bar - presentation only, the underlying tagline classification stays intact', () => {
+  assert.doesNotMatch(source, />Qualify</);
+  assert.doesNotMatch(source, />Validate</);
+  assert.doesNotMatch(source, />Demonstrate</);
+  assert.doesNotMatch(source, />Differentiate</);
+  // The legacy round's own, distinct "Needs stage assignment" badge is unrelated to this cleanup and must be unaffected.
+  const renderStageCardMatch = source.match(/function renderStageCard\(info: StageCardInfo, selected = false\) \{([\s\S]*?)\n  \}/);
+  assert.ok(renderStageCardMatch, 'expected renderStageCard');
+  assert.match(renderStageCardMatch[1], /info\.legacy \? \(/, 'a legacy round must still branch to its own badge');
+  assert.match(renderStageCardMatch[1], /<span className=\{`\$\{styles\.stageTagline\} \$\{styles\.legacyTagline\}`\}>\{info\.tagline\}<\/span>/);
+});
+
+test('each of the four fixed stages shows its canonical one-sentence explanation directly under its name in the stage bar, wrapping cleanly rather than being truncated', () => {
+  const renderStageCardMatch = source.match(/function renderStageCard\(info: StageCardInfo, selected = false\) \{([\s\S]*?)\n  \}/);
+  assert.ok(renderStageCardMatch, 'expected renderStageCard');
+  assert.match(renderStageCardMatch[1], /<span className=\{styles\.roundTitleStack\}>/);
+  assert.match(renderStageCardMatch[1], /<span className=\{styles\.roundName\}>\{info\.label\}<\/span>/);
+  assert.match(renderStageCardMatch[1], /info\.description && <span className=\{styles\.roundExplainer\}>\{info\.description\}<\/span>/);
+  assert.match(source, /function stageCardInfoFor\(stage: typeof INTERVIEW_STAGES\[number\]\): StageCardInfo \{\s*\n\s*return \{ key: stage\.id, label: stage\.label, tagline: stage\.tagline, description: stage\.description \};/, 'the canonical description must flow from INTERVIEW_STAGES, not be hardcoded per stage');
+});
+
+test('candidate/question counts stay in the right-hand column of the stage bar regardless of explanation length', () => {
+  const renderStageCardMatch = source.match(/function renderStageCard\(info: StageCardInfo, selected = false\) \{([\s\S]*?)\n  \}/);
+  assert.ok(renderStageCardMatch);
+  assert.match(renderStageCardMatch[1], /<span className=\{styles\.roundMeta\}>/);
+  assert.match(renderStageCardMatch[1], /\{candidateNames\.length\} Candidates/);
+  assert.match(renderStageCardMatch[1], /\{stageQuestions\.length\} Question/);
+});
+
+test('the underlying stage classification (tagline field) is preserved on INTERVIEW_STAGES and on StageCardInfo, even though the badge is no longer rendered for a canonical stage', () => {
+  assert.match(source, /type StageCardInfo = \{ key: string; label: string; tagline: string; description\?: string; legacy\?: boolean \};/);
 });
 
 test('selecting a stage dispatches the existing workspace-focus/builder-context events with that exact stage id, connecting the right panel (Question Bank) to that stage', () => {

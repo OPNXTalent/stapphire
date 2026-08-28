@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { AREAS_OF_EVALUATION, INTERVIEW_STAGES, type BankQuestion, type InterviewStageId } from '@/lib/interviewQuestionBank';
+import { AREAS_OF_EVALUATION, type BankQuestion, type InterviewStageId } from '@/lib/interviewQuestionBank';
 import { PHONE_SCREEN_BANK_QUESTIONS, PHONE_SCREEN_QUESTION_TYPES, type PhoneScreenResponseKind, type PhoneScreenResponseSpec } from '@/lib/phoneScreenQuestions';
 import { AOE_PREFERENCES_CHANGED_EVENT, type AoePreferences } from '@/lib/aoePreferences';
 import { INTERVIEW_QUESTION_TYPES, type InterviewQuestionType } from '@/lib/interviewQuestionTypes';
@@ -143,18 +143,10 @@ export function InterviewQuestionBankPanel({
   // sourced from a different, stage-specific list instead of the
   // generator's fetched/generated pools.
   const isPhoneScreen = stage === 'phone-screen';
-  // The selected stage's own name/tagline and its canonical, system-
-  // authored one-sentence explainer - not user-editable, and shared
-  // (computed once, rendered from both the phone-screen and structured
-  // branches below) so the right panel always connects to "that
-  // stage's own context" the same way regardless of which is selected.
-  const stageInfo = INTERVIEW_STAGES.find((item) => item.id === stage);
-  const stageContext = stageInfo && (
-    <div className={styles.stageContext}>
-      <h2 className={styles.stageContextTitle}>{stageInfo.label} <span className={styles.stageContextTagline}>{stageInfo.tagline}</span></h2>
-      <p className={styles.stageContextExplainer}>{stageInfo.description}</p>
-    </div>
-  );
+  // The stage's own name and canonical explainer are now shown in the
+  // full-width stage bar (InterviewPlan.tsx) instead of being repeated
+  // here - this panel is reserved for Question Bank functionality and
+  // begins directly with its own heading below.
   const availablePhoneScreenQuestions = useMemo<AvailableQuestion[]>(
     () => PHONE_SCREEN_BANK_QUESTIONS
       .filter((question) => !usedIds.has(question.id))
@@ -385,7 +377,6 @@ export function InterviewQuestionBankPanel({
   if (isPhoneScreen) {
     return (
       <div className={styles.panel}>
-        {stageContext}
         <div className={styles.generator}>
           <div className={styles.panelHeader}>
             <h3>Question Bank <span className={styles.bankCount}>{availablePhoneScreenQuestions.length}</span></h3>
@@ -441,7 +432,6 @@ export function InterviewQuestionBankPanel({
 
   return (
     <div className={styles.panel}>
-      {stageContext}
       <div className={styles.generator}>
         <div className={styles.areaPicker} ref={pickerRef}>
           <div className={styles.panelHeader}>
