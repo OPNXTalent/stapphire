@@ -114,10 +114,13 @@ test('a distinct checking state is shown while a target operation is known but n
   assert.match(source, /Checking résumé processing status/);
 });
 
-test('the Evaluating animation and Done control are both gated on the tracked operation actually being active', () => {
-  assert.match(source, /trackedOperationActive/);
-  assert.match(source, /\{trackedOperationActive && \(/, 'expected the animation gated on active state');
-  assert.match(source, /\{!trackedOperationActive && <button/, 'expected Done gated on NOT active, so it cannot appear while still active');
+test('the Evaluating animation and Done control are both gated on the durable operation actually being active, inside the shared operation-card renderer', () => {
+  const cardMatch = source.match(/function renderOperationCard\([\s\S]*?\n  \}/);
+  assert.ok(cardMatch, 'expected to find renderOperationCard');
+  assert.match(cardMatch[0], /const active = isActiveOperation\(operation\.status\);/);
+  assert.match(cardMatch[0], /active\s*\n?\s*\? <StapphireProcessing/, 'expected the Evaluating animation gated on active state');
+  assert.match(cardMatch[0], /\{!active && <div className="upload-complete">/, 'expected the Done control gated on NOT active, so it cannot appear while still active');
+  assert.match(cardMatch[0], /<button type="button" className="upload-go-btn" onClick=\{options\.onDismiss\}>Done<\/button>/);
 });
 
 test('the component unmounting does not endanger durable work - the cleanup only clears local timers/flags, never touches server state', () => {
@@ -185,7 +188,7 @@ test('a batch that finishes with a locally-failed item (e.g. an exact-duplicate 
   assert.match(visibleMatch[1], /localUploading \|\| localBatchNeedsAttention/, 'a batch with a failed item must remain visible once settled, not disappear the moment phase leaves creating/uploading');
 });
 
-test('the failed-item message is actually rendered, not just tracked in state', () => {
+test('the failed-item message is actually rendered while still in flight, not just tracked in state', () => {
   assert.match(source, /\{item\.status === 'error' && item\.error && <span className="upload-queue-msg">\{item\.error\}<\/span>\}/, 'expected the local per-item error message (e.g. "This resume has already been uploaded.") to render, matching how durable item.errorSummary already renders');
 });
 
@@ -193,13 +196,41 @@ test('the uploading spinner stops once the batch has settled - only a genuinely 
   const mapBlock = source.match(/\{visibleLocalBatches\.map\(\(batch\) => \{([\s\S]*?)\n {6}\}\)\}/);
   assert.ok(mapBlock, 'expected to find the local batch render block');
   assert.match(mapBlock[1], /const stillInFlight = batch\.phase === 'creating' \|\| batch\.phase === 'uploading'/);
-  assert.match(mapBlock[1], /stillInFlight\s*\n?\s*\? <StapphireProcessing/, 'the spinner must be conditioned on still being in flight, not shown unconditionally for every visible batch');
+  const inFlightBranch = mapBlock[1].match(/if \(stillInFlight\) \{([\s\S]*?)\n {8}\}/);
+  assert.ok(inFlightBranch, 'expected a single, resolved-up-front still-in-flight branch');
+  assert.match(inFlightBranch[1], /<StapphireProcessing/, 'the spinner must render for the still-in-flight branch');
+  const spinnerOccurrences = mapBlock[1].match(/<StapphireProcessing/g) || [];
+  assert.equal(spinnerOccurrences.length, 1, 'the animation must only ever render once, from the still-in-flight branch - a settled batch must never show it');
 });
 
-test('a settled batch with a failed item offers a way to dismiss it, mirroring the durable Done affordance', () => {
+test('needs-attention heading is singular/plural and derived from the extracted, independently-tested presentation helper, not a hand-rolled sentence', () => {
+  assert.match(source, /import \{[\s\S]*?needsAttentionHeading[\s\S]*?\} from '@\/lib\/resumeUploadPresentation';/, 'expected needsAttentionHeading to be imported from the presentation helper module, which has its own direct behavioral tests');
+  assert.match(source, /\{needsAttentionHeading\(attentionItems\.length\)\}/);
+});
+
+test('once settled, only failed local items are rendered as needing attention - a successfully uploaded résumé does not reappear here', () => {
+  assert.match(source, /const attentionItems = failedLocalItems\(batch\.items\);/, 'expected the settled branch to filter down to only failed items via the extracted, independently-tested helper');
+  assert.match(source, /\{attentionItems\.map\(\(item\) =>/, 'expected the settled branch to render attentionItems, not the full unfiltered batch.items list');
+});
+
+test('each needs-attention item shows its filename and error message on separate lines, without redundantly duplicating a visible "Failed" label next to the full error sentence', () => {
+  const attentionItemMatch = source.match(/\{attentionItems\.map\(\(item\) => <li[\s\S]*?<\/li>\)\}/);
+  assert.ok(attentionItemMatch, 'expected to find the needs-attention item template');
+  assert.match(attentionItemMatch[0], /<span className="upload-queue-name">\{item\.filename\}<\/span>/, 'filename must render clearly');
+  assert.match(attentionItemMatch[0], /\{item\.error && <span className="upload-queue-msg">\{item\.error\}<\/span>\}/, 'the complete error sentence must render as its own element (a second line via upload-queue-item-attention layout)');
+  assert.doesNotMatch(attentionItemMatch[0], />Failed</, 'must not also render a redundant visible "Failed" label alongside the complete error sentence');
+  assert.match(attentionItemMatch[0], /className="visually-hidden"/, 'a screen-reader-only label must still identify the row as failed for accessibility');
+});
+
+test('a settled batch with a failed item offers a way to dismiss it, labeled distinctly from the durable operation\'s own Done control', () => {
   const mapBlock = source.match(/\{visibleLocalBatches\.map\(\(batch\) => \{([\s\S]*?)\n {6}\}\)\}/);
   assert.ok(mapBlock);
-  assert.match(mapBlock[1], /onClick=\{\(\) => dismissBatch\(batch\.clientBatchKey\)\}/, 'expected a Done-style control that dismisses the settled local batch');
+  assert.match(mapBlock[1], /onClick=\{\(\) => dismissBatch\(batch\.clientBatchKey\)\}>Dismiss<\/button>/, 'expected a "Dismiss" control (not "Done") that clears only the settled local error presentation, so it cannot be mistaken for the durable operation\'s Done control');
+});
+
+test('local Dismiss only clears local batch/dismissal state - it does not touch durable operation state (trackedOperation/knownOperations/dismissOperation)', () => {
+  assert.match(source, /onClick=\{\(\) => dismissBatch\(batch\.clientBatchKey\)\}/);
+  assert.doesNotMatch(source, /dismissBatch\(batch\.clientBatchKey\)[\s\S]{0,40}dismissOperation/, 'dismissing a local batch\'s needs-attention row must not also dismiss durable operation state');
 });
 
 // A proven-deleted target (e.g. an exact-duplicate résumé's operation,
@@ -250,4 +281,70 @@ test('local duplicate-error visibility (message and Done control) is untouched b
   const mapBlock = source.match(/\{visibleLocalBatches\.map\(\(batch\) => \{([\s\S]*?)\n {6}\}\)\}/);
   assert.ok(mapBlock);
   assert.doesNotMatch(mapBlock[1], /trackedOperation/, 'the local per-batch error row/Done control must remain independent of trackedOperation state, so clearing a stale tracked operation can never affect it');
+});
+
+// Presentation cleanup round - regression coverage for the required UX
+// contract (needs-attention/evaluating/completed sections, and the
+// duplicate-only vs. mixed-batch cases). This deliberately does not
+// touch polling, advancePollTarget, tracked-operation authority/cleanup,
+// duplicate detection, or evaluation accounting - only what is shown.
+
+test('an exact-duplicate-only batch shows only the needs-attention section, never an empty evaluation section', () => {
+  // showTrackedOperationView (and therefore renderOperationCard for the
+  // tracked operation) is unconditionally gated on trackedOperation
+  // itself being truthy. A duplicate-only batch's operation is deleted
+  // outright server-side (protected behavior, unchanged by this round -
+  // see the confirmed-deleted clearing tests above), so trackedOperation
+  // is null once settled, and this gate alone is what keeps the
+  // evaluation section from ever rendering empty.
+  assert.match(source, /const showTrackedOperationView = Boolean\(\s*\n\s*trackedOperation && !showCheckingStatus && trackedOperationAuthoritative\s*\n\s*\);/);
+  assert.match(source, /\{showTrackedOperationView && trackedOperation && renderOperationCard\(/, 'the evaluation section must not render at all when there is no tracked operation - not render-with-empty-state');
+  // The needs-attention section, by contrast, depends only on the local
+  // batch's own settled state - independent of trackedOperation - so it
+  // renders regardless of whether any durable operation exists at all.
+  assert.doesNotMatch(source.match(/const localBatchNeedsAttention = [\s\S]*?;/)![0], /trackedOperation/, 'needs-attention visibility must not depend on a durable operation existing');
+});
+
+test('needs-attention and evaluation sections are always sourced from disjoint data - local batch items vs. the durable operation\'s own items - so a mixed batch can never show the same filename in both', () => {
+  assert.match(source, /const attentionItems = failedLocalItems\(batch\.items\);/, 'needs-attention is derived from the local batch\'s own items');
+  const cardMatch = source.match(/function renderOperationCard\([\s\S]*?\n  \}/);
+  assert.ok(cardMatch);
+  assert.match(cardMatch[0], /operation\.items\.map/, 'the evaluation queue is derived from the durable operation\'s own items, a structurally distinct source');
+  assert.doesNotMatch(cardMatch[0], /batch\.items/, 'the evaluation card must never read from local batch items');
+});
+
+test('active evaluation progress ("N of M complete") is rendered exactly once per card, via the extracted presentation helper, not duplicated in a second summary line', () => {
+  const cardMatch = source.match(/function renderOperationCard\([\s\S]*?\n  \}/);
+  assert.ok(cardMatch);
+  const progressOccurrences = cardMatch[0].match(/progressLabel\(completed, total\)/g) || [];
+  assert.equal(progressOccurrences.length, 1, 'progress must be computed/rendered exactly once per card');
+  assert.match(cardMatch[0], /title=\{evaluatingHeading\(total\)\}/, 'expected the heading to state the résumé count, e.g. "Evaluating 6 résumés"');
+});
+
+test('a completed operation\'s filename list is collapsed by default (expandedOperationIds starts empty) and only renders while active or explicitly expanded', () => {
+  assert.match(source, /const \[expandedOperationIds, setExpandedOperationIds\] = useState<Set<string>>\(new Set\(\)\);/, 'expected details to start collapsed for every operation - an empty expanded set');
+  const cardMatch = source.match(/function renderOperationCard\([\s\S]*?\n  \}/);
+  assert.ok(cardMatch);
+  assert.match(cardMatch[0], /const showQueue = active \|\| expanded;/, 'the filename list must only show while active (in-progress) or explicitly expanded once terminal - collapsed by default otherwise');
+});
+
+test('the "View details"/"Hide details" toggle is keyboard-accessible and reflects expanded state via aria-expanded, using the extracted label helper', () => {
+  const cardMatch = source.match(/function renderOperationCard\([\s\S]*?\n  \}/);
+  assert.ok(cardMatch);
+  assert.match(cardMatch[0], /<button type="button" className="upload-retry-action" aria-expanded=\{expanded\} onClick=\{\(\) => toggleOperationDetails\(operation\.id\)\}>/, 'expected a real <button> (keyboard-operable) with aria-expanded reflecting current state');
+  assert.match(cardMatch[0], /\{detailsToggleLabel\(expanded\)\}/, 'expected the label to toggle between View details / Hide details via the extracted helper');
+  assert.match(source, /function toggleOperationDetails\(operationId: string\) \{/);
+});
+
+test('Done dismisses only the durable operation (and its exactly-matching local batch, if any) - the needs-attention Dismiss control is a separate function entirely', () => {
+  const dismissProgressMatch = source.match(/function dismissProgress\(\) \{([\s\S]*?)\n  \}/);
+  assert.ok(dismissProgressMatch);
+  assert.match(dismissProgressMatch[1], /dismissOperation\(trackedOperation\.id\)/);
+  assert.match(dismissProgressMatch[1], /setTrackedOperation\(null\)/);
+  const dismissKnownMatch = source.match(/function dismissKnownOperation\(operation: ResumeOperationSummary\) \{([\s\S]*?)\n  \}/);
+  assert.ok(dismissKnownMatch);
+  assert.match(dismissKnownMatch[1], /dismissOperation\(operation\.id\)/);
+  // Distinct from the local needs-attention Dismiss button, which calls
+  // dismissBatch directly and neither of these two functions.
+  assert.doesNotMatch(dismissProgressMatch[1], /dismissBatch\(batch\.clientBatchKey\)/);
 });

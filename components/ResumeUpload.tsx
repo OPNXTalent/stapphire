@@ -9,6 +9,14 @@ import { getResumeSourceType, MAX_RESUME_BATCH_SIZE, MAX_RESUME_SIZE } from '@/l
 import { resolveTrackedOperationAuthority } from '@/lib/resumeUploadAuthority';
 import { advancePollTarget, type PollTargetState } from '@/lib/resumeOperationPolling';
 import { dispatchResumeOperationTerminal, resolveTerminalObservation } from '@/lib/resumeTerminalSync';
+import {
+  completedSummary,
+  detailsToggleLabel,
+  evaluatingHeading,
+  failedLocalItems,
+  needsAttentionHeading,
+  progressLabel
+} from '@/lib/resumeUploadPresentation';
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -44,6 +52,17 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const [trackedOperation, setTrackedOperation] = useState<ResumeOperationSummary | null>(null);
   const [knownOperations, setKnownOperations] = useState<ResumeOperationSummary[]>([]);
   const [pollUnavailable, setPollUnavailable] = useState(false);
+  // Purely local, per-operation UI state: whether a completed operation's
+  // filename list is expanded past its collapsed-by-default summary.
+  // Never read by polling/authority/cleanup logic - display-only.
+  const [expandedOperationIds, setExpandedOperationIds] = useState<Set<string>>(new Set());
+  function toggleOperationDetails(operationId: string) {
+    setExpandedOperationIds((current) => {
+      const next = new Set(current);
+      if (next.has(operationId)) next.delete(operationId); else next.add(operationId);
+      return next;
+    });
+  }
 
   // Mirrors currentLocalBatch?.operationId on every render - read by
   // the polling loop below without the loop needing to depend on it
@@ -299,7 +318,6 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const showUploadConfirmed = Boolean(
     allItemsDurablyUploaded || (!(trackedOperationAuthoritative && trackedOperation) && currentLocalBatch && localTotal > 0 && localAccepted === localTotal)
   );
-  const trackedOperationActive = Boolean(trackedOperation && isActiveOperation(trackedOperation.status));
   // A target is known but we have not yet confirmed its state in any
   // fetch response - show "checking", never blank.
   const showCheckingStatus = Boolean(
@@ -315,8 +333,6 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const showTrackedOperationView = Boolean(
     trackedOperation && !showCheckingStatus && trackedOperationAuthoritative
   );
-  const visibleFailedItems = trackedOperation?.items.filter((item) => item.status === 'failed') || [];
-  const completedItems = trackedOperation?.items.filter((item) => item.status === 'completed').length || 0;
 
   function dismissProgress() {
     if (!trackedOperation) return;
@@ -346,6 +362,41 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     return { className: 'upload-queue-processing', icon: '·', label: 'Uploading' };
   }
 
+  // Shared rendering for a single durable operation's card, whichever of
+  // trackedOperation/knownOperations it came from - both represent the
+  // exact same kind of durable state and previously duplicated this
+  // structure (and its redundant progress/messaging) twice over.
+  function renderOperationCard(operation: ResumeOperationSummary, options: { onDismiss: () => void; onRetry?: () => void }) {
+    const active = isActiveOperation(operation.status);
+    const total = operation.progressTotal || operation.items.length;
+    const completed = operation.items.filter((item) => item.status === 'completed').length;
+    const failed = operation.items.filter((item) => item.status === 'failed');
+    const retryable = failed.some((item) => item.retryable);
+    const expanded = expandedOperationIds.has(operation.id);
+    const showQueue = active || expanded;
+    return <div className="upload-operation-progress" aria-live="polite" key={operation.id}>
+      {active
+        ? <StapphireProcessing className="processing-compact" title={evaluatingHeading(total)} detail={progressLabel(completed, total)}/>
+        : <p className="upload-summary">{completedSummary(completed, failed.length)}</p>}
+      {!active && <button type="button" className="upload-retry-action" aria-expanded={expanded} onClick={() => toggleOperationDetails(operation.id)}>
+        {detailsToggleLabel(expanded)}
+      </button>}
+      {showQueue && <ul className="upload-queue">{operation.items.map((item) => {
+        const presentation = itemPresentation(item.status);
+        return <li key={item.id} className={`upload-queue-item ${presentation.className}`}>
+          <span className="upload-queue-icon" aria-hidden="true">{presentation.icon}</span>
+          <span className="upload-queue-name">{item.filename}</span>
+          <span className="upload-queue-status">{presentation.label}</span>
+          {item.errorSummary && <span className="upload-queue-msg">{item.errorSummary}</span>}
+        </li>;
+      })}</ul>}
+      {!active && <div className="upload-complete">
+        <button type="button" className="upload-go-btn" onClick={options.onDismiss}>Done</button>
+        {options.onRetry && retryable && <button type="button" className="upload-retry-action" onClick={options.onRetry} disabled={retrying}>{retrying ? 'Retrying…' : 'Retry'}</button>}
+      </div>}
+    </div>;
+  }
+
   return (
     <div className="upload-bar">
       <input ref={inputRef} type="file" multiple hidden
@@ -360,21 +411,35 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
       </ul>}
 
       {visibleLocalBatches.map((batch) => {
-        const accepted = batch.items.filter((item) => item.status === 'accepted').length;
         const stillInFlight = batch.phase === 'creating' || batch.phase === 'uploading';
+        if (stillInFlight) {
+          const accepted = batch.items.filter((item) => item.status === 'accepted').length;
+          return <div className="upload-durable-boundary" key={batch.clientBatchKey}>
+            <StapphireProcessing className="processing-compact" title="Uploading résumés…" detail={`${accepted} of ${batch.items.length} safely uploaded`}/>
+            <ul className="upload-queue">{batch.items.map((item) => <li key={item.id} className={`upload-queue-item ${item.status === 'error' ? 'upload-queue-error' : 'upload-queue-processing'}`}>
+              <span className="upload-queue-icon" aria-hidden="true">·</span>
+              <span className="upload-queue-name">{item.filename}</span>
+              <span className="upload-queue-status">{item.status === 'accepted' ? 'Uploaded' : item.status === 'error' ? 'Failed' : 'Uploading'}</span>
+              {item.status === 'error' && item.error && <span className="upload-queue-msg">{item.error}</span>}
+            </li>)}</ul>
+            <small>Keep this browser open until upload completes.</small>
+          </div>;
+        }
+        // Once settled, only what failed still needs the user's
+        // attention here - a successfully uploaded résumé's own progress
+        // is already, and only, communicated by the evaluation section.
+        const attentionItems = failedLocalItems(batch.items);
         return <div className="upload-durable-boundary" key={batch.clientBatchKey}>
-          {stillInFlight
-            ? <StapphireProcessing className="processing-compact" title="Uploading résumés…" detail={`${accepted} of ${batch.items.length} safely uploaded`}/>
-            : <p className="upload-summary">{accepted} of {batch.items.length} uploaded · {batch.items.length - accepted} need attention</p>}
-          <ul className="upload-queue">{batch.items.map((item) => <li key={item.id} className={`upload-queue-item ${item.status === 'error' ? 'upload-queue-error' : 'upload-queue-processing'}`}>
+          <p className="upload-summary">{needsAttentionHeading(attentionItems.length)}</p>
+          <ul className="upload-queue">{attentionItems.map((item) => <li key={item.id} className="upload-queue-item upload-queue-error upload-queue-item-attention">
             <span className="upload-queue-icon" aria-hidden="true">·</span>
-            <span className="upload-queue-name">{item.filename}</span>
-            <span className="upload-queue-status">{item.status === 'accepted' ? 'Uploaded' : item.status === 'error' ? 'Failed' : 'Uploading'}</span>
-            {item.status === 'error' && item.error && <span className="upload-queue-msg">{item.error}</span>}
+            <span className="visually-hidden">Failed: </span>
+            <span className="upload-queue-detail">
+              <span className="upload-queue-name">{item.filename}</span>
+              {item.error && <span className="upload-queue-msg">{item.error}</span>}
+            </span>
           </li>)}</ul>
-          {stillInFlight
-            ? <small>Keep this browser open until upload completes.</small>
-            : <button type="button" className="upload-go-btn" onClick={() => dismissBatch(batch.clientBatchKey)}>Done</button>}
+          <button type="button" className="upload-go-btn" onClick={() => dismissBatch(batch.clientBatchKey)}>Dismiss</button>
         </div>;
       })}
 
@@ -391,66 +456,11 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
         </div>
       )}
 
-      {showTrackedOperationView && trackedOperation && <div className="upload-operation-progress" aria-live="polite">
-        {showUploadConfirmed && (
-          <div className="upload-confirmed-milestone">
-            <p>✓ {uploadConfirmedCount} of {uploadConfirmedTotal} {uploadConfirmedTotal === 1 ? 'résumé' : 'résumés'} successfully uploaded</p>
-            {trackedOperationActive && <small>Evaluation continues in the background.</small>}
-          </div>
-        )}
-        {trackedOperationActive && (
-          <StapphireProcessing
-            className="processing-compact"
-            title="Evaluating résumés…"
-            detail={`${completedItems} of ${trackedOperation.progressTotal || trackedOperation.items.length} complete`}
-          />
-        )}
-        <div className="upload-complete">
-          <span className="upload-summary">
-            {trackedOperationActive
-              ? `${completedItems} of ${trackedOperation.progressTotal || trackedOperation.items.length} complete`
-              : visibleFailedItems.length > 0
-                ? `${completedItems} completed · ${visibleFailedItems.length} need attention`
-                : `${completedItems} ${completedItems === 1 ? 'résumé' : 'résumés'} completed`}
-          </span>
-          {/* Done only appears once terminal - dismissing an actively
-              processing operation would hide genuinely ongoing
-              background progress. Dismissal belongs to terminal state. */}
-          {!trackedOperationActive && <button type="button" className="upload-go-btn" onClick={dismissProgress}>Done</button>}
-          {visibleFailedItems.some((item) => item.retryable) && <button type="button" className="upload-retry-action" onClick={retryFailed} disabled={retrying}>{retrying ? 'Retrying…' : 'Retry'}</button>}
-        </div>
-        <ul className="upload-queue">{trackedOperation.items.map((item) => {
-          const presentation = itemPresentation(item.status);
-          return <li key={item.id} className={`upload-queue-item ${presentation.className}`}>
-            <span className="upload-queue-icon" aria-hidden="true">{presentation.icon}</span>
-            <span className="upload-queue-name">{item.filename}</span>
-            <span className="upload-queue-status">{presentation.label}</span>
-            {item.errorSummary && <span className="upload-queue-msg">{item.errorSummary}</span>}
-          </li>;
-        })}</ul>
-      </div>}
+      {showTrackedOperationView && trackedOperation && renderOperationCard(trackedOperation, { onDismiss: dismissProgress, onRetry: retryFailed })}
 
-      {knownOperations.filter((operation) => operation.id !== trackedOperation?.id).map((operation) => {
-        const active = isActiveOperation(operation.status);
-        const failed = operation.items.filter((item) => item.status === 'failed');
-        const completed = operation.items.filter((item) => item.status === 'completed').length;
-        return <div className="upload-operation-progress" aria-live="polite" key={operation.id}>
-          {active && <StapphireProcessing className="processing-compact" title="Evaluating résumés…" detail={`${completed} of ${operation.progressTotal || operation.items.length} complete`}/>}
-          <div className="upload-complete">
-            <span className="upload-summary">{active ? `${completed} of ${operation.progressTotal || operation.items.length} complete` : failed.length ? `${completed} completed · ${failed.length} need attention` : `${completed} ${completed === 1 ? 'résumé' : 'résumés'} completed`}</span>
-            {!active && <button type="button" className="upload-go-btn" onClick={() => dismissKnownOperation(operation)}>Done</button>}
-          </div>
-          <ul className="upload-queue">{operation.items.map((item) => {
-            const presentation = itemPresentation(item.status);
-            return <li key={item.id} className={`upload-queue-item ${presentation.className}`}>
-              <span className="upload-queue-icon" aria-hidden="true">{presentation.icon}</span>
-              <span className="upload-queue-name">{item.filename}</span>
-              <span className="upload-queue-status">{presentation.label}</span>
-              {item.errorSummary && <span className="upload-queue-msg">{item.errorSummary}</span>}
-            </li>;
-          })}</ul>
-        </div>;
-      })}
+      {knownOperations.filter((operation) => operation.id !== trackedOperation?.id).map((operation) =>
+        renderOperationCard(operation, { onDismiss: () => dismissKnownOperation(operation) })
+      )}
 
       <div className="upload-bar-row">
         <button type="button" className="upload-add-btn" onClick={() => inputRef.current?.click()}>+ Add résumés</button>
