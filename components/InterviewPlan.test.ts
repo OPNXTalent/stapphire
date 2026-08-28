@@ -6,7 +6,8 @@ import { dirname, join } from 'node:path';
 
 // This project has no React/DOM testing infrastructure - these tests
 // inspect the component's own source for the four-fixed-stage Selection
-// Process redesign, the Phone Screen compact-format branch, its rich
+// Process redesign, the full-width Phone Screen question-card branch
+// (sharing its visual shell with Structured Interview), its rich
 // response-kind controls, and the preservation of legacy/additional
 // rounds. Existing Structured Interview behavior (AOE picker, star
 // scoring, comment boxes) is separately protected by
@@ -94,7 +95,7 @@ test('Phone Screen and the other three stages share the same add/remove/reorder/
   assert.match(structured, /onDrop=\{\(event\) => dropOnQuestion\(event, question\.id\)\}/, 'structured branch must reuse dropOnQuestion');
 });
 
-test('the Phone Screen compact branch never renders Areas of Evaluation, star ratings, score bars, or a permanently visible comment block', () => {
+test('the Phone Screen branch never renders Areas of Evaluation, star ratings, score bars, or a permanently visible comment block', () => {
   const { phoneScreen } = extractStageBranches();
   // The phone-screen branch's own copy legitimately mentions "Areas of
   // Evaluation"/"star ratings" in prose to reassure recruiters they are
@@ -194,6 +195,59 @@ test('round-1\'s starter/default questions are filtered by stage, not positional
   assert.doesNotMatch(starterMatch[1], /bank\.slice\(0, 11\)/, 'must not positionally slice the flattened bank');
 });
 
+// --- Full-width Phone Screen card redesign (shared shell with Structured Interview) ---
+// The compact multi-column grid is gone; Phone Screen now reuses the
+// exact same full-width, vertically-stacked question-card shell as
+// Structured Interview (.editor/.questionCard/.dragHandle/.questionMain/
+// .questionTop), differing only in its evidence-collection controls
+// (Response Type instead of AOE/star/scoring/comment box).
+
+test('Phone Screen no longer uses a compact grid or multi-column auto-fill layout', () => {
+  assert.doesNotMatch(source, /compactGrid|compactCard|compactCardHead|compactQuestionText|compactDropEnd/, 'no trace of the old compact-card classes should remain');
+  assert.doesNotMatch(source, /auto-fill/, 'no multi-column auto-fill grid anywhere in the builder');
+});
+
+test('Phone Screen questions render in a full-width vertical sequence, reusing the identical shell classes Structured Interview already uses (.editor/.questionCard/.dragHandle/.questionMain/.questionTop/.questionNumber/.removeQuestion)', () => {
+  const { phoneScreen, structured } = extractStageBranches();
+  for (const sharedClass of ['editor', 'questionCard', 'dragHandle', 'questionMain', 'questionTop', 'questionNumber', 'removeQuestion', 'dropEnd']) {
+    const pattern = new RegExp(`styles\\.${sharedClass}\\b`);
+    assert.match(phoneScreen, pattern, `Phone Screen must reuse styles.${sharedClass}`);
+    assert.match(structured, pattern, `Structured Interview must still use styles.${sharedClass}`);
+  }
+  // One full-width card per row, vertically stacked in recruiter-defined order - the same flat, unsliced map used before.
+  assert.match(phoneScreen, /\{questions\.map\(\(question, index\) => \{/);
+});
+
+test('a built-in Phone Screen question never shows a duplicate heading (e.g. both "Location" and "Location") - the free-text card-title input only renders once the question is genuinely Custom', () => {
+  const { phoneScreen } = extractStageBranches();
+  const headerMatch = phoneScreen.match(/<div className=\{styles\.cardHeaderRow\}>([\s\S]*?)<\/div>/);
+  assert.ok(headerMatch, 'expected the Phone Screen card header row');
+  assert.match(headerMatch[1], /question\.questionType === 'Custom' && \(/, 'the cardTitle input must be gated on questionType === Custom, not always shown');
+  assert.match(headerMatch[1], /className=\{styles\.questionTypeSelect\}/, 'the Question Type selector is always shown - it is the sole header for a built-in question');
+});
+
+test('a Custom Phone Screen question still shows its editable card title, defaulting to "Custom Question", alongside its (reassignable) Custom type', () => {
+  assert.match(source, /questionType: 'Custom', cardTitle: 'Custom Question'/, 'addCustomPhoneScreenQuestion must still seed this default');
+  const { phoneScreen } = extractStageBranches();
+  assert.match(phoneScreen, /placeholder="Custom Question"/);
+});
+
+test('Response Type and its applicable configuration still render beneath the question text inside the shared full-width card, unaffected by the layout change', () => {
+  const { phoneScreen } = extractStageBranches();
+  assert.match(phoneScreen, /<div className=\{styles\.responseKindRow\}>/);
+  assert.match(phoneScreen, /Response type<\/label>/);
+  assert.match(phoneScreen, /spec\.kind === 'single-choice' &&/);
+  assert.match(phoneScreen, /spec\.kind === 'numeric' &&/);
+});
+
+test('the Phone Screen card still wires onDragOver/onDrop to the same dropOnQuestion/parseBankQuestion machinery as Structured Interview - drag/drop was not reimplemented for the new shell', () => {
+  const { phoneScreen, structured } = extractStageBranches();
+  assert.match(phoneScreen, /onDrop=\{\(event\) => dropOnQuestion\(event, question\.id\)\}/);
+  assert.match(structured, /onDrop=\{\(event\) => dropOnQuestion\(event, question\.id\)\}/);
+  const phoneScreenDragStart = phoneScreen.match(/onDragStart=\{\(event\) => \{\s*\n\s*event\.dataTransfer\.effectAllowed = 'move';\s*\n\s*event\.dataTransfer\.setData\('text\/plain', question\.id\);\s*\n\s*setDraggedQuestionId\(question\.id\);\s*\n\s*\}\}/);
+  assert.ok(phoneScreenDragStart, 'Phone Screen reorder drag-start must match the Structured Interview pattern exactly');
+});
+
 // --- Correction 3: preserving non-fixed/legacy rounds ---
 
 test('loading a persisted plan backfills any missing fixed stage with its defaults, and never guesses a canonical stage for a non-fixed round', () => {
@@ -227,7 +281,7 @@ test('a legacy round\'s card is visibly distinguished ("Needs stage assignment")
   assert.match(legacyInfoMatch[1], /tagline: 'Needs stage assignment'/);
 });
 
-test('selecting a legacy round routes through the existing Structured Interview editor branch (its full AOE/star/scoring/comment-box configuration stays reachable), never the Phone Screen compact branch', () => {
+test('selecting a legacy round routes through the existing Structured Interview editor branch (its full AOE/star/scoring/comment-box configuration stays reachable), never the Phone Screen branch', () => {
   assert.match(source, /const isPhoneScreen = selectedKey === 'phone-screen';/, 'a legacy key can never equal the literal phone-screen id, so it always falls into the structured branch');
 });
 

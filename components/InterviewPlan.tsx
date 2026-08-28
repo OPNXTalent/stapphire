@@ -783,13 +783,13 @@ export function InterviewPlan({
                 <button type="button" className={styles.addCustomQuestion} onClick={addCustomPhoneScreenQuestion}>+ Custom Question</button>
               </div>
 
-              <div className={styles.compactGrid} onDragOver={(event) => event.preventDefault()} onDrop={dropAtEnd}>
+              <div className={styles.editor} onDragOver={(event) => event.preventDefault()} onDrop={dropAtEnd}>
                 {questions.map((question, index) => {
                   const spec = question.responseSpec ?? { kind: 'short-answer' as const };
                   return (
                     <div
                       key={question.id}
-                      className={`${styles.compactCard} ${dropTargetId === question.id ? styles.dropTarget : ''}`}
+                      className={`${styles.questionCard} ${dropTargetId === question.id ? styles.dropTarget : ''}`}
                       onDragOver={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
@@ -797,84 +797,92 @@ export function InterviewPlan({
                       }}
                       onDrop={(event) => dropOnQuestion(event, question.id)}
                     >
-                      <div className={styles.compactCardHead}>
-                        <span
-                          className={styles.dragHandle}
-                          draggable
-                          title="Drag to reorder"
-                          onDragStart={(event) => {
-                            event.dataTransfer.effectAllowed = 'move';
-                            event.dataTransfer.setData('text/plain', question.id);
-                            setDraggedQuestionId(question.id);
-                          }}
-                          onDragEnd={() => { setDraggedQuestionId(null); setDropTargetId(null); }}
-                        >⠿</span>
-                        <span className={styles.questionNumber}>Q{index + 1}</span>
-                        <button type="button" className={styles.removeQuestion} onClick={() => removeQuestion(question.id)} aria-label={`Remove question ${index + 1}`}>×</button>
+                      <span
+                        className={styles.dragHandle}
+                        draggable
+                        title="Drag to reorder"
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = 'move';
+                          event.dataTransfer.setData('text/plain', question.id);
+                          setDraggedQuestionId(question.id);
+                        }}
+                        onDragEnd={() => { setDraggedQuestionId(null); setDropTargetId(null); }}
+                      >⠿</span>
+
+                      <div className={styles.questionMain}>
+                        <div className={styles.cardHeaderRow}>
+                          {/* A built-in question's cardTitle equals its questionType (e.g. "Location" / "Location") -
+                              showing both would repeat the same word twice, so the free-text title only appears once
+                              a question is actually Custom (where the title is meaningful, independent content). */}
+                          {question.questionType === 'Custom' && (
+                            <input
+                              className={styles.cardTitleInput}
+                              value={question.cardTitle}
+                              maxLength={60}
+                              placeholder="Custom Question"
+                              aria-label={`Card title for question ${index + 1}`}
+                              onChange={(event) => setCardTitle(question.id, event.target.value)}
+                            />
+                          )}
+                          <select
+                            className={styles.questionTypeSelect}
+                            value={question.questionType}
+                            aria-label={`Question type for question ${index + 1}`}
+                            onChange={(event) => setQuestionType(question.id, event.target.value)}
+                          >
+                            {PHONE_SCREEN_QUESTION_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{type}</option>)}
+                          </select>
+                        </div>
+                        <div className={styles.questionTop}>
+                          <span className={styles.questionNumber}>Q{index + 1}</span>
+                          <textarea
+                            rows={2}
+                            value={question.text}
+                            placeholder="Type your screening question…"
+                            aria-label={`Question ${index + 1}`}
+                            onChange={(event) => updateQuestion(question.id, { text: event.target.value })}
+                          />
+                          <button type="button" className={styles.removeQuestion} onClick={() => removeQuestion(question.id)} aria-label={`Remove question ${index + 1}`}>×</button>
+                        </div>
+
+                        <div className={styles.responseKindRow}>
+                          <label className={styles.responseKindLabel} htmlFor={`response-kind-${question.id}`}>Response type</label>
+                          <select
+                            id={`response-kind-${question.id}`}
+                            className={styles.responseKindSelect}
+                            value={spec.kind}
+                            onChange={(event) => setResponseSpec(question.id, responseSpecForKind(event.target.value as PhoneScreenResponseKind, question.responseSpec))}
+                          >
+                            {RESPONSE_KIND_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {spec.kind === 'single-choice' && (
+                          <input
+                            type="text"
+                            className={styles.responseKindDetail}
+                            placeholder="Options, comma separated"
+                            value={spec.options.join(', ')}
+                            aria-label={`Response options for question ${index + 1}`}
+                            onChange={(event) => setResponseSpec(question.id, { kind: 'single-choice', options: event.target.value.split(',').map((option) => option.trim()).filter(Boolean) })}
+                          />
+                        )}
+                        {spec.kind === 'numeric' && (
+                          <input
+                            type="text"
+                            className={styles.responseKindDetail}
+                            placeholder="Unit (optional, e.g. years)"
+                            value={spec.unit ?? ''}
+                            aria-label={`Response unit for question ${index + 1}`}
+                            onChange={(event) => setResponseSpec(question.id, { kind: 'numeric', unit: event.target.value || undefined })}
+                          />
+                        )}
                       </div>
-                      <div className={styles.cardHeaderRow}>
-                        <input
-                          className={styles.cardTitleInput}
-                          value={question.cardTitle}
-                          maxLength={60}
-                          placeholder="Custom Question"
-                          aria-label={`Card title for question ${index + 1}`}
-                          onChange={(event) => setCardTitle(question.id, event.target.value)}
-                        />
-                        <select
-                          className={styles.questionTypeSelect}
-                          value={question.questionType}
-                          aria-label={`Question type for question ${index + 1}`}
-                          onChange={(event) => setQuestionType(question.id, event.target.value)}
-                        >
-                          {PHONE_SCREEN_QUESTION_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{type}</option>)}
-                        </select>
-                      </div>
-                      <textarea
-                        rows={2}
-                        className={styles.compactQuestionText}
-                        value={question.text}
-                        placeholder="Type your screening question…"
-                        aria-label={`Question ${index + 1}`}
-                        onChange={(event) => updateQuestion(question.id, { text: event.target.value })}
-                      />
-                      <div className={styles.responseKindRow}>
-                        <label className={styles.responseKindLabel} htmlFor={`response-kind-${question.id}`}>Response type</label>
-                        <select
-                          id={`response-kind-${question.id}`}
-                          className={styles.responseKindSelect}
-                          value={spec.kind}
-                          onChange={(event) => setResponseSpec(question.id, responseSpecForKind(event.target.value as PhoneScreenResponseKind, question.responseSpec))}
-                        >
-                          {RESPONSE_KIND_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                      {spec.kind === 'single-choice' && (
-                        <input
-                          type="text"
-                          className={styles.responseKindDetail}
-                          placeholder="Options, comma separated"
-                          value={spec.options.join(', ')}
-                          aria-label={`Response options for question ${index + 1}`}
-                          onChange={(event) => setResponseSpec(question.id, { kind: 'single-choice', options: event.target.value.split(',').map((option) => option.trim()).filter(Boolean) })}
-                        />
-                      )}
-                      {spec.kind === 'numeric' && (
-                        <input
-                          type="text"
-                          className={styles.responseKindDetail}
-                          placeholder="Unit (optional, e.g. years)"
-                          value={spec.unit ?? ''}
-                          aria-label={`Response unit for question ${index + 1}`}
-                          onChange={(event) => setResponseSpec(question.id, { kind: 'numeric', unit: event.target.value || undefined })}
-                        />
-                      )}
                     </div>
                   );
                 })}
-                <div className={`${styles.dropEnd} ${styles.compactDropEnd}`}>Drop a Question Bank item here</div>
+                <div className={styles.dropEnd}>Drop a Question Bank item here</div>
               </div>
             </>
           ) : (
