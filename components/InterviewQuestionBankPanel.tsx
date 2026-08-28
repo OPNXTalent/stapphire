@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { AREAS_OF_EVALUATION, type BankQuestion, type InterviewStageId } from '@/lib/interviewQuestionBank';
+import { AREAS_OF_EVALUATION, INTERVIEW_STAGES, type BankQuestion, type InterviewStageId } from '@/lib/interviewQuestionBank';
+import { PHONE_SCREEN_BANK_QUESTIONS } from '@/lib/phoneScreenQuestions';
 import { AOE_PREFERENCES_CHANGED_EVENT, type AoePreferences } from '@/lib/aoePreferences';
 import { INTERVIEW_QUESTION_TYPES, type InterviewQuestionType } from '@/lib/interviewQuestionTypes';
 import {
@@ -17,7 +18,7 @@ type AvailableQuestion = { id: string; text: string; areas: string[] };
 type JsonRecord = Record<string, unknown>;
 
 const UNSAVED_STARTER_USED_IDS = new Set([
-  'phone-screen-1','phone-screen-2','phone-screen-3','phone-screen-4','phone-screen-5','phone-screen-6',
+  'phone-screen-default-1','phone-screen-default-2','phone-screen-default-3','phone-screen-default-4','phone-screen-default-5','phone-screen-default-6',
   'round-1-1','round-1-2','round-1-3','round-1-4','round-1-5'
 ]);
 
@@ -77,6 +78,30 @@ export function InterviewQuestionBankPanel({
   const availableQuestions = useMemo(
     () => [...generatedQuestions, ...starterQuestions].filter((question) => !usedIds.has(question.id)),
     [generatedQuestions, starterQuestions, usedIds]
+  );
+  // Phone Screen's bank is a fixed, curated list of screening questions
+  // (not AI-generated, no Areas of Evaluation) - it reuses the exact
+  // same usedIds tracking as the Structured Interview bank above, just
+  // sourced from a different, stage-specific list instead of the
+  // generator's fetched/generated pools.
+  const isPhoneScreen = stage === 'phone-screen';
+  // The selected stage's own name/tagline and its canonical, system-
+  // authored one-sentence explainer - not user-editable, and shared
+  // (computed once, rendered from both the phone-screen and structured
+  // branches below) so the right panel always connects to "that
+  // stage's own context" the same way regardless of which is selected.
+  const stageInfo = INTERVIEW_STAGES.find((item) => item.id === stage);
+  const stageContext = stageInfo && (
+    <div className={styles.stageContext}>
+      <h2 className={styles.stageContextTitle}>{stageInfo.label} <span className={styles.stageContextTagline}>{stageInfo.tagline}</span></h2>
+      <p className={styles.stageContextExplainer}>{stageInfo.description}</p>
+    </div>
+  );
+  const availablePhoneScreenQuestions = useMemo<AvailableQuestion[]>(
+    () => PHONE_SCREEN_BANK_QUESTIONS
+      .filter((question) => !usedIds.has(question.id))
+      .map((question) => ({ id: question.id, text: question.text, areas: [] })),
+    [usedIds]
   );
 
   async function refreshUsedIds() {
@@ -274,8 +299,47 @@ export function InterviewQuestionBankPanel({
     }
   }
 
+  if (isPhoneScreen) {
+    return (
+      <div className={styles.panel}>
+        {stageContext}
+        <div className={styles.generator}>
+          <div className={styles.panelHeader}>
+            <h3>Question Bank <span className={styles.bankCount}>{availablePhoneScreenQuestions.length}</span></h3>
+          </div>
+          <p className={styles.workflowHint}>Curated screening questions for Phone Screen — no Areas of Evaluation or generation needed. Drag a question onto the form, or write your own.</p>
+        </div>
+
+        <div className={styles.list}>
+          <div className={`${styles.question} ${styles.wildcard}`} draggable onDragStart={startBlankDrag}>
+            <div className={styles.questionTop}>
+              <span className={styles.drag} aria-hidden="true">⠿</span>
+              <div>
+                <p>Create Your Own Question</p>
+                <span className={styles.wildcardCopy}>Drag this onto the Phone Screen, then write your question and choose Yes/No or Short Answer.</span>
+              </div>
+            </div>
+          </div>
+
+          {availablePhoneScreenQuestions.map((question) => (
+            <div key={question.id} className={styles.question} draggable onDragStart={(event) => startDrag(event, question)} onDragEnd={() => window.setTimeout(() => void refreshUsedIds(), 750)}>
+              <div className={styles.questionTop}>
+                <span className={styles.drag} aria-hidden="true">⠿</span>
+                <p>{question.text}</p>
+              </div>
+            </div>
+          ))}
+          {availablePhoneScreenQuestions.length === 0 && <p className={styles.empty}>All screening questions are currently on the form.</p>}
+        </div>
+
+        <div className={styles.footer}>Drag questions onto the Phone Screen. Used questions disappear from the bank and return if removed.</div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.panel}>
+      {stageContext}
       <div className={styles.generator}>
         <div className={styles.areaPicker} ref={pickerRef}>
           <div className={styles.panelHeader}>

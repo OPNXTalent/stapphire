@@ -11,11 +11,18 @@ export type BankQuestion = {
   areas: string[];
 };
 
-export const INTERVIEW_STAGES: { id: InterviewStageId; label: string; shortLabel: string; description: string }[] = [
-  { id: 'phone-screen', label: 'Phone Screen', shortLabel: 'Phone Screen', description: 'Confirm baseline fit, motivation, communication, and obvious gaps before a formal interview.' },
-  { id: 'round-1', label: 'Interview — Round 1', shortLabel: 'Round 1', description: 'Explore core duties, job knowledge, transferable experience, and behavioral evidence tied to the requisition.' },
-  { id: 'round-2', label: 'Interview — Round 2', shortLabel: 'Round 2', description: 'Probe judgment, collaboration, leadership, problem solving, and deeper scenario-based evidence.' },
-  { id: 'final', label: 'Final Interview', shortLabel: 'Final', description: 'Validate readiness, decision quality, role ownership, expectations, and remaining risk before a hiring decision.' }
+// tagline is the one-word purpose of each stage in the Selection
+// Process (Qualify / Validate / Demonstrate / Differentiate) - shown
+// alongside label wherever the four stages are presented as a set (the
+// fixed stage tabs in InterviewPlan). label itself stays a standalone
+// name (no tagline baked in) since it also renders alone as a fallback
+// heading for existing, already-invited interviews
+// (ParticipantInterviewPreview) that predate this naming.
+export const INTERVIEW_STAGES: { id: InterviewStageId; label: string; shortLabel: string; tagline: string; description: string }[] = [
+  { id: 'phone-screen', label: 'Phone Screen', shortLabel: 'Phone Screen', tagline: 'Qualify', description: 'Confirm minimum requirements, practical alignment, and whether the candidate should advance to an interview.' },
+  { id: 'round-1', label: '1st Interview', shortLabel: '1st Interview', tagline: 'Validate', description: 'Establish whether the candidate has the relevant experience and foundational capability to perform the role.' },
+  { id: 'round-2', label: '2nd Interview', shortLabel: '2nd Interview', tagline: 'Demonstrate', description: 'Explore how the candidate applies their skills when handling complexity, competing priorities, and collaboration.' },
+  { id: 'final', label: '3rd Interview', shortLabel: '3rd Interview', tagline: 'Differentiate', description: 'Distinguish qualified finalists through judgment, leadership, strategic thinking, and potential organizational impact.' }
 ];
 
 export function buildQuestionBank(positionTitle = 'this role'): BankQuestion[] {

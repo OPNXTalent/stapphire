@@ -1,4 +1,8 @@
 .panel{display:flex;height:100%;min-height:0;flex-direction:column;background:var(--paper)}
+.stageContext{flex:none;padding:12px 12px 10px;border-bottom:1px solid var(--line);background:#fff}
+.stageContextTitle{display:flex;align-items:baseline;gap:8px;margin:0;color:var(--deep);font-size:14px;font-weight:700}
+.stageContextTagline{padding:2px 7px;border-radius:999px;background:var(--sapphire-pale);color:var(--sapphire);font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.stageContextExplainer{margin:6px 0 0;color:var(--muted);font-size:10.5px;line-height:1.45}
 .generator{position:relative;padding:12px;border-bottom:1px solid var(--line);background:#fff}
 .areaPicker{position:relative;margin-right:38px}
 .panelHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
