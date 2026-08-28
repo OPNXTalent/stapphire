@@ -16,6 +16,12 @@ export type BankQuestion = {
   // of this adapter can access the intended response semantics too, not
   // just the question text.
   response?: PhoneScreenResponseSpec;
+  // The controlled organizational category used to group the Question
+  // Bank into collapsible sections - distinct from cardTitle (the
+  // compact header shown on the card) and from areas (Structured
+  // Interview scoring metadata only, never used for grouping).
+  questionType: string;
+  cardTitle: string;
 };
 
 // tagline is the one-word purpose of each stage in the Selection
@@ -39,30 +45,36 @@ export function buildQuestionBank(positionTitle = 'this role'): BankQuestion[] {
   // adapter (e.g. by the pre-production InterviewBuilder prototype) and
   // one added directly from InterviewQuestionBankPanel's Phone Screen
   // branch are recognized as the exact same question, not duplicates.
+  // Each starter question's questionType is a one-time content-based
+  // classification using the app's existing Structured Interview
+  // Question Type vocabulary (lib/interviewQuestionTypes.ts) - these
+  // fixed starters were never generated, so they carry no type of their
+  // own; this assigns one so they group sensibly in the Question Bank
+  // alongside AI-generated questions that do carry a selected type.
   const bank: Record<Exclude<InterviewStageId, 'phone-screen'>, Omit<BankQuestion, 'id' | 'stage'>[]> = {
     'round-1': [
-      { text: 'Walk us through a recent responsibility that is similar to one of the core duties of this role. What was your personal contribution?', areas: ['Job Knowledge', 'Results Driven'] },
-      { text: 'Tell us about a time you had to learn a new process, system, or body of information quickly.', areas: ['Adaptability', 'Computer Skills', 'Self-Development'] },
-      { text: 'Describe a situation where you had to work with another team or partner to solve a problem.', areas: ['Teamwork', 'Communication', 'Problem Solving'] },
-      { text: 'Tell us about a time you noticed a quality or service issue before someone asked you to address it.', areas: ['Initiative', 'Quality', 'Sense of Urgency'] },
-      { text: 'How do you decide what needs your attention first when several important tasks compete at the same time?', areas: ['Decision Making', 'Organizational Skills', 'Productivity'] },
-      { text: 'Describe a time you had to explain a complicated issue to someone who did not have your level of subject knowledge.', areas: ['Communication', 'Interpersonal Skills', 'Job Knowledge'] }
+      { text: 'Walk us through a recent responsibility that is similar to one of the core duties of this role. What was your personal contribution?', areas: ['Job Knowledge', 'Results Driven'], questionType: 'Background & Experience', cardTitle: 'Background & Experience' },
+      { text: 'Tell us about a time you had to learn a new process, system, or body of information quickly.', areas: ['Adaptability', 'Computer Skills', 'Self-Development'], questionType: 'Behavioral', cardTitle: 'Behavioral' },
+      { text: 'Describe a situation where you had to work with another team or partner to solve a problem.', areas: ['Teamwork', 'Communication', 'Problem Solving'], questionType: 'Behavioral', cardTitle: 'Behavioral' },
+      { text: 'Tell us about a time you noticed a quality or service issue before someone asked you to address it.', areas: ['Initiative', 'Quality', 'Sense of Urgency'], questionType: 'Behavioral', cardTitle: 'Behavioral' },
+      { text: 'How do you decide what needs your attention first when several important tasks compete at the same time?', areas: ['Decision Making', 'Organizational Skills', 'Productivity'], questionType: 'Problem-Solving', cardTitle: 'Problem-Solving' },
+      { text: 'Describe a time you had to explain a complicated issue to someone who did not have your level of subject knowledge.', areas: ['Communication', 'Interpersonal Skills', 'Job Knowledge'], questionType: 'Behavioral', cardTitle: 'Behavioral' }
     ],
     'round-2': [
-      { text: 'Tell us about a decision you made when the available information was incomplete. How did you work through it?', areas: ['Decision Making', 'Problem Solving', 'Strategic Thought'] },
-      { text: 'Describe a disagreement with a colleague or stakeholder that you had to work through without damaging the relationship.', areas: ['Conflict Management', 'Communication', 'Interpersonal Skills'] },
-      { text: 'Give us an example of a time you had to balance speed, quality, and competing expectations.', areas: ['Quality', 'Results Driven', 'Sense of Urgency'] },
-      { text: 'Tell us about a time you guided, supported, or influenced someone even when you were not their formal supervisor.', areas: ['Leadership', 'Employee Development', 'Teamwork'] },
-      { text: 'What is an example of a process you improved, and how did you know the change was working?', areas: ['Innovation', 'Project Management', 'Results Driven'] },
-      { text: 'Describe a situation where the obvious solution was not the best solution. What did you do instead?', areas: ['Problem Solving', 'Decision Making', 'Innovation'] }
+      { text: 'Tell us about a decision you made when the available information was incomplete. How did you work through it?', areas: ['Decision Making', 'Problem Solving', 'Strategic Thought'], questionType: 'Behavioral', cardTitle: 'Behavioral' },
+      { text: 'Describe a disagreement with a colleague or stakeholder that you had to work through without damaging the relationship.', areas: ['Conflict Management', 'Communication', 'Interpersonal Skills'], questionType: 'Behavioral', cardTitle: 'Behavioral' },
+      { text: 'Give us an example of a time you had to balance speed, quality, and competing expectations.', areas: ['Quality', 'Results Driven', 'Sense of Urgency'], questionType: 'Behavioral', cardTitle: 'Behavioral' },
+      { text: 'Tell us about a time you guided, supported, or influenced someone even when you were not their formal supervisor.', areas: ['Leadership', 'Employee Development', 'Teamwork'], questionType: 'Leadership', cardTitle: 'Leadership' },
+      { text: 'What is an example of a process you improved, and how did you know the change was working?', areas: ['Innovation', 'Project Management', 'Results Driven'], questionType: 'Behavioral', cardTitle: 'Behavioral' },
+      { text: 'Describe a situation where the obvious solution was not the best solution. What did you do instead?', areas: ['Problem Solving', 'Decision Making', 'Innovation'], questionType: 'Problem-Solving', cardTitle: 'Problem-Solving' }
     ],
     'final': [
-      { text: `What would success in the ${positionTitle} role look like to you after the first six months?`, areas: ['Job Knowledge', 'Results Driven', 'Strategic Thought'] },
-      { text: 'Tell us about a professional judgment call you would handle differently today and what changed your thinking.', areas: ['Decision Making', 'Self-Development', 'Ethics'] },
-      { text: 'Describe the working environment and leadership style that consistently brings out your best work.', areas: ['Interpersonal Skills', 'Dependability', 'Teamwork'] },
-      { text: 'What responsibility in this role do you expect to be the biggest stretch, and how would you prepare for it?', areas: ['Adaptability', 'Self-Development', 'Job Knowledge'] },
-      { text: 'If selected, what would you want to understand during your first 30 days before making significant changes?', areas: ['Strategic Thought', 'Job Knowledge', 'Decision Making'] },
-      { text: 'What is one professional standard you will not compromise even when the pressure is high?', areas: ['Ethics', 'Quality', 'Dependability'] }
+      { text: `What would success in the ${positionTitle} role look like to you after the first six months?`, areas: ['Job Knowledge', 'Results Driven', 'Strategic Thought'], questionType: 'Career Goals', cardTitle: 'Career Goals' },
+      { text: 'Tell us about a professional judgment call you would handle differently today and what changed your thinking.', areas: ['Decision Making', 'Self-Development', 'Ethics'], questionType: 'Values & Ethics', cardTitle: 'Values & Ethics' },
+      { text: 'Describe the working environment and leadership style that consistently brings out your best work.', areas: ['Interpersonal Skills', 'Dependability', 'Teamwork'], questionType: 'Culture & Work Style', cardTitle: 'Culture & Work Style' },
+      { text: 'What responsibility in this role do you expect to be the biggest stretch, and how would you prepare for it?', areas: ['Adaptability', 'Self-Development', 'Job Knowledge'], questionType: 'Career Goals', cardTitle: 'Career Goals' },
+      { text: 'If selected, what would you want to understand during your first 30 days before making significant changes?', areas: ['Strategic Thought', 'Job Knowledge', 'Decision Making'], questionType: 'Situational', cardTitle: 'Situational' },
+      { text: 'What is one professional standard you will not compromise even when the pressure is high?', areas: ['Ethics', 'Quality', 'Dependability'], questionType: 'Values & Ethics', cardTitle: 'Values & Ethics' }
     ]
   };
 
@@ -71,7 +83,9 @@ export function buildQuestionBank(positionTitle = 'this role'): BankQuestion[] {
     stage: 'phone-screen',
     text: seed.text,
     areas: [],
-    response: seed.response
+    response: seed.response,
+    questionType: seed.questionType,
+    cardTitle: seed.cardTitle
   }));
 
   const structuredEntries: BankQuestion[] = (Object.keys(bank) as Exclude<InterviewStageId, 'phone-screen'>[])

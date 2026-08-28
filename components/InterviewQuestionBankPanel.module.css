@@ -51,6 +51,13 @@
 .questionTop{display:grid;grid-template-columns:18px minmax(0,1fr);gap:6px;align-items:start}
 .drag{padding-top:2px;color:var(--faint);font:700 14px/1 var(--mono)}
 .question p{margin:0;color:#2b3548;font-size:11.5px;font-weight:600;line-height:1.5}
+.questionBody{min-width:0}
+.question .cardTitle{margin:0 0 2px;color:var(--sapphire);font-size:9px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+.typeSection{display:grid;gap:8px}
+.typeSectionHeader{display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;padding:5px 3px;border:0;background:transparent;color:var(--deep);font:inherit;text-align:left;cursor:pointer}
+.typeSectionHeader:hover{color:var(--sapphire)}
+.typeSectionName{display:flex;align-items:baseline;gap:6px;color:var(--deep);font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+.typeSectionChevron{flex:none;color:var(--faint);font-size:11px;line-height:1}
 .chips{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0 0}
 .generator>.chips{width:calc(100% - 38px)}
 .chips span{padding:4px 6px;border-radius:999px;background:var(--sapphire-pale);color:var(--deep);font-size:9.5px;font-weight:700}

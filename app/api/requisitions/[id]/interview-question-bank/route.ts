@@ -23,7 +23,9 @@ function starterQuestions(positionTitle: string) {
     .map((question) => ({
       id: question.id,
       text: question.text,
-      areas: question.areas
+      areas: question.areas,
+      questionType: question.questionType,
+      cardTitle: question.cardTitle
     }));
 }
 
@@ -45,10 +47,19 @@ async function loadPersistedQuestions(requisitionId: string) {
     .eq('requisition_id', requisitionId)
     .order('created_at', { ascending: true });
   if (error) throw error;
+  // The persisted question bank table has no question_type/card_title
+  // column (adding one is a migration, out of scope this pass) - a
+  // reloaded generated question's originally-selected type can't be
+  // recovered, so it falls back to a generic "General" bucket rather
+  // than being misrepresented as a specific type it was never tagged
+  // with. A freshly generated question (still in this session) keeps
+  // its real type - see generateMore() in InterviewQuestionBankPanel.
   return (data || []).map((question) => ({
     id: question.question_key as string,
     text: question.question_text as string,
-    areas: Array.isArray(question.areas) ? question.areas as string[] : []
+    areas: Array.isArray(question.areas) ? question.areas as string[] : [],
+    questionType: 'General',
+    cardTitle: 'General'
   }));
 }
 

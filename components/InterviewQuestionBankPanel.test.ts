@@ -16,13 +16,13 @@ test('Phone Screen gets its own early-return branch, not a duplicated right-pane
 });
 
 test('the Phone Screen bank list is sourced from the fixed PHONE_SCREEN_BANK_QUESTIONS list, filtered by the same usedIds tracking the Structured Interview bank already uses', () => {
-  assert.match(source, /import \{ PHONE_SCREEN_BANK_QUESTIONS, type PhoneScreenResponseKind, type PhoneScreenResponseSpec \} from '@\/lib\/phoneScreenQuestions';/);
+  assert.match(source, /import \{ PHONE_SCREEN_BANK_QUESTIONS, PHONE_SCREEN_QUESTION_TYPES, type PhoneScreenResponseKind, type PhoneScreenResponseSpec \} from '@\/lib\/phoneScreenQuestions';/);
   const memoMatch = source.match(/const availablePhoneScreenQuestions = useMemo<AvailableQuestion\[\]>\(\s*\n\s*\(\) => PHONE_SCREEN_BANK_QUESTIONS\s*\n\s*\.filter\(\(question\) => !usedIds\.has\(question\.id\)\)/);
   assert.ok(memoMatch, 'expected availablePhoneScreenQuestions to filter the fixed bank list by the shared usedIds set, matching availableQuestions\' own filtering pattern');
 });
 
-test('each Phone Screen bank question carries its canonical response metadata through the drag payload, not just its text/areas', () => {
-  assert.match(source, /\.map\(\(question\) => \(\{ id: question\.id, text: question\.text, areas: \[\], response: question\.response \}\)\)/, 'availablePhoneScreenQuestions must preserve response so cloneBankQuestion on the receiving side can see the intended response kind');
+test('each Phone Screen bank question carries its canonical response metadata AND its questionType/cardTitle through the drag payload, not just its text/areas', () => {
+  assert.match(source, /\.map\(\(question\) => \(\{ id: question\.id, text: question\.text, areas: \[\], response: question\.response, questionType: question\.questionType, cardTitle: question\.cardTitle \}\)\)/, 'availablePhoneScreenQuestions must preserve response/questionType/cardTitle so cloneBankQuestion on the receiving side can see them');
 });
 
 test('a Phone Screen bank item shows a short response-kind badge, reusing the existing .chips styling', () => {
@@ -59,6 +59,54 @@ test('the stage explainer is system guidance, not user-editable - a <p>, not an 
   assert.match(contextMatch[1], /<h2 className=\{styles\.stageContextTitle\}>\{stageInfo\.label\} <span className=\{styles\.stageContextTagline\}>\{stageInfo\.tagline\}<\/span><\/h2>/);
   assert.match(contextMatch[1], /<p className=\{styles\.stageContextExplainer\}>\{stageInfo\.description\}<\/p>/);
   assert.doesNotMatch(contextMatch[1], /<input|<textarea|onChange/, 'the explainer must be static system text, never an editable field');
+});
+
+// --- Question Type organization ---
+
+test('the Question Bank groups questions into collapsible Question Type sections in both branches, not a flat list', () => {
+  assert.match(source, /function groupByType<T extends \{ questionType: string \}>\(/, 'expected a shared grouping helper');
+  assert.match(source, /const phoneScreenGroups = useMemo\(/);
+  assert.match(source, /const structuredGroups = useMemo\(/);
+  assert.match(source, /phoneScreenGroups\.map\(\(group\) => \{/);
+  assert.match(source, /structuredGroups\.map\(\(group\) => \{/);
+});
+
+test('each Question Type section header shows the type name and its available-question count, and can be collapsed/expanded', () => {
+  const headerMatches = source.match(/<span className=\{styles\.typeSectionName\}>\{typeSectionLabel\(group\.type\)\} <span className=\{styles\.bankCount\}>\{group\.questions\.length\}<\/span><\/span>/g) || [];
+  assert.equal(headerMatches.length, 2, 'expected one type-section header per branch (phone-screen and structured)');
+  assert.match(source, /const \[collapsedTypes, setCollapsedTypes\] = useState<Set<string>>\(\(\) => new Set\(\)\);/, 'sections must start expanded (empty collapsed set)');
+  assert.match(source, /function toggleTypeCollapsed\(type: string\)/);
+  const toggleMatches = source.match(/onClick=\{\(\) => toggleTypeCollapsed\(group\.type\)\}/g) || [];
+  assert.equal(toggleMatches.length, 2, 'both branches must reuse the same toggle function');
+});
+
+test('the Custom bucket displays as "Custom Questions" while every other section displays its type name as-is', () => {
+  assert.match(source, /function typeSectionLabel\(type: string\) \{\s*\n\s*return type === 'Custom' \? 'Custom Questions' : type;\s*\n\s*\}/);
+});
+
+test('sections are ordered by a stable canonical list, not first-seen order - Structured Interview appends Custom then General after the app\'s existing generated Question Type vocabulary', () => {
+  assert.match(source, /const STRUCTURED_QUESTION_TYPE_ORDER: readonly string\[\] = \[\.\.\.INTERVIEW_QUESTION_TYPES, 'Custom', 'General'\];/);
+  assert.match(source, /groupByType\(availablePhoneScreenQuestions, PHONE_SCREEN_QUESTION_TYPES\)/);
+  assert.match(source, /groupByType\(availableQuestions, STRUCTURED_QUESTION_TYPE_ORDER\)/);
+});
+
+test('every question card shows its cardTitle as a compact header above the question text, in both branches', () => {
+  const cardTitleMatches = source.match(/<p className=\{styles\.cardTitle\}>\{question\.cardTitle\}<\/p>/g) || [];
+  assert.equal(cardTitleMatches.length, 2, 'expected a cardTitle header on both the phone-screen and structured question cards');
+});
+
+test('a freshly generated batch of questions is tagged, client-side, with the recruiter\'s selected Question Type (or "General" if none was selected) - the generator itself only returns text/areas', () => {
+  const generateMoreMatch = source.match(/async function generateMore\(\) \{([\s\S]*?)\n {2}\}/);
+  assert.ok(generateMoreMatch, 'expected generateMore');
+  assert.match(generateMoreMatch[1], /const batchType = selectedQuestionType \|\| 'General';/);
+  assert.match(generateMoreMatch[1], /questionType: batchType, cardTitle: batchType/);
+});
+
+test('a wildcard-dragged custom question defaults to questionType Custom / cardTitle "Custom Question" the same way the button-created one does elsewhere in the builder', () => {
+  const blankDragMatch = source.match(/function startBlankDrag\(event: DragEvent<HTMLDivElement>\) \{([\s\S]*?)\n {2}\}/);
+  assert.ok(blankDragMatch, 'expected startBlankDrag');
+  assert.match(blankDragMatch[1], /questionType: 'Custom',/);
+  assert.match(blankDragMatch[1], /cardTitle: 'Custom Question',/);
 });
 
 test('the stage context (title + explainer) renders above the Question Bank heading in both branches', () => {

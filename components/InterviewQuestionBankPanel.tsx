@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { AREAS_OF_EVALUATION, INTERVIEW_STAGES, type BankQuestion, type InterviewStageId } from '@/lib/interviewQuestionBank';
-import { PHONE_SCREEN_BANK_QUESTIONS, type PhoneScreenResponseKind, type PhoneScreenResponseSpec } from '@/lib/phoneScreenQuestions';
+import { PHONE_SCREEN_BANK_QUESTIONS, PHONE_SCREEN_QUESTION_TYPES, type PhoneScreenResponseKind, type PhoneScreenResponseSpec } from '@/lib/phoneScreenQuestions';
 import { AOE_PREFERENCES_CHANGED_EVENT, type AoePreferences } from '@/lib/aoePreferences';
 import { INTERVIEW_QUESTION_TYPES, type InterviewQuestionType } from '@/lib/interviewQuestionTypes';
 import {
@@ -14,8 +14,9 @@ import {
 } from '@/lib/interviewQuestionBankEvents';
 import styles from './InterviewQuestionBankPanel.module.css';
 
-type AvailableQuestion = { id: string; text: string; areas: string[]; response?: PhoneScreenResponseSpec };
+type AvailableQuestion = { id: string; text: string; areas: string[]; questionType: string; cardTitle: string; response?: PhoneScreenResponseSpec };
 type JsonRecord = Record<string, unknown>;
+type QuestionGroup<T> = { type: string; questions: T[] };
 
 // Short badge copy for each response kind, shown on Phone Screen bank
 // items so a recruiter can see the intended response format before
@@ -27,6 +28,40 @@ const RESPONSE_KIND_LABELS: Record<PhoneScreenResponseKind, string> = {
   numeric: 'Numeric',
   'short-answer': 'Short answer'
 };
+
+// The canonical section order for the Structured Interview side of the
+// Question Bank: the app's existing generated Question Type vocabulary,
+// then Custom, then General (the fallback bucket for a reloaded
+// generated question whose original type wasn't persisted - see
+// loadPersistedQuestions in the interview-question-bank route).
+const STRUCTURED_QUESTION_TYPE_ORDER: readonly string[] = [...INTERVIEW_QUESTION_TYPES, 'Custom', 'General'];
+
+// Groups questions into Question-Type sections in a stable, canonical
+// order (not first-seen order, so sections don't reshuffle as
+// questions are used/returned) - any type absent from `order` (should
+// not normally happen) still surfaces, appended at the end, rather than
+// silently dropping questions from the bank.
+function groupByType<T extends { questionType: string }>(questions: T[], order: readonly string[]): QuestionGroup<T>[] {
+  const byType = new Map<string, T[]>();
+  for (const question of questions) {
+    const list = byType.get(question.questionType) ?? [];
+    list.push(question);
+    byType.set(question.questionType, list);
+  }
+  const groups: QuestionGroup<T>[] = [];
+  for (const type of order) {
+    const list = byType.get(type);
+    if (list && list.length > 0) groups.push({ type, questions: list });
+  }
+  for (const [type, list] of byType) {
+    if (!order.includes(type) && list.length > 0) groups.push({ type, questions: list });
+  }
+  return groups;
+}
+
+function typeSectionLabel(type: string) {
+  return type === 'Custom' ? 'Custom Questions' : type;
+}
 
 const UNSAVED_STARTER_USED_IDS = new Set([
   'phone-screen-default-1','phone-screen-default-2','phone-screen-default-3','phone-screen-default-4','phone-screen-default-5','phone-screen-default-6',
@@ -84,7 +119,19 @@ export function InterviewQuestionBankPanel({
   const [loadingBank, setLoadingBank] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  // Collapsed Question Type sections, by section label - starts empty
+  // (every section expanded). This groups the Question Bank only; the
+  // selected form's own question order is never regrouped.
+  const [collapsedTypes, setCollapsedTypes] = useState<Set<string>>(() => new Set());
   const pickerRef = useRef<HTMLDivElement | null>(null);
+
+  function toggleTypeCollapsed(type: string) {
+    setCollapsedTypes((current) => {
+      const next = new Set(current);
+      if (next.has(type)) next.delete(type); else next.add(type);
+      return next;
+    });
+  }
 
   const availableQuestions = useMemo(
     () => [...generatedQuestions, ...starterQuestions].filter((question) => !usedIds.has(question.id)),
@@ -111,8 +158,16 @@ export function InterviewQuestionBankPanel({
   const availablePhoneScreenQuestions = useMemo<AvailableQuestion[]>(
     () => PHONE_SCREEN_BANK_QUESTIONS
       .filter((question) => !usedIds.has(question.id))
-      .map((question) => ({ id: question.id, text: question.text, areas: [], response: question.response })),
+      .map((question) => ({ id: question.id, text: question.text, areas: [], response: question.response, questionType: question.questionType, cardTitle: question.cardTitle })),
     [usedIds]
+  );
+  const phoneScreenGroups = useMemo(
+    () => groupByType(availablePhoneScreenQuestions, PHONE_SCREEN_QUESTION_TYPES),
+    [availablePhoneScreenQuestions]
+  );
+  const structuredGroups = useMemo(
+    () => groupByType(availableQuestions, STRUCTURED_QUESTION_TYPE_ORDER),
+    [availableQuestions]
   );
 
   async function refreshUsedIds() {
@@ -257,6 +312,8 @@ export function InterviewQuestionBankPanel({
       stage,
       text: '',
       areas: [],
+      questionType: 'Custom',
+      cardTitle: 'Custom Question',
       ...(isPhoneScreen ? { response: { kind: 'short-answer' } as PhoneScreenResponseSpec } : {})
     });
   }
@@ -302,8 +359,17 @@ export function InterviewQuestionBankPanel({
       });
       const result = await readJson(response, 'Unable to generate interview questions.');
       if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Unable to generate interview questions.');
-      const questions = Array.isArray(result.questions) ? result.questions as AvailableQuestion[] : [];
-      if (questions.length !== 5) throw new Error('Unable to generate five interview questions. No QC was used.');
+      const rawQuestions = Array.isArray(result.questions) ? result.questions as Array<{ id: string; text: string; areas: string[] }> : [];
+      if (rawQuestions.length !== 5) throw new Error('Unable to generate five interview questions. No QC was used.');
+      // The generator itself only returns text/areas per question - the
+      // recruiter's selected Question Type for this batch is attached
+      // here, client-side, at the moment of generation. It is not sent
+      // to or stored by the question-bank RPC (no migration this pass),
+      // so it only survives for the remainder of this session; a
+      // reloaded generated question falls back to "General" (see
+      // loadPersistedQuestions in the interview-question-bank route).
+      const batchType = selectedQuestionType || 'General';
+      const questions: AvailableQuestion[] = rawQuestions.map((question) => ({ ...question, questionType: batchType, cardTitle: batchType }));
       setGeneratedQuestions((current) => [...questions, ...current]);
       setSelectedAreas([]);
       setSelectedQuestionType('');
@@ -338,19 +404,33 @@ export function InterviewQuestionBankPanel({
             </div>
           </div>
 
-          {availablePhoneScreenQuestions.map((question) => (
-            <div key={question.id} className={styles.question} draggable onDragStart={(event) => startDrag(event, question)} onDragEnd={() => window.setTimeout(() => void refreshUsedIds(), 750)}>
-              <div className={styles.questionTop}>
-                <span className={styles.drag} aria-hidden="true">⠿</span>
-                <p>{question.text}</p>
+          {phoneScreenGroups.map((group) => {
+            const collapsed = collapsedTypes.has(group.type);
+            return (
+              <div className={styles.typeSection} key={group.type}>
+                <button type="button" className={styles.typeSectionHeader} onClick={() => toggleTypeCollapsed(group.type)} aria-expanded={!collapsed}>
+                  <span className={styles.typeSectionName}>{typeSectionLabel(group.type)} <span className={styles.bankCount}>{group.questions.length}</span></span>
+                  <span className={styles.typeSectionChevron} aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+                </button>
+                {!collapsed && group.questions.map((question) => (
+                  <div key={question.id} className={styles.question} draggable onDragStart={(event) => startDrag(event, question)} onDragEnd={() => window.setTimeout(() => void refreshUsedIds(), 750)}>
+                    <div className={styles.questionTop}>
+                      <span className={styles.drag} aria-hidden="true">⠿</span>
+                      <div className={styles.questionBody}>
+                        <p className={styles.cardTitle}>{question.cardTitle}</p>
+                        <p>{question.text}</p>
+                      </div>
+                    </div>
+                    {question.response && (
+                      <div className={styles.chips}>
+                        <span>{RESPONSE_KIND_LABELS[question.response.kind]}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-              {question.response && (
-                <div className={styles.chips}>
-                  <span>{RESPONSE_KIND_LABELS[question.response.kind]}</span>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
           {availablePhoneScreenQuestions.length === 0 && <p className={styles.empty}>All screening questions are currently on the form.</p>}
         </div>
 
@@ -467,17 +547,31 @@ export function InterviewQuestionBankPanel({
         </div>
 
         {loadingBank && <p className={styles.empty}>Loading questions…</p>}
-        {!loadingBank && availableQuestions.map((question) => (
-          <div key={question.id} className={styles.question} draggable onDragStart={(event) => startDrag(event, question)} onDragEnd={() => window.setTimeout(() => void refreshUsedIds(), 750)}>
-            <div className={styles.questionTop}>
-              <span className={styles.drag} aria-hidden="true">⠿</span>
-              <p>{question.text}</p>
+        {!loadingBank && structuredGroups.map((group) => {
+          const collapsed = collapsedTypes.has(group.type);
+          return (
+            <div className={styles.typeSection} key={group.type}>
+              <button type="button" className={styles.typeSectionHeader} onClick={() => toggleTypeCollapsed(group.type)} aria-expanded={!collapsed}>
+                <span className={styles.typeSectionName}>{typeSectionLabel(group.type)} <span className={styles.bankCount}>{group.questions.length}</span></span>
+                <span className={styles.typeSectionChevron} aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+              </button>
+              {!collapsed && group.questions.map((question) => (
+                <div key={question.id} className={styles.question} draggable onDragStart={(event) => startDrag(event, question)} onDragEnd={() => window.setTimeout(() => void refreshUsedIds(), 750)}>
+                  <div className={styles.questionTop}>
+                    <span className={styles.drag} aria-hidden="true">⠿</span>
+                    <div className={styles.questionBody}>
+                      <p className={styles.cardTitle}>{question.cardTitle}</p>
+                      <p>{question.text}</p>
+                    </div>
+                  </div>
+                  <div className={styles.chips}>
+                    {question.areas.map((area) => <span key={area}>{area}</span>)}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className={styles.chips}>
-              {question.areas.map((area) => <span key={area}>{area}</span>)}
-            </div>
-          </div>
-        ))}
+          );
+        })}
         {!loadingBank && availableQuestions.length === 0 && <p className={styles.empty}>All available questions are currently in use.</p>}
       </div>
 

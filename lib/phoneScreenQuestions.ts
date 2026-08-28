@@ -30,10 +30,29 @@ export type PhoneScreenResponseSpec =
 
 export type PhoneScreenResponseKind = PhoneScreenResponseSpec['kind'];
 
+// The controlled organizational category used to group the Phone
+// Screen Question Bank into collapsible sections. Distinct from
+// cardTitle (the compact header shown on the card - for a built-in
+// question the two happen to match, but they are never the same
+// field) and distinct from Areas of Evaluation, which remain
+// Structured-Interview-only scoring metadata and are never used for
+// this grouping.
+export const PHONE_SCREEN_QUESTION_TYPES = [
+  'Location', 'Compensation', 'Experience', 'Education', 'Work Authorization', 'Sponsorship',
+  'Availability', 'Schedule', 'Work Arrangement', 'Employment Type', 'Credentials', 'Travel',
+  'Essential Functions', 'Security Clearance', 'Language', 'Work Sample', 'Training', 'Custom'
+] as const;
+
+export type PhoneScreenQuestionType = typeof PHONE_SCREEN_QUESTION_TYPES[number];
+
 export type PhoneScreenQuestionSeed = {
   id: string;
   text: string;
   response: PhoneScreenResponseSpec;
+  // Every canonical seed carries a real (non-Custom) type; 'Custom' is
+  // reserved for recruiter-created questions, assigned in InterviewPlan.tsx.
+  questionType: Exclude<PhoneScreenQuestionType, 'Custom'>;
+  cardTitle: string;
 };
 
 const DEGREE_OPTIONS = ['High school diploma / GED', 'Associate degree', "Bachelor's degree", "Master's degree", 'Doctorate / professional degree'];
@@ -47,32 +66,44 @@ export const PHONE_SCREEN_DEFAULT_QUESTIONS: PhoneScreenQuestionSeed[] = [
   {
     id: 'phone-screen-default-1',
     text: 'Are you within commuting distance of the work location, or prepared to relocate?',
-    response: { kind: 'single-choice', options: ['Within commuting distance', 'Willing to relocate', 'Neither'] }
+    response: { kind: 'single-choice', options: ['Within commuting distance', 'Willing to relocate', 'Neither'] },
+    questionType: 'Location',
+    cardTitle: 'Location'
   },
   {
     id: 'phone-screen-default-2',
     text: 'Is the stated compensation range acceptable?',
-    response: { kind: 'yes-no-needs-discussion' }
+    response: { kind: 'yes-no-needs-discussion' },
+    questionType: 'Compensation',
+    cardTitle: 'Compensation'
   },
   {
     id: 'phone-screen-default-3',
     text: 'How many years of applicable experience do you have?',
-    response: { kind: 'numeric', unit: 'years' }
+    response: { kind: 'numeric', unit: 'years' },
+    questionType: 'Experience',
+    cardTitle: 'Experience'
   },
   {
     id: 'phone-screen-default-4',
     text: 'What is the highest degree you have completed?',
-    response: { kind: 'single-choice', options: DEGREE_OPTIONS }
+    response: { kind: 'single-choice', options: DEGREE_OPTIONS },
+    questionType: 'Education',
+    cardTitle: 'Education'
   },
   {
     id: 'phone-screen-default-5',
     text: 'Are you currently authorized to work in the United States?',
-    response: { kind: 'yes-no' }
+    response: { kind: 'yes-no' },
+    questionType: 'Work Authorization',
+    cardTitle: 'Work Authorization'
   },
   {
     id: 'phone-screen-default-6',
     text: 'Will you now or in the future require employer sponsorship to work in the United States?',
-    response: { kind: 'yes-no' }
+    response: { kind: 'yes-no' },
+    questionType: 'Sponsorship',
+    cardTitle: 'Sponsorship'
   }
 ];
 
@@ -81,20 +112,20 @@ export const PHONE_SCREEN_DEFAULT_QUESTIONS: PhoneScreenQuestionSeed[] = [
 // Phone Screen the same way a Structured Interview bank question is -
 // and, removed, they return here the same way too.
 export const PHONE_SCREEN_BANK_QUESTIONS: PhoneScreenQuestionSeed[] = [
-  { id: 'phone-screen-bank-1', text: 'Required schedule availability', response: { kind: 'short-answer' } },
-  { id: 'phone-screen-bank-2', text: 'Onsite, hybrid, or remote arrangement', response: { kind: 'single-choice', options: ['Onsite', 'Hybrid', 'Remote'] } },
-  { id: 'phone-screen-bank-3', text: 'Earliest start date', response: { kind: 'short-answer' } },
-  { id: 'phone-screen-bank-4', text: 'Employment-type acceptance', response: { kind: 'yes-no' } },
-  { id: 'phone-screen-bank-5', text: 'Travel requirements', response: { kind: 'yes-no' } },
-  { id: 'phone-screen-bank-6', text: 'Required licenses or certifications', response: { kind: 'yes-no' } },
-  { id: 'phone-screen-bank-7', text: 'Essential job functions', response: { kind: 'yes-no' } },
-  { id: 'phone-screen-bank-8', text: 'Highest level of education', response: { kind: 'single-choice', options: DEGREE_OPTIONS } },
-  { id: 'phone-screen-bank-9', text: 'Evening, weekend, holiday, overtime, split-shift, or on-call availability', response: { kind: 'yes-no' } },
-  { id: 'phone-screen-bank-10', text: 'Time-zone or coverage-hour requirements', response: { kind: 'short-answer' } },
-  { id: 'phone-screen-bank-11', text: 'Security-clearance requirements', response: { kind: 'yes-no' } },
-  { id: 'phone-screen-bank-12', text: 'Language proficiency', response: { kind: 'short-answer' } },
-  { id: 'phone-screen-bank-13', text: 'Portfolio or work sample', response: { kind: 'yes-no' } },
-  { id: 'phone-screen-bank-14', text: 'Required training availability', response: { kind: 'yes-no' } }
+  { id: 'phone-screen-bank-1', text: 'Required schedule availability', response: { kind: 'short-answer' }, questionType: 'Schedule', cardTitle: 'Schedule' },
+  { id: 'phone-screen-bank-2', text: 'Onsite, hybrid, or remote arrangement', response: { kind: 'single-choice', options: ['Onsite', 'Hybrid', 'Remote'] }, questionType: 'Work Arrangement', cardTitle: 'Work Arrangement' },
+  { id: 'phone-screen-bank-3', text: 'Earliest start date', response: { kind: 'short-answer' }, questionType: 'Availability', cardTitle: 'Availability' },
+  { id: 'phone-screen-bank-4', text: 'Employment-type acceptance', response: { kind: 'yes-no' }, questionType: 'Employment Type', cardTitle: 'Employment Type' },
+  { id: 'phone-screen-bank-5', text: 'Travel requirements', response: { kind: 'yes-no' }, questionType: 'Travel', cardTitle: 'Travel' },
+  { id: 'phone-screen-bank-6', text: 'Required licenses or certifications', response: { kind: 'yes-no' }, questionType: 'Credentials', cardTitle: 'Credentials' },
+  { id: 'phone-screen-bank-7', text: 'Essential job functions', response: { kind: 'yes-no' }, questionType: 'Essential Functions', cardTitle: 'Essential Functions' },
+  { id: 'phone-screen-bank-8', text: 'Highest level of education', response: { kind: 'single-choice', options: DEGREE_OPTIONS }, questionType: 'Education', cardTitle: 'Education' },
+  { id: 'phone-screen-bank-9', text: 'Evening, weekend, holiday, overtime, split-shift, or on-call availability', response: { kind: 'yes-no' }, questionType: 'Availability', cardTitle: 'Availability' },
+  { id: 'phone-screen-bank-10', text: 'Time-zone or coverage-hour requirements', response: { kind: 'short-answer' }, questionType: 'Schedule', cardTitle: 'Schedule' },
+  { id: 'phone-screen-bank-11', text: 'Security-clearance requirements', response: { kind: 'yes-no' }, questionType: 'Security Clearance', cardTitle: 'Security Clearance' },
+  { id: 'phone-screen-bank-12', text: 'Language proficiency', response: { kind: 'short-answer' }, questionType: 'Language', cardTitle: 'Language' },
+  { id: 'phone-screen-bank-13', text: 'Portfolio or work sample', response: { kind: 'yes-no' }, questionType: 'Work Sample', cardTitle: 'Work Sample' },
+  { id: 'phone-screen-bank-14', text: 'Required training availability', response: { kind: 'yes-no' }, questionType: 'Training', cardTitle: 'Training' }
 ];
 
 export const PHONE_SCREEN_ALL_QUESTIONS: PhoneScreenQuestionSeed[] = [...PHONE_SCREEN_DEFAULT_QUESTIONS, ...PHONE_SCREEN_BANK_QUESTIONS];

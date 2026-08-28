@@ -139,8 +139,13 @@ test('dragging a Phone Screen bank question onto the form gives it the seed\'s i
   assert.match(cloneMatch[1], /const flags = responseSpecToWireFlags\(question\.response\);/);
   assert.match(cloneMatch[1], /responseSpec: question\.response/);
   // The pre-existing Structured Interview fallback (protected by interviewStabilization.test.ts) must still exist for non-phone-screen bank entries.
-  assert.match(cloneMatch[1], /commentBox: true \};/);
+  assert.match(cloneMatch[1], /commentBox: true,/);
   assert.doesNotMatch(source, /import \{ PHONE_SCREEN_BANK_QUESTIONS/, 'cloneBankQuestion must not need a direct import of the bank list - the canonical response travels through BankQuestion itself');
+});
+
+test('cloneBankQuestion and every question-creation path carry questionType/cardTitle through from the bank/seed - never left undefined', () => {
+  assert.match(source, /questionType: question\.questionType,\s*\n\s*cardTitle: question\.cardTitle/);
+  assert.match(source, /questionType: seed\.questionType,\s*\n\s*cardTitle: seed\.cardTitle/);
 });
 
 test('a Phone Screen question\'s response kind (and single-choice options / numeric unit) can only be represented up to what the two persisted flags allow - only yes-no and short-answer are honestly wire-representable, the rest defer to a client-side view model', () => {
@@ -168,7 +173,7 @@ test('loading a persisted plan backfills any missing fixed stage with its defaul
 });
 
 test('any persisted round whose stage is not one of the four canonical ids is kept, verbatim and in order, as an additionalKeys entry - never mapped, dropped, or mutated', () => {
-  const legacyLoadMatch = source.match(/for \(const round of persistedRounds\) \{\s*\n\s*if \(isCanonicalStage\(round\.stage\)\) continue;\s*\n\s*loadedTitles\[round\.stage\] = String\(round\.title \|\| round\.stage\);\s*\n\s*loadedQuestions\[round\.stage\] = parsePersistedQuestions\(round, false\);\s*\n\s*loadedAdditionalKeys\.push\(round\.stage\);\s*\n\s*\}/);
+  const legacyLoadMatch = source.match(/for \(const round of persistedRounds\) \{\s*\n\s*if \(isCanonicalStage\(round\.stage\)\) continue;\s*\n\s*loadedTitles\[round\.stage\] = String\(round\.title \|\| round\.stage\);\s*\n\s*loadedQuestions\[round\.stage\] = parsePersistedQuestions\(round, false, bank\);\s*\n\s*loadedAdditionalKeys\.push\(round\.stage\);\s*\n\s*\}/);
   assert.ok(legacyLoadMatch, 'expected the legacy-round preservation loop to read the round\'s stage/title/questions verbatim, with no title-based guessing of a canonical stage');
   assert.doesNotMatch(source, /guessStage|inferStage|mapTitleToStage/i, 'must never attempt to guess a canonical stage from a legacy round\'s title');
 });
@@ -195,4 +200,52 @@ test('a legacy round\'s card is visibly distinguished ("Needs stage assignment")
 
 test('selecting a legacy round routes through the existing Structured Interview editor branch (its full AOE/star/scoring/comment-box configuration stays reachable), never the Phone Screen compact branch', () => {
   assert.match(source, /const isPhoneScreen = selectedKey === 'phone-screen';/, 'a legacy key can never equal the literal phone-screen id, so it always falls into the structured branch');
+});
+
+// --- Question Type metadata (questionType / cardTitle) ---
+
+test('every question-creation path sets both questionType and cardTitle - a custom question defaults to Custom / "Custom Question"', () => {
+  assert.match(source, /questionType: string;\s*\n\s*cardTitle: string;/, 'expected both fields on the Question type');
+  const manualMatch = source.match(/function addManualQuestion\(\) \{([\s\S]*?)\n {2}\}/);
+  assert.ok(manualMatch);
+  assert.match(manualMatch[1], /questionType: 'Custom', cardTitle: 'Custom Question'/);
+  const customPhoneScreenMatch = source.match(/function addCustomPhoneScreenQuestion\(\) \{([\s\S]*?)\n {2}\}/);
+  assert.ok(customPhoneScreenMatch);
+  assert.match(customPhoneScreenMatch[1], /questionType: 'Custom', cardTitle: 'Custom Question'/);
+});
+
+test('renaming a card title (setCardTitle) never touches questionType, and reassigning a Question Type (setQuestionType) never touches cardTitle - the two are decoupled', () => {
+  const setCardTitleMatch = source.match(/function setCardTitle\(questionId: string, cardTitle: string\) \{([\s\S]*?)\n {2}\}/);
+  assert.ok(setCardTitleMatch, 'expected setCardTitle');
+  assert.match(setCardTitleMatch[1], /\{ \.\.\.question, cardTitle \}/);
+  assert.doesNotMatch(setCardTitleMatch[1], /questionType/, 'setCardTitle must not touch questionType');
+
+  const setQuestionTypeMatch = source.match(/function setQuestionType\(questionId: string, questionType: string\) \{([\s\S]*?)\n {2}\}/);
+  assert.ok(setQuestionTypeMatch, 'expected setQuestionType');
+  assert.match(setQuestionTypeMatch[1], /\{ \.\.\.question, questionType \}/);
+  assert.doesNotMatch(setQuestionTypeMatch[1], /cardTitle/, 'setQuestionType must not touch cardTitle');
+});
+
+test('a question\'s questionType/cardTitle is reconstructed on load by looking the sourceId up in the bank (covering every stage, not just phone-screen), falling back to Custom for a question the bank can\'t resolve', () => {
+  const reconstructMatch = source.match(/function reconstructTypeMetadata\(sourceId: string \| undefined, bank: BankQuestion\[\]\): \{ questionType: string; cardTitle: string \} \{([\s\S]*?)\n\}/);
+  assert.ok(reconstructMatch, 'expected reconstructTypeMetadata');
+  assert.match(reconstructMatch[1], /bank\.find\(\(question\) => question\.id === sourceId\)/);
+  assert.match(reconstructMatch[1], /return \{ questionType: 'Custom', cardTitle: 'Custom Question' \};/);
+});
+
+test('every Phone Screen and Structured Interview question card shows an editable cardTitle header and a Question Type reassignment selector', () => {
+  const { phoneScreen, structured } = extractStageBranches();
+  for (const branch of [phoneScreen, structured]) {
+    assert.match(branch, /className=\{styles\.cardTitleInput\}/);
+    assert.match(branch, /onChange=\{\(event\) => setCardTitle\(question\.id, event\.target\.value\)\}/);
+    assert.match(branch, /className=\{styles\.questionTypeSelect\}/);
+    assert.match(branch, /onChange=\{\(event\) => setQuestionType\(question\.id, event\.target\.value\)\}/);
+  }
+  assert.match(phoneScreen, /PHONE_SCREEN_QUESTION_TYPE_OPTIONS\.map\(/, 'Phone Screen must offer its own controlled type list');
+  assert.match(structured, /STRUCTURED_QUESTION_TYPE_OPTIONS\.map\(/, 'Structured Interview must offer the generated Question Type vocabulary');
+});
+
+test('the selected form is never regrouped by Question Type - questions render in the recruiter-controlled order from the questions array, with no grouping helper in this file', () => {
+  assert.doesNotMatch(source, /groupByType|collapsedTypes|typeSection/, 'InterviewPlan.tsx must not group its own question list - only the Question Bank panel groups');
+  assert.match(source, /\{questions\.map\(\(question, index\) => \{/, 'phone-screen form must map the flat questions array directly, preserving order');
 });

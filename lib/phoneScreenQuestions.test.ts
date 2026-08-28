@@ -4,6 +4,7 @@ import {
   PHONE_SCREEN_BANK_QUESTIONS,
   PHONE_SCREEN_DEFAULT_QUESTIONS,
   PHONE_SCREEN_ALL_QUESTIONS,
+  PHONE_SCREEN_QUESTION_TYPES,
   findPhoneScreenSeed,
   responseSpecToWireFlags,
   wireFlagsToResponseSpec,
@@ -112,6 +113,47 @@ test('wireFlagsToResponseSpec only ever recovers yes-no or short-answer - it is 
   assert.deepEqual(wireFlagsToResponseSpec({ commentBox: false, yesNo: true }), { kind: 'yes-no' });
   assert.deepEqual(wireFlagsToResponseSpec({ commentBox: true, yesNo: false }), { kind: 'short-answer' });
   assert.deepEqual(wireFlagsToResponseSpec({ commentBox: false, yesNo: false }), { kind: 'short-answer' });
+});
+
+// Question Type metadata (grouping the Question Bank, and the card
+// header) - distinct from response kind and from Areas of Evaluation.
+test('PHONE_SCREEN_QUESTION_TYPES is exactly the specified 18 categories, in order, ending with Custom', () => {
+  assert.deepEqual(PHONE_SCREEN_QUESTION_TYPES, [
+    'Location', 'Compensation', 'Experience', 'Education', 'Work Authorization', 'Sponsorship',
+    'Availability', 'Schedule', 'Work Arrangement', 'Employment Type', 'Credentials', 'Travel',
+    'Essential Functions', 'Security Clearance', 'Language', 'Work Sample', 'Training', 'Custom'
+  ]);
+});
+
+test('every canonical question declares a real (non-Custom) questionType from the controlled list', () => {
+  const realTypes = new Set(PHONE_SCREEN_QUESTION_TYPES.filter((type) => type !== 'Custom'));
+  for (const question of PHONE_SCREEN_ALL_QUESTIONS) {
+    assert.ok(realTypes.has(question.questionType), `${question.id} has an invalid or Custom questionType`);
+  }
+});
+
+test('for built-in questions, cardTitle matches questionType exactly', () => {
+  for (const question of PHONE_SCREEN_ALL_QUESTIONS) {
+    assert.equal(question.cardTitle, question.questionType, `${question.id}: cardTitle must match questionType for a built-in question`);
+  }
+});
+
+test('the six default questions are tagged with the specific type their content requires', () => {
+  const byText = new Map(PHONE_SCREEN_DEFAULT_QUESTIONS.map((question) => [question.text, question.questionType]));
+  assert.equal(byText.get('Are you within commuting distance of the work location, or prepared to relocate?'), 'Location');
+  assert.equal(byText.get('Is the stated compensation range acceptable?'), 'Compensation');
+  assert.equal(byText.get('How many years of applicable experience do you have?'), 'Experience');
+  assert.equal(byText.get('What is the highest degree you have completed?'), 'Education');
+  assert.equal(byText.get('Are you currently authorized to work in the United States?'), 'Work Authorization');
+  assert.equal(byText.get('Will you now or in the future require employer sponsorship to work in the United States?'), 'Sponsorship');
+});
+
+test('every real Question Type in the controlled list is used by at least one canonical question', () => {
+  const usedTypes = new Set(PHONE_SCREEN_ALL_QUESTIONS.map((question) => question.questionType));
+  for (const type of PHONE_SCREEN_QUESTION_TYPES) {
+    if (type === 'Custom') continue;
+    assert.ok(usedTypes.has(type), `${type} is never used by a canonical question`);
+  }
 });
 
 test('responseSpecForKind builds a sensible default for each kind and preserves prior single-choice options / numeric unit when switching kind and back', () => {

@@ -38,14 +38,22 @@ test('each stage carries its exact canonical one-sentence explainer, shown in th
 // are required to be a thin, id-preserving adapter over the one
 // canonical source (lib/phoneScreenQuestions.ts), not a second array
 // with different text.
-test('buildQuestionBank\'s phone-screen entries are adapted 1:1 from the one canonical source, preserving its ids, text, and response metadata exactly', () => {
+test('buildQuestionBank\'s phone-screen entries are adapted 1:1 from the one canonical source, preserving its ids, text, response, and Question Type metadata exactly', () => {
   const bank = buildQuestionBank('Test Role');
   const phoneScreenEntries = bank.filter((question) => question.stage === 'phone-screen');
   assert.equal(phoneScreenEntries.length, PHONE_SCREEN_ALL_QUESTIONS.length);
   assert.deepEqual(
-    phoneScreenEntries.map((question) => ({ id: question.id, text: question.text, response: question.response })),
-    PHONE_SCREEN_ALL_QUESTIONS.map((seed) => ({ id: seed.id, text: seed.text, response: seed.response }))
+    phoneScreenEntries.map((question) => ({ id: question.id, text: question.text, response: question.response, questionType: question.questionType, cardTitle: question.cardTitle })),
+    PHONE_SCREEN_ALL_QUESTIONS.map((seed) => ({ id: seed.id, text: seed.text, response: seed.response, questionType: seed.questionType, cardTitle: seed.cardTitle }))
   );
+});
+
+test('every round-1/round-2/final starter question carries a non-empty questionType/cardTitle, so the Structured Interview Question Bank can group them even though they were never AI-generated', () => {
+  const bank = buildQuestionBank('Test Role');
+  for (const question of bank.filter((item) => item.stage !== 'phone-screen')) {
+    assert.ok(question.questionType.trim().length > 0, `${question.id} is missing a questionType`);
+    assert.ok(question.cardTitle.trim().length > 0, `${question.id} is missing a cardTitle`);
+  }
 });
 
 test('buildQuestionBank\'s round-1/round-2/final entries are unaffected by the phone-screen consolidation - still 6 each, with stable ids', () => {
