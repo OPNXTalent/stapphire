@@ -310,7 +310,7 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
             <div className="matrix-row">
               {renderBanner(expandedCandidate, true, expandedRank, 'pinned')}
             </div>
-            <CandidateDetailActions candidateId={expandedCandidate.id} sourceFilename={expandedCandidate.sourceFilename} resumeAvailable={expandedCandidate.resumeAvailable}/>
+            <CandidateDetailActions candidateId={expandedCandidate.id} requisitionId={requisitionId} sourceFilename={expandedCandidate.sourceFilename} resumeAvailable={expandedCandidate.resumeAvailable}/>
           </div>
           <div className="matrix-selected-detail">
             <div className="matrix-row expanded">

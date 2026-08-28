@@ -34,7 +34,7 @@ export default async function CandidatePage({ params }: { params: { id: string }
       <Link className="back" href={`/requisitions/${requisitionId}`}>
         ← {position}
       </Link>
-      <CandidateDetailActions candidateId={candidate.id} sourceFilename={candidate.source_filename} resumeAvailable={Boolean(candidate.source_storage_path)}/>
+      <CandidateDetailActions candidateId={candidate.id} requisitionId={requisitionId} sourceFilename={candidate.source_filename} resumeAvailable={Boolean(candidate.source_storage_path)}/>
       <CandidateReport
         candidateName={candidate.full_name}
         positionTitle={position}

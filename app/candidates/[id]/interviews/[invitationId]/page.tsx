@@ -85,6 +85,7 @@ export default async function CompletedInterviewPage({
         <CandidateDetailActions
           candidateId={params.id}
           candidateName={candidate.full_name}
+          requisitionId={invitation.requisition_id}
           sourceFilename={String(candidate.source_filename || '')}
           resumeAvailable={Boolean(candidate.source_storage_path)}
           focusInterviewId={params.invitationId}

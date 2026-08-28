@@ -31,15 +31,45 @@ test('matrix-level candidate workspace retains resume upload and requisition tea
 // maintains for the matrix, rather than a separate right-panel
 // implementation.
 
-test('the completed-interview route is recognized narrowly - only app/candidates/[id]/interviews/[invitationId], not the public/participant interview routes', () => {
-  const routeMatch = source.match(/const isCompletedInterviewRoute = \/(.+)\/\.test\(pathname\);/);
-  assert.ok(routeMatch, 'expected to find the isCompletedInterviewRoute pattern');
+test('the completed-interview route pathname pattern is recognized narrowly - only app/candidates/[id]/interviews/[invitationId], not the public/participant interview routes', () => {
+  const routeMatch = source.match(/const isCompletedInterviewRoute = \/(.+)\/\.test\(pathname\) && !isPrintSession;/);
+  assert.ok(routeMatch, 'expected to find the isCompletedInterviewRoute pattern, explicitly excluding print sessions');
   const pattern = new RegExp(routeMatch[1]);
   assert.ok(pattern.test('/candidates/cand-1/interviews/inv-1'), 'must match the internal completed-interview assessment route');
   assert.ok(!pattern.test('/interview/invite/some-token'), 'must NOT match the public, gate-exempt participant submission route');
   assert.ok(!pattern.test('/interview/preview/phone-screen'), 'must NOT match the participant preview route (which bypasses AppShell/WorkspacePanel entirely anyway)');
   assert.ok(!pattern.test('/candidates/cand-1'), 'must NOT match the bare candidate route with no interview segment');
   assert.ok(!pattern.test('/requisitions/req-1'), 'must NOT match the ordinary requisition workspace route');
+});
+
+// Print-session correction (follow-up): usePathname() never includes
+// the query string, so the pathname pattern alone matches
+// /candidates/[id]/interviews/[invitationId]?print=1 identically to a
+// normal view. The disposable print tab must never hydrate Candidate
+// Files/Teamwork, so WorkspacePanel excludes it explicitly rather than
+// relying solely on the interview page withholding the focus event.
+
+test('isPrintSession is read directly from the URL search params, not derived from pathname (which cannot see ?print=1)', () => {
+  assert.match(source, /import \{ usePathname, useSearchParams \} from 'next\/navigation';/);
+  assert.match(source, /const searchParams = useSearchParams\(\);/);
+  assert.match(source, /const isPrintSession = searchParams\.get\('print'\) === '1';/);
+});
+
+test('isCompletedInterviewRoute is false for the print-session URL even though its pathname is identical to the normal view', () => {
+  const routeMatch = source.match(/const isCompletedInterviewRoute = \/(.+)\/\.test\(pathname\) && !isPrintSession;/);
+  assert.ok(routeMatch);
+  const pathnameOnlyMatches = new RegExp(routeMatch[1]).test('/candidates/cand-1/interviews/inv-1');
+  assert.ok(pathnameOnlyMatches, 'sanity check: the pathname of a print-session URL (query strings are stripped from usePathname()) does match the raw pattern');
+  assert.match(source, /&& !isPrintSession;/, 'expected the print-session exclusion to be applied on top of the pathname match, since pathname alone cannot distinguish the two');
+});
+
+test('the print-session exclusion is derived from this file\'s own URL read, not by importing or depending on the interview page\'s own isPrintSession guard - defense in depth, not the only guard', () => {
+  // WorkspacePanel reads searchParams itself (asserted above); it does
+  // not import anything from the interview page, so Candidate Files/
+  // Teamwork hydration in the print tab does not depend on that other
+  // file continuing to withhold CandidateDetailActions correctly.
+  assert.match(source, /const isPrintSession = searchParams\.get\('print'\) === '1';/);
+  assert.doesNotMatch(source, /from '@\/app\/candidates/, 'must not import anything from the interview page - the exclusion must be self-derived, not borrowed');
 });
 
 test('Candidate Files opens on the completed-interview route without requiring a /requisitions/[id] context, but only once a candidate has actually been focused', () => {

@@ -6,7 +6,12 @@ import styles from './CandidateFilesPanel.module.css';
 
 export function CandidateTeamworkPanel({ candidate }: { candidate: CandidateFilesSelection }) {
   return (
-    <div className={styles.panel}>
+    // data-requisition-id makes the requisition this candidate (and
+    // therefore this Teamwork thread) belongs to explicit and
+    // verifiable, even though phase1_candidate_teamwork_notes is itself
+    // scoped only by candidate_id - a candidate row belongs to exactly
+    // one requisition, so the two can never disagree.
+    <div className={styles.panel} data-requisition-id={candidate.requisitionId}>
       <div className={styles.header}>
         <span className={styles.eyebrow}>Candidate teamwork</span>
         <h2>{candidate.name}</h2>

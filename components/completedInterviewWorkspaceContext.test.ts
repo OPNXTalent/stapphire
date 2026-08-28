@@ -31,9 +31,23 @@ test('the page dispatches candidate-files focus via the existing CandidateDetail
   assert.ok(bridgeMatch, 'expected to find the CandidateDetailActions bridge element');
   assert.match(bridgeMatch[1], /candidateId=\{params\.id\}/);
   assert.match(bridgeMatch[1], /candidateName=\{candidate\.full_name\}/);
+  assert.match(bridgeMatch[1], /requisitionId=\{invitation\.requisition_id\}/, 'expected the assessment\'s own already-resolved requisition_id to be threaded through, not left null');
   assert.match(bridgeMatch[1], /sourceFilename=\{String\(candidate\.source_filename \|\| ''\)\}/);
   assert.match(bridgeMatch[1], /resumeAvailable=\{Boolean\(candidate\.source_storage_path\)\}/);
   assert.match(bridgeMatch[1], /focusInterviewId=\{params\.invitationId\}/, 'expected the current invitation id to be threaded through so Candidate Files can expand/highlight it');
+});
+
+test('Teamwork receives the correct requisition id from the completed-assessment route via the shared candidate-selection event, not a second Teamwork implementation', () => {
+  // The chain: this page passes invitation.requisition_id into
+  // CandidateDetailActions (asserted above) -> it becomes part of the
+  // CANDIDATE_FILES_FOCUS_EVENT detail (lib/candidateFilesEvents.ts /
+  // CandidateDetailActions.tsx) -> WorkspacePanel's candidate state
+  // carries it -> CandidateTeamworkPanel renders candidate.requisitionId
+  // (CandidateTeamworkPanel.test.ts covers that last hop directly).
+  const eventsFile = readFileSync(join(repoRoot, 'lib', 'candidateFilesEvents.ts'), 'utf8');
+  assert.match(eventsFile, /requisitionId: string;/, 'requisitionId must be a required field on the shared selection type carried by the focus event');
+  const detailActions = readFileSync(join(repoRoot, 'components', 'CandidateDetailActions.tsx'), 'utf8');
+  assert.match(detailActions, /const detail = \{ id: candidateId, name: candidateName, requisitionId, sourceFilename, resumeAvailable, focusInterviewId \};/, 'requisitionId must actually be included in the dispatched event detail');
 });
 
 test('the completed-interview route is internal, not the public/gate-exempt participant route - the gate middleware does not exempt it', () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { CandidateFilesPanel } from '@/components/CandidateFilesPanel';
 import { CandidateTeamworkPanel } from '@/components/CandidateTeamworkPanel';
 import { InterviewQuestionBankPanel } from '@/components/InterviewQuestionBankPanel';
@@ -29,8 +29,16 @@ export function WorkspacePanel({
   onCollapse: () => void;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const requisitionId = pathname.match(/^\/requisitions\/([^/]+)/)?.[1] || null;
   const isInterviewBuilder = /^\/requisitions\/[^/]+\/interviews\/builder\/?$/.test(pathname);
+  // usePathname() never includes the query string, so this pattern
+  // alone matches the completed-interview page's ?print=1 print-session
+  // tab identically to a normal view - the disposable print tab
+  // (see AutoPrint) must never hydrate Candidate Files/Teamwork
+  // regardless of whether anything upstream also happens to withhold
+  // the focus event there, so print is excluded explicitly here too.
+  const isPrintSession = searchParams.get('print') === '1';
   // The internal completed-interview assessment view
   // (app/candidates/[id]/interviews/[invitationId]/page.tsx) has no
   // /requisitions/[id] segment of its own, but it already belongs to a
@@ -38,7 +46,7 @@ export function WorkspacePanel({
   // the same CANDIDATE_FILES_FOCUS_EVENT there as it does from the
   // matrix, so Candidate Files should open there too, the same way,
   // without requiring a /requisitions/[id] context.
-  const isCompletedInterviewRoute = /^\/candidates\/[^/]+\/interviews\/[^/]+/.test(pathname);
+  const isCompletedInterviewRoute = /^\/candidates\/[^/]+\/interviews\/[^/]+/.test(pathname) && !isPrintSession;
   const { state, update } = useRequisitionViewState(requisitionId || '');
   const tab = state.panelTab;
   const [candidate, setCandidate] = useState<CandidateFilesSelection | null>(null);

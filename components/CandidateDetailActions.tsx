@@ -6,6 +6,7 @@ import { CANDIDATE_FILES_CLEAR_EVENT, CANDIDATE_FILES_FOCUS_EVENT } from '@/lib/
 export function CandidateDetailActions({
   candidateId,
   candidateName: explicitCandidateName,
+  requisitionId,
   sourceFilename,
   resumeAvailable,
   focusInterviewId
@@ -16,6 +17,7 @@ export function CandidateDetailActions({
   // DOM to read it from) can pass it directly instead of relying on the
   // CandidateMatrix-specific DOM query below.
   candidateName?: string;
+  requisitionId: string;
   sourceFilename: string;
   resumeAvailable: boolean;
   focusInterviewId?: string;
@@ -24,7 +26,7 @@ export function CandidateDetailActions({
     const candidateName = explicitCandidateName
       || document.querySelector('.matrix-selected-banner .matrix-row-name')?.textContent?.trim()
       || 'Candidate';
-    const detail = { id: candidateId, name: candidateName, sourceFilename, resumeAvailable, focusInterviewId };
+    const detail = { id: candidateId, name: candidateName, requisitionId, sourceFilename, resumeAvailable, focusInterviewId };
     let cancelled = false;
     // Deferred to a microtask so this dispatch always lands after every
     // effect from this same commit has run - including WorkspacePanel's
@@ -43,7 +45,7 @@ export function CandidateDetailActions({
       cancelled = true;
       window.dispatchEvent(new CustomEvent(CANDIDATE_FILES_CLEAR_EVENT, { detail: { id: candidateId } }));
     };
-  }, [candidateId, explicitCandidateName, sourceFilename, resumeAvailable, focusInterviewId]);
+  }, [candidateId, explicitCandidateName, requisitionId, sourceFilename, resumeAvailable, focusInterviewId]);
 
   return null;
 }

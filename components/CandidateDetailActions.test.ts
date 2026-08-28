@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 
 const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'CandidateDetailActions.tsx'), 'utf8');
 
-const effectRegex = /useEffect\(\(\) => \{([\s\S]*?)\n  \}, \[candidateId, explicitCandidateName, sourceFilename, resumeAvailable, focusInterviewId\]\);/;
+const effectRegex = /useEffect\(\(\) => \{([\s\S]*?)\n  \}, \[candidateId, explicitCandidateName, requisitionId, sourceFilename, resumeAvailable, focusInterviewId\]\);/;
 
 test('the candidate-files focus dispatch is deferred to a microtask, not fired synchronously on mount', () => {
   // AppShell renders the page content (which mounts this component)
@@ -41,12 +41,17 @@ test('the clear event still fires synchronously on cleanup, unaffected by deferr
   assert.match(cleanupMatch[1], /window\.dispatchEvent\(new CustomEvent\(CANDIDATE_FILES_CLEAR_EVENT, \{ detail: \{ id: candidateId \} \}\)\)/);
 });
 
-test('candidate display data (name/sourceFilename/resumeAvailable/focusInterviewId) is still computed synchronously on mount, only the dispatch itself is deferred', () => {
+test('candidate display data (name/requisitionId/sourceFilename/resumeAvailable/focusInterviewId) is still computed synchronously on mount, only the dispatch itself is deferred', () => {
   const effectMatch = source.match(effectRegex);
   assert.ok(effectMatch);
   const beforeMicrotask = effectMatch[1].slice(0, effectMatch[1].indexOf('queueMicrotask'));
   assert.match(beforeMicrotask, /const candidateName = explicitCandidateName\s*\n\s*\|\| document\.querySelector\('\.matrix-selected-banner \.matrix-row-name'\)/);
-  assert.match(beforeMicrotask, /const detail = \{ id: candidateId, name: candidateName, sourceFilename, resumeAvailable, focusInterviewId \};/);
+  assert.match(beforeMicrotask, /const detail = \{ id: candidateId, name: candidateName, requisitionId, sourceFilename, resumeAvailable, focusInterviewId \};/);
+});
+
+test('requisitionId is a required prop, not optional - every candidate belongs to exactly one requisition, so nothing should be able to omit it', () => {
+  assert.match(source, /requisitionId: string;/, 'requisitionId must be required, unlike candidateName/focusInterviewId which are genuinely optional');
+  assert.doesNotMatch(source, /requisitionId\?: string;/, 'requisitionId must not be optional');
 });
 
 test('an explicit candidate name (e.g. from a server-resolved page with no matrix DOM to read) takes priority over the CandidateMatrix-specific DOM query', () => {
@@ -64,4 +69,16 @@ test('candidateName and focusInterviewId are optional props, so the existing Can
   assert.ok(propsMatch);
   assert.match(source, /candidateName\?: string;/, 'candidateName must be optional');
   assert.match(source, /focusInterviewId\?: string;/, 'focusInterviewId must be optional');
+});
+
+test('every known caller of CandidateDetailActions passes requisitionId - CandidateMatrix (already has it as a prop), the completed-interview page (invitation.requisition_id), and the legacy candidate detail page (its own resolved requisitionId)', () => {
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const matrix = readFileSync(join(repoRoot, 'components', 'CandidateMatrix.tsx'), 'utf8');
+  assert.match(matrix, /<CandidateDetailActions candidateId=\{expandedCandidate\.id\} requisitionId=\{requisitionId\}/);
+
+  const interviewPage = readFileSync(join(repoRoot, 'app', 'candidates', '[id]', 'interviews', '[invitationId]', 'page.tsx'), 'utf8');
+  assert.match(interviewPage, /requisitionId=\{invitation\.requisition_id\}/);
+
+  const legacyCandidatePage = readFileSync(join(repoRoot, 'app', 'candidates', '[id]', 'page.tsx'), 'utf8');
+  assert.match(legacyCandidatePage, /<CandidateDetailActions candidateId=\{candidate\.id\} requisitionId=\{requisitionId\}/);
 });
