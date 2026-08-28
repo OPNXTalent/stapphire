@@ -24,6 +24,13 @@
 .assessment h2{margin:0 0 16px;font-size:16px}
 .assessmentBlock+ .assessmentBlock{margin-top:18px}
 .assessmentBlock strong{display:block;margin-bottom:5px;color:var(--muted);font-size:10px;letter-spacing:.04em;text-transform:uppercase}
-.assessmentBlock p{margin:0;font-size:13px;line-height:1.55;white-space:pre-wrap}
+.assessmentBlock p{margin:0;font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:break-word}
+/* Per-question comments (.assessmentBlock nested in .question) have no
+   inset of their own to inherit - unlike .questionHead/.ratings, which
+   each carry their own horizontal padding, .question itself has none.
+   The identical block inside .assessment is unaffected: that parent
+   already supplies its own 18px padding, so adding padding here too
+   would double-inset it. */
+.question .assessmentBlock{padding:12px 16px}
 @media(max-width:640px){.page{padding:20px 16px 40px}.meta{grid-template-columns:1fr}.header h1{font-size:25px}.ratingRow{align-items:flex-start}.topRow{align-items:flex-start}.topActions{align-items:flex-end;flex-direction:column}}
 @media print{.topRow{display:none}.page{max-width:none;padding:0}.question,.assessment{break-inside:avoid;box-shadow:none}}
