@@ -201,3 +201,53 @@ test('a settled batch with a failed item offers a way to dismiss it, mirroring t
   assert.ok(mapBlock);
   assert.match(mapBlock[1], /onClick=\{\(\) => dismissBatch\(batch\.clientBatchKey\)\}/, 'expected a Done-style control that dismisses the settled local batch');
 });
+
+// A proven-deleted target (e.g. an exact-duplicate résumé's operation,
+// which the duplicate-protection RPC deletes outright once its only item
+// is rejected) resolves through advancePollTarget to found: null with its
+// polling target cleared - but until this fix, nothing ever told
+// trackedOperation React state to let go of its last-known, now-stale
+// snapshot, since setTrackedOperation was only ever called inside
+// `if (found)`. That left the "Evaluating résumés…" card rendering
+// forever, surviving only a full page refresh (a fresh mount resets
+// trackedOperation to null).
+test('a proven-deleted target clears the stale tracked-operation snapshot in the same tick, not just the polling target ref', () => {
+  const tickMatch = source.match(/async function tick\(\) \{([\s\S]*?)\n    \}\n/);
+  assert.ok(tickMatch, 'expected to find tick()');
+  assert.match(
+    tickMatch[1],
+    /\} else if \(targetId && !pollState\.targetId\) \{\s*\n[\s\S]*?setTrackedOperation\(\(current\) => \(current && current\.id === targetId \? null : current\)\);/,
+    'expected the found/not-found branch to clear trackedOperation when advancePollTarget just resolved the exact id it was tracking as confirmed-deleted'
+  );
+});
+
+test('the stale-snapshot clear is scoped to the exact proven-deleted id, never a blanket clear of trackedOperation', () => {
+  const tickMatch = source.match(/async function tick\(\) \{([\s\S]*?)\n    \}\n/);
+  assert.ok(tickMatch);
+  const branchMatch = tickMatch[1].match(/\} else if \(targetId && !pollState\.targetId\) \{([\s\S]*?)\n {8}\}/);
+  assert.ok(branchMatch, 'expected the confirmed-deleted else-if branch');
+  assert.match(branchMatch[1], /current && current\.id === targetId \? null : current/, 'must only null out trackedOperation when it still references the exact id just proven deleted, preserving it otherwise');
+  assert.doesNotMatch(branchMatch[1], /setKnownOperations\(\[\]\)|setTrackedOperation\(null\)(?!\)| ==)/, 'must not unconditionally null trackedOperation or blanket-clear knownOperations - only the exact matching id may be cleared');
+});
+
+test('the confirmed-deleted clear only fires when advancePollTarget actually resolved the tracked id away (targetId was set, pollState.targetId now cleared) - never on an unrelated null-target tick such as reconstruction finding nothing', () => {
+  const tickMatch = source.match(/async function tick\(\) \{([\s\S]*?)\n    \}\n/);
+  assert.ok(tickMatch);
+  assert.match(tickMatch[1], /\} else if \(targetId && !pollState\.targetId\) \{/, 'the guard must require a truthy prior targetId, so a tick that already had no target (e.g. reconstruction) cannot spuriously trigger this branch');
+});
+
+test('a found operation (e.g. the surviving résumé in a mixed duplicate/unique batch) still updates trackedOperation exactly as before - the new branch never runs instead of the existing found path', () => {
+  const tickMatch = source.match(/async function tick\(\) \{([\s\S]*?)\n    \}\n/);
+  assert.ok(tickMatch);
+  assert.match(tickMatch[1], /if \(found\) \{\s*\n\s*setTrackedOperation\(found\);/, 'the found path must remain unchanged - a surviving operation must keep rendering its live progress');
+  const foundIndex = tickMatch[1].indexOf('if (found) {');
+  const elseIfIndex = tickMatch[1].indexOf('} else if (targetId && !pollState.targetId) {');
+  assert.ok(foundIndex >= 0 && elseIfIndex > foundIndex, 'the confirmed-deleted branch must be the else-if counterpart of the same found check, mutually exclusive with it');
+});
+
+test('local duplicate-error visibility (message and Done control) is untouched by the tracked-operation fix - it is driven by visibleLocalBatches/currentLocalBatch, not trackedOperation', () => {
+  assert.match(source, /\{item\.status === 'error' && item\.error && <span className="upload-queue-msg">\{item\.error\}<\/span>\}/);
+  const mapBlock = source.match(/\{visibleLocalBatches\.map\(\(batch\) => \{([\s\S]*?)\n {6}\}\)\}/);
+  assert.ok(mapBlock);
+  assert.doesNotMatch(mapBlock[1], /trackedOperation/, 'the local per-batch error row/Done control must remain independent of trackedOperation state, so clearing a stale tracked operation can never affect it');
+});

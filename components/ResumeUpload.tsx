@@ -164,6 +164,13 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
               dispatchResumeOperationTerminal(window, { requisitionId, operationId: found.id });
             }
           }
+        } else if (targetId && !pollState.targetId) {
+          // advancePollTarget just resolved targetId as confirmed-deleted
+          // (e.g. an exact-duplicate résumé whose operation the duplicate-
+          // protection RPC deleted outright) - only the polling target ref
+          // is cleared internally, so drop the last-known snapshot too,
+          // and only if it's still that exact proven-deleted operation.
+          setTrackedOperation((current) => (current && current.id === targetId ? null : current));
         }
 
         const stillUnresolved = Boolean(
