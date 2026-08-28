@@ -8,7 +8,9 @@ import {
   findPhoneScreenSeed,
   responseSpecToWireFlags,
   wireFlagsToResponseSpec,
-  responseSpecForKind
+  responseSpecForKind,
+  responseSpecFromParts,
+  templateForPhoneScreenType
 } from './phoneScreenQuestions.ts';
 
 test('exactly the six specified default questions are present, verbatim, in the specified order', () => {
@@ -67,7 +69,7 @@ test('sourcing questions ("How did you hear about this opportunity?" and employe
 test('each of the six default questions declares the exact response kind its content semantically requires', () => {
   const byText = new Map(PHONE_SCREEN_DEFAULT_QUESTIONS.map((question) => [question.text, question]));
   assert.equal(byText.get('Are you within commuting distance of the work location, or prepared to relocate?')?.response.kind, 'single-choice');
-  assert.equal(byText.get('Is the stated compensation range acceptable?')?.response.kind, 'yes-no-needs-discussion');
+  assert.equal(byText.get('Is the stated compensation range acceptable?')?.response.kind, 'yes-no');
   assert.equal(byText.get('How many years of applicable experience do you have?')?.response.kind, 'numeric');
   assert.equal(byText.get('What is the highest degree you have completed?')?.response.kind, 'single-choice');
   assert.equal(byText.get('Are you currently authorized to work in the United States?')?.response.kind, 'yes-no');
@@ -169,4 +171,56 @@ test('responseSpecForKind builds a sensible default for each kind and preserves 
   assert.deepEqual(responseSpecForKind('numeric', previousNumeric), previousNumeric);
   // Switching away and back to a different kind does not carry over an unrelated previous shape.
   assert.deepEqual(responseSpecForKind('single-choice', previousNumeric), { kind: 'single-choice', options: [] });
+});
+
+// The Location template's exact qualifying/disqualifying split, called
+// out explicitly in this pass: "Within commuting distance" and "Willing
+// to relocate" qualify; "Neither" does not; there is deliberately no
+// third "Needs discussion" option.
+test('Location has the exact three responses with the specified qualifying/disqualifying split, and no Needs discussion option', () => {
+  const location = PHONE_SCREEN_DEFAULT_QUESTIONS.find((question) => question.questionType === 'Location');
+  assert.ok(location && location.response.kind === 'single-choice');
+  if (location && location.response.kind === 'single-choice') {
+    assert.deepEqual(location.response.options, ['Within commuting distance', 'Willing to relocate', 'Neither']);
+    assert.deepEqual(location.response.qualifying, ['Within commuting distance', 'Willing to relocate']);
+    assert.ok(!location.response.options.some((option) => /needs discussion/i.test(option)));
+  }
+});
+
+test('templateForPhoneScreenType returns the coherent canonical package for every real type and undefined for Custom', () => {
+  for (const type of PHONE_SCREEN_QUESTION_TYPES) {
+    if (type === 'Custom') {
+      assert.equal(templateForPhoneScreenType(type), undefined);
+      continue;
+    }
+    const template = templateForPhoneScreenType(type);
+    assert.ok(template, `expected a template for ${type}`);
+    assert.equal(template?.questionType, type);
+    assert.ok(template?.text.length, `expected non-empty template text for ${type}`);
+  }
+  assert.equal(templateForPhoneScreenType('Not A Real Type'), undefined);
+});
+
+test('templateForPhoneScreenType matches the specified default wording for each explicitly called-out type', () => {
+  assert.equal(templateForPhoneScreenType('Location')?.text, 'Are you within commuting distance of the work location, or prepared to relocate?');
+  assert.equal(templateForPhoneScreenType('Compensation')?.text, 'Is the stated compensation range acceptable?');
+  assert.equal(templateForPhoneScreenType('Experience')?.text, 'How many years of applicable experience do you have?');
+  assert.equal(templateForPhoneScreenType('Education')?.text, 'What is the highest degree you have completed?');
+  assert.equal(templateForPhoneScreenType('Work Authorization')?.text, 'Are you currently authorized to work in the United States?');
+  assert.equal(templateForPhoneScreenType('Sponsorship')?.text, 'Will you now or in the future require employer sponsorship to work in the United States?');
+});
+
+test('responseSpecFromParts reconstructs the exact discriminated spec for every kind, including qualifying metadata, and falls back safely for an unrecognized kind', () => {
+  assert.deepEqual(responseSpecFromParts('yes-no'), { kind: 'yes-no' });
+  assert.deepEqual(responseSpecFromParts('yes-no-needs-discussion'), { kind: 'yes-no-needs-discussion' });
+  assert.deepEqual(responseSpecFromParts('short-answer'), { kind: 'short-answer' });
+  assert.deepEqual(responseSpecFromParts('numeric', undefined, 'years'), { kind: 'numeric', unit: 'years' });
+  assert.deepEqual(responseSpecFromParts('numeric'), { kind: 'numeric' });
+  assert.deepEqual(responseSpecFromParts('single-choice', ['A', 'B']), { kind: 'single-choice', options: ['A', 'B'] });
+  assert.deepEqual(
+    responseSpecFromParts('single-choice', ['Within commuting distance', 'Willing to relocate', 'Neither'], undefined, ['Within commuting distance', 'Willing to relocate']),
+    { kind: 'single-choice', options: ['Within commuting distance', 'Willing to relocate', 'Neither'], qualifying: ['Within commuting distance', 'Willing to relocate'] }
+  );
+  assert.deepEqual(responseSpecFromParts(undefined), { kind: 'short-answer' });
+  assert.deepEqual(responseSpecFromParts('not-a-real-kind'), { kind: 'short-answer' });
 });

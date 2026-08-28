@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { AREAS_OF_EVALUATION, type BankQuestion, type InterviewStageId } from '@/lib/interviewQuestionBank';
-import { PHONE_SCREEN_BANK_QUESTIONS, PHONE_SCREEN_QUESTION_TYPES, type PhoneScreenResponseKind, type PhoneScreenResponseSpec } from '@/lib/phoneScreenQuestions';
+import { PHONE_SCREEN_BANK_QUESTIONS, PHONE_SCREEN_QUESTION_TYPES, responseSpecFromParts, type PhoneScreenQuestionType, type PhoneScreenResponseKind, type PhoneScreenResponseSpec } from '@/lib/phoneScreenQuestions';
 import { AOE_PREFERENCES_CHANGED_EVENT, type AoePreferences } from '@/lib/aoePreferences';
 import { INTERVIEW_QUESTION_TYPES, type InterviewQuestionType } from '@/lib/interviewQuestionTypes';
 import {
+  INTERVIEW_BANK_ADD_EVENT,
   INTERVIEW_BANK_DRAG_MIME,
   INTERVIEW_BANK_USED_EVENT,
   INTERVIEW_BUILDER_CONTEXT_EVENT,
@@ -29,38 +30,39 @@ const RESPONSE_KIND_LABELS: Record<PhoneScreenResponseKind, string> = {
   'short-answer': 'Short answer'
 };
 
-// The canonical section order for the Structured Interview side of the
-// Question Bank: the app's existing generated Question Type vocabulary,
-// then Custom, then General (the fallback bucket for a reloaded
-// generated question whose original type wasn't persisted - see
-// loadPersistedQuestions in the interview-question-bank route).
-const STRUCTURED_QUESTION_TYPE_ORDER: readonly string[] = [...INTERVIEW_QUESTION_TYPES, 'Custom', 'General'];
+// A small, representative subset of the full canonical Phone Screen
+// bank - the panel's static baseline is now a concise set of examples
+// rather than a warehouse of all fourteen remaining questions.
+// "Generate Screen Questions" is the primary way to get more, tailored
+// ones; the full PHONE_SCREEN_BANK_QUESTIONS list is untouched and
+// still canonical (still used by cloneBankQuestion/reconstruction).
+const PHONE_SCREEN_REPRESENTATIVE_IDS = new Set([
+  'phone-screen-bank-1', // Schedule
+  'phone-screen-bank-2', // Work Arrangement
+  'phone-screen-bank-5', // Travel
+  'phone-screen-bank-12' // Language
+]);
 
-// Groups questions into Question-Type sections in a stable, canonical
-// order (not first-seen order, so sections don't reshuffle as
-// questions are used/returned) - any type absent from `order` (should
-// not normally happen) still surfaces, appended at the end, rather than
-// silently dropping questions from the bank.
-function groupByType<T extends { questionType: string }>(questions: T[], order: readonly string[]): QuestionGroup<T>[] {
-  const byType = new Map<string, T[]>();
+// Groups questions into Question-Type sections, alphabetically by
+// type, case-insensitively (so capitalization differences never split
+// one category into two) - not first-seen or a fixed canonical order,
+// so a freshly generated category inserts itself in the correct
+// alphabetical position automatically. Custom is excluded: it is
+// reserved for manually created questions and never a reusable,
+// drag-from-the-bank category.
+function groupByType<T extends { questionType: string }>(questions: T[]): QuestionGroup<T>[] {
+  const byKey = new Map<string, { label: string; questions: T[] }>();
   for (const question of questions) {
-    const list = byType.get(question.questionType) ?? [];
-    list.push(question);
-    byType.set(question.questionType, list);
+    if (question.questionType === 'Custom') continue;
+    const key = question.questionType.trim().toLocaleLowerCase();
+    const existing = byKey.get(key);
+    if (existing) existing.questions.push(question);
+    else byKey.set(key, { label: question.questionType, questions: [question] });
   }
-  const groups: QuestionGroup<T>[] = [];
-  for (const type of order) {
-    const list = byType.get(type);
-    if (list && list.length > 0) groups.push({ type, questions: list });
-  }
-  for (const [type, list] of byType) {
-    if (!order.includes(type) && list.length > 0) groups.push({ type, questions: list });
-  }
-  return groups;
-}
-
-function typeSectionLabel(type: string) {
-  return type === 'Custom' ? 'Custom Questions' : type;
+  return Array.from(byKey.values())
+    .filter((group) => group.questions.length > 0)
+    .map(({ label, questions: groupQuestions }) => ({ type: label, questions: groupQuestions }))
+    .sort((a, b) => a.type.localeCompare(b.type, undefined, { sensitivity: 'base' }));
 }
 
 const UNSAVED_STARTER_USED_IDS = new Set([
@@ -107,6 +109,10 @@ export function InterviewQuestionBankPanel({
   const [stage, setStage] = useState<InterviewStageId>(initialStage);
   const [starterQuestions, setStarterQuestions] = useState<AvailableQuestion[]>([]);
   const [generatedQuestions, setGeneratedQuestions] = useState<AvailableQuestion[]>([]);
+  const [generatedPhoneScreenQuestions, setGeneratedPhoneScreenQuestions] = useState<AvailableQuestion[]>([]);
+  const [phoneScreenQuestionType, setPhoneScreenQuestionType] = useState<Exclude<PhoneScreenQuestionType, 'Custom'> | ''>('');
+  const [generatingPhoneScreen, setGeneratingPhoneScreen] = useState(false);
+  const [phoneScreenError, setPhoneScreenError] = useState('');
   const [usedIds, setUsedIds] = useState<Set<string>>(() => new Set());
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
   const [selectedQuestionType, setSelectedQuestionType] = useState<InterviewQuestionType | ''>('');
@@ -147,18 +153,22 @@ export function InterviewQuestionBankPanel({
   // full-width stage bar (InterviewPlan.tsx) instead of being repeated
   // here - this panel is reserved for Question Bank functionality and
   // begins directly with its own heading below.
-  const availablePhoneScreenQuestions = useMemo<AvailableQuestion[]>(
+  const representativePhoneScreenQuestions = useMemo<AvailableQuestion[]>(
     () => PHONE_SCREEN_BANK_QUESTIONS
-      .filter((question) => !usedIds.has(question.id))
+      .filter((question) => PHONE_SCREEN_REPRESENTATIVE_IDS.has(question.id) && !usedIds.has(question.id))
       .map((question) => ({ id: question.id, text: question.text, areas: [], response: question.response, questionType: question.questionType, cardTitle: question.cardTitle })),
     [usedIds]
   );
+  const availablePhoneScreenQuestions = useMemo<AvailableQuestion[]>(
+    () => [...generatedPhoneScreenQuestions, ...representativePhoneScreenQuestions].filter((question) => !usedIds.has(question.id)),
+    [generatedPhoneScreenQuestions, representativePhoneScreenQuestions, usedIds]
+  );
   const phoneScreenGroups = useMemo(
-    () => groupByType(availablePhoneScreenQuestions, PHONE_SCREEN_QUESTION_TYPES),
+    () => groupByType(availablePhoneScreenQuestions),
     [availablePhoneScreenQuestions]
   );
   const structuredGroups = useMemo(
-    () => groupByType(availableQuestions, STRUCTURED_QUESTION_TYPE_ORDER),
+    () => groupByType(availableQuestions),
     [availableQuestions]
   );
 
@@ -214,12 +224,18 @@ export function InterviewQuestionBankPanel({
         if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Unable to load interview questions.');
         return result;
       }),
+      fetch(`/api/requisitions/${requisitionId}/interview-question-bank?stage=phone-screen`, { cache: 'no-store' }).then(async (response) => {
+        const result = await readJson(response, 'Unable to load Phone Screen questions.');
+        if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Unable to load Phone Screen questions.');
+        return result;
+      }),
       fetch(`/api/requisitions/${requisitionId}/interview-plan`, { cache: 'no-store' }).then(async (response) => response.ok ? response.json() : null)
     ])
-      .then(([bankResult, planResult]) => {
+      .then(([bankResult, phoneScreenBankResult, planResult]) => {
         if (cancelled) return;
         setStarterQuestions(Array.isArray(bankResult.starterQuestions) ? bankResult.starterQuestions as AvailableQuestion[] : []);
         setGeneratedQuestions(Array.isArray(bankResult.generatedQuestions) ? bankResult.generatedQuestions as AvailableQuestion[] : []);
+        setGeneratedPhoneScreenQuestions(Array.isArray(phoneScreenBankResult.generatedQuestions) ? phoneScreenBankResult.generatedQuestions as AvailableQuestion[] : []);
         setUsedIds(sourceIdsFromPlan(planResult?.plan));
         setPreferences(bankResult.aoePreferences && typeof bankResult.aoePreferences === 'object' ? bankResult.aoePreferences as AoePreferences : { hiddenStandardAreas: [], customAreas: [] });
         setAvailableAreas(Array.isArray(bankResult.availableAreas) ? bankResult.availableAreas.map(String) : [...AREAS_OF_EVALUATION]);
@@ -305,9 +321,28 @@ export function InterviewQuestionBankPanel({
       text: '',
       areas: [],
       questionType: 'Custom',
-      cardTitle: 'Custom Question',
-      ...(isPhoneScreen ? { response: { kind: 'short-answer' } as PhoneScreenResponseSpec } : {})
+      cardTitle: 'Custom Question'
     });
+  }
+
+  // The single manual-creation action for Phone Screen - replaces the
+  // old "Create Your Own Question" drag tile, so there is exactly one
+  // way to start a custom Phone Screen question rather than two
+  // competing ones. Dispatches through the same INTERVIEW_BANK_ADD_EVENT
+  // the drag-and-drop path already uses (see addFromBankPanel in
+  // InterviewPlan.tsx), so it is added directly to the form.
+  function addCustomPhoneScreenQuestion() {
+    const suffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`;
+    const question: BankQuestion = {
+      id: `custom-phone-screen-${suffix}`,
+      stage: 'phone-screen',
+      text: '',
+      areas: [],
+      questionType: 'Custom',
+      cardTitle: 'Custom Question',
+      response: { kind: 'short-answer' }
+    };
+    window.dispatchEvent(new CustomEvent(INTERVIEW_BANK_ADD_EVENT, { detail: { question } }));
   }
 
   function toggleSelectedArea(area: string) {
@@ -351,18 +386,31 @@ export function InterviewQuestionBankPanel({
       });
       const result = await readJson(response, 'Unable to generate interview questions.');
       if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Unable to generate interview questions.');
-      const rawQuestions = Array.isArray(result.questions) ? result.questions as Array<{ id: string; text: string; areas: string[] }> : [];
-      if (rawQuestions.length !== 5) throw new Error('Unable to generate five interview questions. No QC was used.');
-      // The generator itself only returns text/areas per question - the
-      // recruiter's selected Question Type for this batch is attached
-      // here, client-side, at the moment of generation. It is not sent
-      // to or stored by the question-bank RPC (no migration this pass),
-      // so it only survives for the remainder of this session; a
-      // reloaded generated question falls back to "General" (see
-      // loadPersistedQuestions in the interview-question-bank route).
-      const batchType = selectedQuestionType || 'General';
-      const questions: AvailableQuestion[] = rawQuestions.map((question) => ({ ...question, questionType: batchType, cardTitle: batchType }));
+      // `generated` carries the server-validated, real per-question
+      // Question Type for this batch - never a single client-guessed
+      // label, since a mixed (no specific type requested) batch can
+      // legitimately return five different types.
+      const generatedBatch = Array.isArray(result.generated)
+        ? result.generated as Array<{ id: string; text: string; areas: string[]; questionType: InterviewQuestionType }>
+        : [];
+      if (generatedBatch.length !== 5) throw new Error('Unable to generate five interview questions. No QC was used.');
+      const questions: AvailableQuestion[] = generatedBatch.map((question) => ({
+        id: question.id,
+        text: question.text,
+        areas: question.areas,
+        questionType: question.questionType,
+        cardTitle: question.questionType
+      }));
       setGeneratedQuestions((current) => [...questions, ...current]);
+      // Auto-expand every category this batch just populated, so the new
+      // results are immediately visible rather than hidden behind a
+      // previously collapsed section.
+      const newTypes = new Set(questions.map((question) => question.questionType));
+      setCollapsedTypes((current) => {
+        const next = new Set(current);
+        for (const type of newTypes) next.delete(type);
+        return next;
+      });
       setSelectedAreas([]);
       setSelectedQuestionType('');
       setAreaPickerOpen(false);
@@ -374,6 +422,45 @@ export function InterviewQuestionBankPanel({
     }
   }
 
+  async function generatePhoneScreenQuestionsAction() {
+    if (generatingPhoneScreen) return;
+    setGeneratingPhoneScreen(true);
+    setPhoneScreenError('');
+    try {
+      const response = await fetch(`/api/requisitions/${requisitionId}/interview-question-bank`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: 'phone-screen', questionType: phoneScreenQuestionType || null })
+      });
+      const result = await readJson(response, 'Unable to generate Phone Screen questions.');
+      if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Unable to generate Phone Screen questions.');
+      const generatedBatch = Array.isArray(result.generated)
+        ? result.generated as Array<{ id: string; text: string; questionType: Exclude<PhoneScreenQuestionType, 'Custom'>; responseKind: PhoneScreenResponseKind; responseOptions?: string[]; responseUnit?: string }>
+        : [];
+      if (generatedBatch.length !== 5) throw new Error('Unable to generate five Phone Screen questions. No QC was used.');
+      const questions: AvailableQuestion[] = generatedBatch.map((question) => ({
+        id: question.id,
+        text: question.text,
+        areas: [],
+        questionType: question.questionType,
+        cardTitle: question.questionType,
+        response: responseSpecFromParts(question.responseKind, question.responseOptions, question.responseUnit)
+      }));
+      setGeneratedPhoneScreenQuestions((current) => [...questions, ...current]);
+      const newTypes = new Set(questions.map((question) => question.questionType));
+      setCollapsedTypes((current) => {
+        const next = new Set(current);
+        for (const type of newTypes) next.delete(type);
+        return next;
+      });
+      setPhoneScreenQuestionType('');
+    } catch (generationError) {
+      setPhoneScreenError(generationError instanceof Error ? generationError.message : 'Unable to generate Phone Screen questions.');
+    } finally {
+      setGeneratingPhoneScreen(false);
+    }
+  }
+
   if (isPhoneScreen) {
     return (
       <div className={styles.panel}>
@@ -381,26 +468,35 @@ export function InterviewQuestionBankPanel({
           <div className={styles.panelHeader}>
             <h3>Question Bank <span className={styles.bankCount}>{availablePhoneScreenQuestions.length}</span></h3>
           </div>
-          <p className={styles.workflowHint}>Curated screening questions for Phone Screen — no Areas of Evaluation or generation needed. Drag a question onto the form, or write your own.</p>
+          <p className={styles.workflowHint}>A few representative screening questions to start from. Generate more for a specific subject, or write your own.</p>
+
+          <div className={styles.selectWrap}>
+            <select
+              className={styles.questionTypeSelect}
+              value={phoneScreenQuestionType}
+              onChange={(event) => setPhoneScreenQuestionType(event.target.value as Exclude<PhoneScreenQuestionType, 'Custom'> | '')}
+              aria-label="Phone Screen Question Type"
+            >
+              <option value="">All Question Types</option>
+              {PHONE_SCREEN_QUESTION_TYPES.filter((type) => type !== 'Custom').map((type) => <option key={type} value={type}>{type}</option>)}
+            </select>
+            <span className={styles.dropdownChevron} aria-hidden="true">▾</span>
+          </div>
+
+          <button type="button" className={styles.phoneScreenGenerateButton} onClick={generatePhoneScreenQuestionsAction} disabled={generatingPhoneScreen}>
+            {generatingPhoneScreen ? 'Generating…' : 'Generate Screen Questions · Uses 1 QC'}
+          </button>
+          <button type="button" className={styles.addCustomScreenQuestion} onClick={addCustomPhoneScreenQuestion}>+ Custom Screen Question</button>
+          {phoneScreenError && <p className={styles.error}>{phoneScreenError}</p>}
         </div>
 
         <div className={styles.list}>
-          <div className={`${styles.question} ${styles.wildcard}`} draggable onDragStart={startBlankDrag}>
-            <div className={styles.questionTop}>
-              <span className={styles.drag} aria-hidden="true">⠿</span>
-              <div>
-                <p>Create Your Own Question</p>
-                <span className={styles.wildcardCopy}>Drag this onto the Phone Screen, then write your question and choose its response type.</span>
-              </div>
-            </div>
-          </div>
-
           {phoneScreenGroups.map((group) => {
             const collapsed = collapsedTypes.has(group.type);
             return (
               <div className={styles.typeSection} key={group.type}>
                 <button type="button" className={styles.typeSectionHeader} onClick={() => toggleTypeCollapsed(group.type)} aria-expanded={!collapsed}>
-                  <span className={styles.typeSectionName}>{typeSectionLabel(group.type)} <span className={styles.bankCount}>{group.questions.length}</span></span>
+                  <span className={styles.typeSectionName}>{group.type} <span className={styles.bankCount}>{group.questions.length}</span></span>
                   <span className={styles.typeSectionChevron} aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
                 </button>
                 {!collapsed && group.questions.map((question) => (
@@ -542,7 +638,7 @@ export function InterviewQuestionBankPanel({
           return (
             <div className={styles.typeSection} key={group.type}>
               <button type="button" className={styles.typeSectionHeader} onClick={() => toggleTypeCollapsed(group.type)} aria-expanded={!collapsed}>
-                <span className={styles.typeSectionName}>{typeSectionLabel(group.type)} <span className={styles.bankCount}>{group.questions.length}</span></span>
+                <span className={styles.typeSectionName}>{group.type} <span className={styles.bankCount}>{group.questions.length}</span></span>
                 <span className={styles.typeSectionChevron} aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
               </button>
               {!collapsed && group.questions.map((question) => (

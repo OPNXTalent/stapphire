@@ -97,3 +97,17 @@ export function buildQuestionBank(positionTitle = 'this role'): BankQuestion[] {
 
   return [...phoneScreenEntries, ...structuredEntries];
 }
+
+// Question Type "doing real work" for Structured Interview: selecting a
+// non-Custom type on a given stage must synchronously load that stage's
+// own coherent default (stage-appropriate wording + suggested AOE) -
+// 1st Interview validates foundational evidence, 2nd Interview
+// demonstrates application/complexity/collaboration, 3rd Interview
+// differentiates finalists. Reads directly from the already-built bank
+// (which already reflects the position title) rather than a second,
+// separate static map. The first bank entry for that (stage, type) pair
+// wins, deterministically, when a stage has more than one.
+export function templateForStructuredType(bank: BankQuestion[], stage: InterviewStageId, questionType: string): { text: string; areas: string[] } | undefined {
+  const match = bank.find((question) => question.stage === stage && question.questionType === questionType);
+  return match ? { text: match.text, areas: [...match.areas] } : undefined;
+}

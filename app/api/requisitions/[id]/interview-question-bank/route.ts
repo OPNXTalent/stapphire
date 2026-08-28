@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server';
 import { buildQuestionBank } from '@/lib/interviewQuestionBank';
 import { activeAoeAreas, DEFAULT_AOE_PREFERENCES, type AoePreferences } from '@/lib/aoePreferences';
-import { generateInterviewQuestions } from '@/lib/interviewQuestionGenerator';
+import { generateInterviewQuestions, generatePhoneScreenQuestions } from '@/lib/interviewQuestionGenerator';
 import { isInterviewQuestionType, type InterviewQuestionType } from '@/lib/interviewQuestionTypes';
+import { PHONE_SCREEN_QUESTION_TYPES, type PhoneScreenQuestionType } from '@/lib/phoneScreenQuestions';
 import { resolveCurrentEvaluationBasis } from '@/lib/evaluationBasis';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+
+type PhoneScreenGeneratableType = Exclude<PhoneScreenQuestionType, 'Custom'>;
+
+function isPhoneScreenGeneratableType(value: unknown): value is PhoneScreenGeneratableType {
+  return typeof value === 'string' && value !== 'Custom' && (PHONE_SCREEN_QUESTION_TYPES as readonly string[]).includes(value);
+}
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -40,27 +47,39 @@ async function loadRequisition(requisitionId: string) {
   return data;
 }
 
-async function loadPersistedQuestions(requisitionId: string) {
-  const { data, error } = await supabaseAdmin
+// stage: 'phone-screen' loads only rows generated for Phone Screen;
+// 'structured' loads everything else, including rows persisted before
+// the stage column existed (stage is null there, which is treated as
+// structured - the only kind of generation that existed at the time).
+async function loadPersistedQuestions(requisitionId: string, stage: 'phone-screen' | 'structured') {
+  let query = supabaseAdmin
     .from('phase1_interview_question_bank')
-    .select('question_key,question_text,areas,created_at')
-    .eq('requisition_id', requisitionId)
-    .order('created_at', { ascending: true });
+    .select('question_key,question_text,areas,created_at,question_type,stage,response_kind,response_options,response_unit')
+    .eq('requisition_id', requisitionId);
+  query = stage === 'phone-screen' ? query.eq('stage', 'phone-screen') : query.or('stage.is.null,stage.neq.phone-screen');
+  const { data, error } = await query.order('created_at', { ascending: true });
   if (error) throw error;
-  // The persisted question bank table has no question_type/card_title
-  // column (adding one is a migration, out of scope this pass) - a
-  // reloaded generated question's originally-selected type can't be
-  // recovered, so it falls back to a generic "General" bucket rather
-  // than being misrepresented as a specific type it was never tagged
-  // with. A freshly generated question (still in this session) keeps
-  // its real type - see generateMore() in InterviewQuestionBankPanel.
-  return (data || []).map((question) => ({
-    id: question.question_key as string,
-    text: question.question_text as string,
-    areas: Array.isArray(question.areas) ? question.areas as string[] : [],
-    questionType: 'General',
-    cardTitle: 'General'
-  }));
+  const fallbackType = stage === 'phone-screen' ? 'Custom' : 'General';
+  return (data || []).map((question) => {
+    const questionType = typeof question.question_type === 'string' && question.question_type ? question.question_type : fallbackType;
+    const responseKind = question.response_kind as string | null;
+    return {
+      id: question.question_key as string,
+      text: question.question_text as string,
+      areas: Array.isArray(question.areas) ? question.areas as string[] : [],
+      questionType,
+      cardTitle: questionType,
+      ...(stage === 'phone-screen' && responseKind
+        ? {
+            response: {
+              kind: responseKind,
+              ...(Array.isArray(question.response_options) ? { options: question.response_options } : {}),
+              ...(question.response_unit ? { unit: question.response_unit } : {})
+            }
+          }
+        : {})
+    };
+  });
 }
 
 async function loadPlanQuestionTexts(requisitionId: string) {
@@ -108,17 +127,47 @@ async function loadAoePreferences(orgId: string | null): Promise<AoePreferences>
   } : DEFAULT_AOE_PREFERENCES;
 }
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+// Backfills question_type/stage/response metadata onto rows the opaque,
+// out-of-repo consume_qc_and_add_interview_questions RPC just inserted.
+// The RPC itself is never modified or sent these fields - this is a
+// plain, additive follow-up update keyed by the same question_key it
+// already writes, so a generated question's real category (and, for
+// Phone Screen, its response package) survives a reload instead of
+// falling back to Custom/General once it's no longer freshly in memory.
+async function backfillQuestionTypeMetadata(requisitionId: string, rows: Array<{
+  id: string;
+  questionType: string;
+  stage: 'phone-screen' | null;
+  responseKind?: string;
+  responseOptions?: string[];
+  responseUnit?: string;
+}>) {
+  await Promise.all(rows.map((row) => supabaseAdmin
+    .from('phase1_interview_question_bank')
+    .update({
+      question_type: row.questionType,
+      stage: row.stage,
+      response_kind: row.responseKind ?? null,
+      response_options: row.responseOptions ?? null,
+      response_unit: row.responseUnit ?? null
+    })
+    .eq('requisition_id', requisitionId)
+    .eq('question_key', row.id)));
+}
+
+export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
+    const stageParam = new URL(request.url).searchParams.get('stage');
+    const stage: 'phone-screen' | 'structured' = stageParam === 'phone-screen' ? 'phone-screen' : 'structured';
     const [requisition, organization] = await Promise.all([loadRequisition(params.id), resolveOrganization()]);
     if (!requisition) return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 });
     const [persisted, aoePreferences] = await Promise.all([
-      loadPersistedQuestions(params.id),
+      loadPersistedQuestions(params.id, stage),
       loadAoePreferences(organization?.id ?? null)
     ]);
     return NextResponse.json({
       positionTitle: requisition.title,
-      starterQuestions: starterQuestions(requisition.title),
+      starterQuestions: stage === 'phone-screen' ? [] : starterQuestions(requisition.title),
       generatedQuestions: persisted,
       aoePreferences,
       availableAreas: activeAoeAreas(aoePreferences)
@@ -137,6 +186,58 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     const organization = await resolveOrganization();
     if (!organization) return NextResponse.json({ error: 'QC billing is not configured for this workspace.' }, { status: 409 });
+    if ((organization.credits_remaining as number) < 1) return NextResponse.json({ error: 'No QC credits remain.' }, { status: 402 });
+
+    if (body.stage === 'phone-screen') {
+      let phoneScreenType: Exclude<PhoneScreenQuestionType, 'Custom'> | null = null;
+      if (body.questionType != null && body.questionType !== '') {
+        if (!isPhoneScreenGeneratableType(body.questionType)) return NextResponse.json({ error: 'Select a valid Question Type.' }, { status: 400 });
+        phoneScreenType = body.questionType;
+      }
+
+      const [basis, persisted, planQuestions] = await Promise.all([
+        resolveCurrentEvaluationBasis(params.id),
+        loadPersistedQuestions(params.id, 'phone-screen'),
+        loadPlanQuestionTexts(params.id)
+      ]);
+      if (!basis) return NextResponse.json({ error: 'Apply a Job Description or Hiring Criteria basis before generating questions.' }, { status: 409 });
+
+      const existingQuestions = [...persisted.map((question) => question.text), ...planQuestions];
+      const questions = await generatePhoneScreenQuestions({ basis, questionType: phoneScreenType, existingQuestions });
+
+      const { data, error } = await supabaseAdmin.rpc('consume_qc_and_add_interview_questions', {
+        p_org_id: organization.id,
+        p_requisition_id: params.id,
+        p_questions: questions.map((question) => ({ id: question.id, text: question.text, areas: [] }))
+      });
+      if (error) {
+        if (error.message?.includes('INSUFFICIENT_QC')) return NextResponse.json({ error: 'No QC credits remain.' }, { status: 402 });
+        throw error;
+      }
+      if (!data || typeof data !== 'object' || !Array.isArray(data.questions)) throw new Error('Question generation persistence returned an invalid result.');
+
+      await backfillQuestionTypeMetadata(params.id, questions.map((question) => ({
+        id: question.id,
+        questionType: question.questionType,
+        stage: 'phone-screen',
+        responseKind: question.responseKind,
+        responseOptions: question.responseOptions,
+        responseUnit: question.responseUnit
+      })));
+
+      // `generated` carries the full, validated per-question metadata
+      // (Question Type + response package) this route just computed and
+      // persisted, keyed by the same ids in `questions` - the client
+      // uses it to display the real category immediately, in this same
+      // session, rather than a client-side guess that would only match
+      // reality after a reload.
+      return NextResponse.json({
+        questions: data.questions,
+        creditsRemaining: data.creditsRemaining,
+        generated: questions
+      }, { status: 201 });
+    }
+
     const aoePreferences = await loadAoePreferences(organization.id);
     const availableAreas = activeAoeAreas(aoePreferences);
     const availableAreaSet = new Set(availableAreas);
@@ -153,11 +254,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
       questionType = body.questionType;
     }
 
-    if ((organization.credits_remaining as number) < 1) return NextResponse.json({ error: 'No QC credits remain.' }, { status: 402 });
-
     const [basis, persisted, planQuestions] = await Promise.all([
       resolveCurrentEvaluationBasis(params.id),
-      loadPersistedQuestions(params.id),
+      loadPersistedQuestions(params.id, 'structured'),
       loadPlanQuestionTexts(params.id)
     ]);
     if (!basis) return NextResponse.json({ error: 'Apply a Job Description or Hiring Criteria basis before generating questions.' }, { status: 409 });
@@ -172,7 +271,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const { data, error } = await supabaseAdmin.rpc('consume_qc_and_add_interview_questions', {
       p_org_id: organization.id,
       p_requisition_id: params.id,
-      p_questions: questions
+      p_questions: questions.map((question) => ({ id: question.id, text: question.text, areas: question.areas }))
     });
     if (error) {
       if (error.message?.includes('INSUFFICIENT_QC')) return NextResponse.json({ error: 'No QC credits remain.' }, { status: 402 });
@@ -180,7 +279,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
     if (!data || typeof data !== 'object' || !Array.isArray(data.questions)) throw new Error('Question generation persistence returned an invalid result.');
 
-    return NextResponse.json({ questions: data.questions, creditsRemaining: data.creditsRemaining }, { status: 201 });
+    await backfillQuestionTypeMetadata(params.id, questions.map((question) => ({
+      id: question.id,
+      questionType: question.questionType,
+      stage: null
+    })));
+
+    return NextResponse.json({
+      questions: data.questions,
+      creditsRemaining: data.creditsRemaining,
+      generated: questions
+    }, { status: 201 });
   } catch (error) {
     console.error('Interview question generation failed', { requisitionId: params.id, error });
     return NextResponse.json({ error: 'Unable to generate interview questions. Try again.' }, { status: 500 });

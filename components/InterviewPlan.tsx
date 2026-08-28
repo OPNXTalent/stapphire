@@ -5,6 +5,7 @@ import {
   AREAS_OF_EVALUATION,
   buildQuestionBank,
   INTERVIEW_STAGES,
+  templateForStructuredType,
   type BankQuestion,
   type InterviewStageId
 } from '@/lib/interviewQuestionBank';
@@ -13,12 +14,15 @@ import {
   PHONE_SCREEN_QUESTION_TYPES,
   findPhoneScreenSeed,
   responseSpecForKind,
+  responseSpecFromParts,
   responseSpecToWireFlags,
+  templateForPhoneScreenType,
   wireFlagsToResponseSpec,
   type PhoneScreenResponseKind,
   type PhoneScreenResponseSpec
 } from '@/lib/phoneScreenQuestions';
 import { INTERVIEW_QUESTION_TYPES } from '@/lib/interviewQuestionTypes';
+import { isQuestionTextCustomized } from '@/lib/questionCustomization';
 import { AOE_PREFERENCES_CHANGED_EVENT } from '@/lib/aoePreferences';
 import {
   INTERVIEW_BANK_ADD_EVENT,
@@ -68,6 +72,18 @@ type PersistedRound = {
     areas: string[];
     commentBox?: boolean;
     yesNo?: boolean;
+    // Persisted Question Type / Phone Screen response package (see
+    // 20260828120000_interview_question_type_metadata.sql) - present on
+    // any question saved by this build. Preferred over the sourceId
+    // bank lookup below so a generated-then-placed question (whose
+    // sourceId, "ai-<uuid>", never resolves against the static
+    // canonical bank) survives reload with its real category and
+    // response package instead of falling back to Custom.
+    questionType?: string;
+    responseKind?: string;
+    responseOptions?: string[];
+    responseUnit?: string;
+    responseQualifying?: string[];
   }>;
 };
 
@@ -191,7 +207,18 @@ function defaultQuestionsByStage(bank: BankQuestion[]): Record<InterviewStageId,
 // disclosed limitation, not a bug: a custom question with no sourceId,
 // or a kind change to a bank/default question that isn't itself
 // wire-representable, only round-trips as far as yes-no/short-answer.
-function reconstructResponseSpec(question: { sourceId?: string; commentBox?: boolean; yesNo?: boolean }): PhoneScreenResponseSpec {
+function reconstructResponseSpec(question: {
+  sourceId?: string;
+  commentBox?: boolean;
+  yesNo?: boolean;
+  responseKind?: string;
+  responseOptions?: string[];
+  responseUnit?: string;
+  responseQualifying?: string[];
+}): PhoneScreenResponseSpec {
+  if (question.responseKind) {
+    return responseSpecFromParts(question.responseKind, question.responseOptions, question.responseUnit, question.responseQualifying);
+  }
   const seed = question.sourceId ? findPhoneScreenSeed(question.sourceId) : undefined;
   if (seed) return seed.response;
   return wireFlagsToResponseSpec({ commentBox: Boolean(question.commentBox), yesNo: Boolean(question.yesNo) });
@@ -206,8 +233,9 @@ function reconstructResponseSpec(question: { sourceId?: string; commentBox?: boo
 // resolves, is treated as Custom - the same disclosed limitation as
 // responseSpec: a recruiter's own rename/reassignment is not yet
 // round-trip safe, since storing it is out of scope this pass.
-function reconstructTypeMetadata(sourceId: string | undefined, bank: BankQuestion[]): { questionType: string; cardTitle: string } {
-  const seed = sourceId ? bank.find((question) => question.id === sourceId) : undefined;
+function reconstructTypeMetadata(question: { sourceId?: string; questionType?: string }, bank: BankQuestion[]): { questionType: string; cardTitle: string } {
+  if (question.questionType) return { questionType: question.questionType, cardTitle: deriveCardTitle(question.questionType) };
+  const seed = question.sourceId ? bank.find((item) => item.id === question.sourceId) : undefined;
   if (seed) return { questionType: seed.questionType, cardTitle: seed.cardTitle };
   return { questionType: 'Custom', cardTitle: 'Custom Question' };
 }
@@ -222,20 +250,28 @@ function parsePersistedQuestions(round: PersistedRound, isPhoneScreenStage: bool
       areas: Array.isArray(question.areas) ? [...question.areas] : [],
       commentBox: Boolean(question.commentBox),
       yesNo: Boolean(question.yesNo),
-      ...reconstructTypeMetadata(question.sourceId, bank)
+      ...reconstructTypeMetadata(question, bank)
     };
-    return isPhoneScreenStage ? { ...base, responseSpec: reconstructResponseSpec(base) } : base;
+    return isPhoneScreenStage ? { ...base, responseSpec: reconstructResponseSpec(question) } : base;
   });
 }
 
 function serializeQuestions(questions: Question[]) {
-  return questions.map((question) => ({
-    ...(question.sourceId ? { sourceId: question.sourceId } : {}),
-    text: question.text,
-    areas: question.areas,
-    commentBox: Boolean(question.commentBox),
-    yesNo: Boolean(question.yesNo)
-  }));
+  return questions.map((question) => {
+    const spec = question.responseSpec;
+    return {
+      ...(question.sourceId ? { sourceId: question.sourceId } : {}),
+      text: question.text,
+      areas: question.areas,
+      commentBox: Boolean(question.commentBox),
+      yesNo: Boolean(question.yesNo),
+      questionType: question.questionType,
+      ...(spec ? { responseKind: spec.kind } : {}),
+      ...(spec?.kind === 'single-choice' && spec.options.length > 0 ? { responseOptions: spec.options } : {}),
+      ...(spec?.kind === 'single-choice' && spec.qualifying && spec.qualifying.length > 0 ? { responseQualifying: spec.qualifying } : {}),
+      ...(spec?.kind === 'numeric' && spec.unit ? { responseUnit: spec.unit } : {})
+    };
+  });
 }
 
 function serializePlan(titlesByKey: Record<string, string>, questionsByKey: Record<string, Question[]>, additionalKeys: string[]) {
@@ -268,6 +304,16 @@ function parseBankQuestion(event: DragEvent<HTMLElement>): BankQuestion | null {
   } catch {
     return null;
   }
+}
+
+// A question's card no longer exposes a free-text title field (see
+// removal of cardTitleInput below) - its display title is always
+// derived from Question Type, never independently edited. cardTitle
+// remains on the Question type only as an internal, backward-compatible
+// carrier (e.g. for the Question Bank panel's own display), always kept
+// in sync with questionType by this single function.
+function deriveCardTitle(questionType: string): string {
+  return questionType === 'Custom' ? 'Custom Question' : questionType;
 }
 
 function ratingKey(questionId: string, area: string) {
@@ -315,6 +361,7 @@ export function InterviewPlan({
   const latestPayloadRef = useRef('');
   const savedPayloadRef = useRef('');
   const savingRef = useRef(false);
+  const editorRef = useRef<HTMLDivElement | null>(null);
 
   const questions = selectedKey ? questionsByKey[selectedKey] || [] : [];
   const serializedPlan = useMemo(() => serializePlan(titlesByKey, questionsByKey, additionalKeys), [titlesByKey, questionsByKey, additionalKeys]);
@@ -486,6 +533,14 @@ export function InterviewPlan({
     window.dispatchEvent(new CustomEvent(INTERVIEW_BUILDER_CONTEXT_EVENT, { detail }));
   }, [selectedKey, positionTitle]);
 
+  // Opening or switching to a stage always begins scrolled to the top
+  // of its question editor, never wherever a previously selected
+  // stage's scroll position happened to leave off (which could clip a
+  // question mid-view).
+  useEffect(() => {
+    if (selectedKey && editorRef.current) editorRef.current.scrollTop = 0;
+  }, [selectedKey]);
+
   useEffect(() => () => {
     window.dispatchEvent(new CustomEvent(INTERVIEW_WORKSPACE_CLEAR_EVENT));
   }, []);
@@ -544,15 +599,6 @@ export function InterviewPlan({
     ]);
   }
 
-  function addCustomPhoneScreenQuestion() {
-    if (!selectedKey) return;
-    const id = localId();
-    patchQuestions(selectedKey, (current) => [
-      { id, text: '', areas: [], commentBox: true, yesNo: false, responseSpec: { kind: 'short-answer' }, questionType: 'Custom', cardTitle: 'Custom Question' },
-      ...current
-    ]);
-  }
-
   function updateQuestion(questionId: string, patch: Partial<Question>) {
     if (!selectedKey) return;
     patchQuestions(selectedKey, (current) => current.map((question) =>
@@ -602,22 +648,69 @@ export function InterviewPlan({
     ));
   }
 
-  // Renaming a question's card header never touches its questionType -
-  // the two are intentionally decoupled (see the Question type above).
-  function setCardTitle(questionId: string, cardTitle: string) {
-    if (!selectedKey) return;
-    patchQuestions(selectedKey, (current) => current.map((question) =>
-      question.id === questionId ? { ...question, cardTitle } : question
-    ));
-  }
-
-  // Reassigning a question's organizational Question Type never touches
-  // its cardTitle - the two are intentionally decoupled.
+  // Question Type as a template selector. Selecting a non-Custom type
+  // synchronously loads that type's whole coherent default package
+  // (wording + response control for Phone Screen; wording + suggested
+  // AOE for Structured). Applied immediately when the question is not
+  // yet "customized" (still blank, or still reads exactly as its
+  // current type's own template) - otherwise the recruiter is asked to
+  // confirm before real content is replaced; Cancel is a complete
+  // no-op; a plain reassignment (no template for the new type, e.g.
+  // Custom) never touches text/response/areas, only the type label.
   function setQuestionType(questionId: string, questionType: string) {
     if (!selectedKey) return;
-    patchQuestions(selectedKey, (current) => current.map((question) =>
-      question.id === questionId ? { ...question, questionType } : question
-    ));
+    const question = (questionsByKey[selectedKey] || []).find((item) => item.id === questionId);
+    if (!question) return;
+
+    const applyLabelOnly = () => {
+      patchQuestions(selectedKey, (current) => current.map((item) =>
+        item.id === questionId ? { ...item, questionType, cardTitle: deriveCardTitle(questionType) } : item
+      ));
+    };
+
+    if (selectedKey === 'phone-screen') {
+      const template = templateForPhoneScreenType(questionType);
+      if (!template) { applyLabelOnly(); return; }
+      const currentTemplate = templateForPhoneScreenType(question.questionType);
+      const apply = () => {
+        const flags = responseSpecToWireFlags(template.response);
+        patchQuestions(selectedKey, (current) => current.map((item) =>
+          item.id === questionId
+            ? { ...item, questionType, cardTitle: template.cardTitle, text: template.text, responseSpec: template.response, commentBox: flags.commentBox, yesNo: flags.yesNo }
+            : item
+        ));
+      };
+      if (isQuestionTextCustomized(question.text, currentTemplate?.text)) {
+        // Cancel must leave the card exactly as it was - including its
+        // Question Type <select>, which the browser already flips to the
+        // just-picked option natively before this handler runs. Without
+        // a state update here React has nothing to reconcile the
+        // controlled value against, so the dropdown would keep showing
+        // the cancelled choice; a no-op patch forces it back in sync.
+        if (window.confirm(`Switching to "${questionType}" will replace this question's current text and response settings with its standard version. Continue?`)) apply();
+        else patchQuestions(selectedKey, (current) => current.map((item) => item.id === questionId ? { ...item } : item));
+        return;
+      }
+      apply();
+      return;
+    }
+
+    const template = isCanonicalStage(selectedKey) ? templateForStructuredType(bank, selectedKey, questionType) : undefined;
+    if (!template) { applyLabelOnly(); return; }
+    const currentTemplate = isCanonicalStage(selectedKey) ? templateForStructuredType(bank, selectedKey, question.questionType) : undefined;
+    const apply = () => {
+      patchQuestions(selectedKey, (current) => current.map((item) =>
+        item.id === questionId
+          ? { ...item, questionType, cardTitle: deriveCardTitle(questionType), text: template.text, areas: [...template.areas] }
+          : item
+      ));
+    };
+    if (isQuestionTextCustomized(question.text, currentTemplate?.text)) {
+      if (window.confirm(`Switching to "${questionType}" will replace this question's current text and suggested Areas of Evaluation with its standard version. Continue?`)) apply();
+      else patchQuestions(selectedKey, (current) => current.map((item) => item.id === questionId ? { ...item } : item));
+      return;
+    }
+    apply();
   }
 
   function reorderQuestion(sourceId: string, targetId: string) {
@@ -780,10 +873,9 @@ export function InterviewPlan({
             <>
               <div className={styles.phoneScreenToolbar}>
                 <p className={styles.phoneScreenHint}>Compact qualification format — short, closed-form questions answered in minutes. No Areas of Evaluation, star ratings, or permanent comment blocks.</p>
-                <button type="button" className={styles.addCustomQuestion} onClick={addCustomPhoneScreenQuestion}>+ Custom Question</button>
               </div>
 
-              <div className={styles.editor} onDragOver={(event) => event.preventDefault()} onDrop={dropAtEnd}>
+              <div className={styles.editor} ref={editorRef} onDragOver={(event) => event.preventDefault()} onDrop={dropAtEnd}>
                 {questions.map((question, index) => {
                   const spec = question.responseSpec ?? { kind: 'short-answer' as const };
                   return (
@@ -810,29 +902,6 @@ export function InterviewPlan({
                       >⠿</span>
 
                       <div className={styles.questionMain}>
-                        <div className={styles.cardHeaderRow}>
-                          {/* A built-in question's cardTitle equals its questionType (e.g. "Location" / "Location") -
-                              showing both would repeat the same word twice, so the free-text title only appears once
-                              a question is actually Custom (where the title is meaningful, independent content). */}
-                          {question.questionType === 'Custom' && (
-                            <input
-                              className={styles.cardTitleInput}
-                              value={question.cardTitle}
-                              maxLength={60}
-                              placeholder="Custom Question"
-                              aria-label={`Card title for question ${index + 1}`}
-                              onChange={(event) => setCardTitle(question.id, event.target.value)}
-                            />
-                          )}
-                          <select
-                            className={styles.questionTypeSelect}
-                            value={question.questionType}
-                            aria-label={`Question type for question ${index + 1}`}
-                            onChange={(event) => setQuestionType(question.id, event.target.value)}
-                          >
-                            {PHONE_SCREEN_QUESTION_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{type}</option>)}
-                          </select>
-                        </div>
                         <div className={styles.questionTop}>
                           <span className={styles.questionNumber}>Q{index + 1}</span>
                           <textarea
@@ -845,18 +914,38 @@ export function InterviewPlan({
                           <button type="button" className={styles.removeQuestion} onClick={() => removeQuestion(question.id)} aria-label={`Remove question ${index + 1}`}>×</button>
                         </div>
 
-                        <div className={styles.responseKindRow}>
-                          <label className={styles.responseKindLabel} htmlFor={`response-kind-${question.id}`}>Response type</label>
+                        <div className={styles.cardHeaderRow}>
                           <select
-                            id={`response-kind-${question.id}`}
-                            className={styles.responseKindSelect}
-                            value={spec.kind}
-                            onChange={(event) => setResponseSpec(question.id, responseSpecForKind(event.target.value as PhoneScreenResponseKind, question.responseSpec))}
+                            className={styles.questionTypeSelect}
+                            value={question.questionType}
+                            aria-label={`Question type for question ${index + 1}`}
+                            onChange={(event) => setQuestionType(question.id, event.target.value)}
                           >
-                            {RESPONSE_KIND_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
+                            {PHONE_SCREEN_QUESTION_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{type}</option>)}
                           </select>
+                        </div>
+
+                        {/* Response control derives from the template once a real (non-Custom) Question Type
+                            is selected - only Custom exposes the manual response-format dropdown, since a
+                            canonical type's response kind is not an arbitrary recruiter choice. */}
+                        <div className={styles.responseKindRow}>
+                          {question.questionType === 'Custom' ? (
+                            <>
+                              <label className={styles.responseKindLabel} htmlFor={`response-kind-${question.id}`}>Response type</label>
+                              <select
+                                id={`response-kind-${question.id}`}
+                                className={styles.responseKindSelect}
+                                value={spec.kind}
+                                onChange={(event) => setResponseSpec(question.id, responseSpecForKind(event.target.value as PhoneScreenResponseKind, question.responseSpec))}
+                              >
+                                {RESPONSE_KIND_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                              </select>
+                            </>
+                          ) : (
+                            <span className={styles.responseKindLabel}>Response: {RESPONSE_KIND_OPTIONS.find((option) => option.value === spec.kind)?.label ?? spec.kind}</span>
+                          )}
                         </div>
                         {spec.kind === 'single-choice' && (
                           <input
@@ -865,7 +954,11 @@ export function InterviewPlan({
                             placeholder="Options, comma separated"
                             value={spec.options.join(', ')}
                             aria-label={`Response options for question ${index + 1}`}
-                            onChange={(event) => setResponseSpec(question.id, { kind: 'single-choice', options: event.target.value.split(',').map((option) => option.trim()).filter(Boolean) })}
+                            onChange={(event) => setResponseSpec(question.id, {
+                              kind: 'single-choice',
+                              options: event.target.value.split(',').map((option) => option.trim()).filter(Boolean),
+                              ...(spec.qualifying ? { qualifying: spec.qualifying } : {})
+                            })}
                           />
                         )}
                         {spec.kind === 'numeric' && (
@@ -889,7 +982,7 @@ export function InterviewPlan({
             <>
               <button type="button" className={styles.addManual} onClick={addManualQuestion}>+ Add Question</button>
 
-              <div className={styles.editor} onDragOver={(event) => event.preventDefault()} onDrop={dropAtEnd}>
+              <div className={styles.editor} ref={editorRef} onDragOver={(event) => event.preventDefault()} onDrop={dropAtEnd}>
                 {questions.map((question, index) => {
                   const maxed = question.areas.length >= 4;
                   return (
@@ -916,15 +1009,13 @@ export function InterviewPlan({
                       >⠿</span>
 
                       <div className={styles.questionMain}>
+                        <div className={styles.questionTop}>
+                          <span className={styles.questionNumber}>Q{index + 1}</span>
+                          <textarea rows={2} value={question.text} aria-label={`Question ${index + 1}`} onChange={(event) => updateQuestion(question.id, { text: event.target.value })} />
+                          <button type="button" className={styles.removeQuestion} onClick={() => removeQuestion(question.id)} aria-label={`Remove question ${index + 1}`}>×</button>
+                        </div>
+
                         <div className={styles.cardHeaderRow}>
-                          <input
-                            className={styles.cardTitleInput}
-                            value={question.cardTitle}
-                            maxLength={60}
-                            placeholder="Custom Question"
-                            aria-label={`Card title for question ${index + 1}`}
-                            onChange={(event) => setCardTitle(question.id, event.target.value)}
-                          />
                           <select
                             className={styles.questionTypeSelect}
                             value={question.questionType}
@@ -933,11 +1024,6 @@ export function InterviewPlan({
                           >
                             {STRUCTURED_QUESTION_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{type}</option>)}
                           </select>
-                        </div>
-                        <div className={styles.questionTop}>
-                          <span className={styles.questionNumber}>Q{index + 1}</span>
-                          <textarea rows={2} value={question.text} aria-label={`Question ${index + 1}`} onChange={(event) => updateQuestion(question.id, { text: event.target.value })} />
-                          <button type="button" className={styles.removeQuestion} onClick={() => removeQuestion(question.id)} aria-label={`Remove question ${index + 1}`}>×</button>
                         </div>
 
                         <div className={styles.areaLine} data-area-picker={question.id}>

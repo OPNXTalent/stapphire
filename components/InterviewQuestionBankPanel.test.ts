@@ -10,15 +10,25 @@ test('Phone Screen gets its own early-return branch, not a duplicated right-pane
   assert.match(source, /if \(isPhoneScreen\) \{\s*\n\s*return \(/, 'expected an early return for the phone-screen branch');
   const phoneScreenReturnMatch = source.match(/if \(isPhoneScreen\) \{([\s\S]*?)\n {2}\}\n\n {2}return \(/);
   assert.ok(phoneScreenReturnMatch, 'expected to isolate the phone-screen branch body');
-  assert.doesNotMatch(phoneScreenReturnMatch[1], /Generate \d+ Questions/, 'Phone Screen must not show the AI question generator');
+  assert.doesNotMatch(phoneScreenReturnMatch[1], /Generate 5 Questions/, 'Phone Screen must not show the Structured Interview AI question generator');
   assert.doesNotMatch(phoneScreenReturnMatch[1], /Manage AOE/, 'Phone Screen must not show Areas of Evaluation management');
-  assert.doesNotMatch(phoneScreenReturnMatch[1], /questionTypeSelect/, 'Phone Screen must not show the Question Type generator dropdown');
+  // Phone Screen does get its own, narrower Question Type filter for generation - a real requirement of this pass, distinct from the Structured generator UI it must not duplicate.
+  assert.match(phoneScreenReturnMatch[1], /aria-label="Phone Screen Question Type"/);
 });
 
-test('the Phone Screen bank list is sourced from the fixed PHONE_SCREEN_BANK_QUESTIONS list, filtered by the same usedIds tracking the Structured Interview bank already uses', () => {
-  assert.match(source, /import \{ PHONE_SCREEN_BANK_QUESTIONS, PHONE_SCREEN_QUESTION_TYPES, type PhoneScreenResponseKind, type PhoneScreenResponseSpec \} from '@\/lib\/phoneScreenQuestions';/);
-  const memoMatch = source.match(/const availablePhoneScreenQuestions = useMemo<AvailableQuestion\[\]>\(\s*\n\s*\(\) => PHONE_SCREEN_BANK_QUESTIONS\s*\n\s*\.filter\(\(question\) => !usedIds\.has\(question\.id\)\)/);
-  assert.ok(memoMatch, 'expected availablePhoneScreenQuestions to filter the fixed bank list by the shared usedIds set, matching availableQuestions\' own filtering pattern');
+test('the Phone Screen bank\'s static baseline is a small, representative subset of the canonical bank (not the whole 14-question list), combined with any AI-generated Phone Screen questions, both filtered by the shared usedIds tracking', () => {
+  assert.match(source, /import \{ PHONE_SCREEN_BANK_QUESTIONS, PHONE_SCREEN_QUESTION_TYPES, responseSpecFromParts, type PhoneScreenQuestionType, type PhoneScreenResponseKind, type PhoneScreenResponseSpec \} from '@\/lib\/phoneScreenQuestions';/);
+  assert.match(source, /const PHONE_SCREEN_REPRESENTATIVE_IDS = new Set\(\[/, 'expected a curated representative-id subset');
+  const representativeMatch = source.match(/const representativePhoneScreenQuestions = useMemo<AvailableQuestion\[\]>\(\s*\n\s*\(\) => PHONE_SCREEN_BANK_QUESTIONS\s*\n\s*\.filter\(\(question\) => PHONE_SCREEN_REPRESENTATIVE_IDS\.has\(question\.id\) && !usedIds\.has\(question\.id\)\)/);
+  assert.ok(representativeMatch, 'expected representativePhoneScreenQuestions to filter the fixed bank down to only the curated ids, excluding used ones');
+  const combinedMatch = source.match(/const availablePhoneScreenQuestions = useMemo<AvailableQuestion\[\]>\(\s*\n\s*\(\) => \[\.\.\.generatedPhoneScreenQuestions, \.\.\.representativePhoneScreenQuestions\]\.filter\(\(question\) => !usedIds\.has\(question\.id\)\)/);
+  assert.ok(combinedMatch, 'expected the combined available list to merge generated and representative questions, filtered by usedIds');
+});
+
+test('a representative subset of exactly the specified four questions (Schedule, Work Arrangement, Travel, Language) is curated for the static baseline', () => {
+  const idsMatch = source.match(/const PHONE_SCREEN_REPRESENTATIVE_IDS = new Set\(\[([\s\S]*?)\]\);/);
+  assert.ok(idsMatch);
+  assert.equal((idsMatch[1].match(/'phone-screen-bank-\d+'/g) || []).length, 4, 'expected exactly four curated ids');
 });
 
 test('each Phone Screen bank question carries its canonical response metadata AND its questionType/cardTitle through the drag payload, not just its text/areas', () => {
@@ -36,9 +46,16 @@ test('Phone Screen bank questions drag onto the form through the exact same tran
   assert.match(phoneScreenReturnMatch[1], /onDragEnd=\{\(\) => window\.setTimeout\(\(\) => void refreshUsedIds\(\), 750\)\}/);
 });
 
-test('the "Create Your Own Question" wildcard is present on both Phone Screen and Structured Interview banks, reusing the same startBlankDrag mechanism', () => {
+test('Structured Interview keeps its single "Create Your Own Question" wildcard tile; Phone Screen replaces it with exactly one clear manual-creation action ("+ Custom Screen Question"), never both', () => {
   const matches = source.match(/draggable onDragStart=\{startBlankDrag\}/g) || [];
-  assert.equal(matches.length, 2, 'expected exactly one wildcard tile per branch (phone-screen and structured), both wired to the same startBlankDrag function');
+  assert.equal(matches.length, 1, 'Structured Interview must keep exactly one wildcard tile; Phone Screen must not have its own copy of it');
+
+  const phoneScreenReturnMatch = source.match(/if \(isPhoneScreen\) \{([\s\S]*?)\n {2}\}\n\n {2}return \(/);
+  assert.ok(phoneScreenReturnMatch);
+  assert.doesNotMatch(phoneScreenReturnMatch[1], /Create Your Own Question/, 'the old Phone Screen wildcard tile must be gone');
+  const customButtonMatches = phoneScreenReturnMatch[1].match(/\+ Custom Screen Question/g) || [];
+  assert.equal(customButtonMatches.length, 1, 'expected exactly one manual-creation action on Phone Screen');
+  assert.match(phoneScreenReturnMatch[1], /onClick=\{addCustomPhoneScreenQuestion\}/);
 });
 
 test('the stale pre-plan-load "already used" starter ids were updated to match the new Phone Screen default question ids, not left pointing at the old (now unrelated) buildQuestionBank phone-screen ids', () => {
@@ -76,7 +93,7 @@ test('the Question Bank groups questions into collapsible Question Type sections
 });
 
 test('each Question Type section header shows the type name and its available-question count, and can be collapsed/expanded', () => {
-  const headerMatches = source.match(/<span className=\{styles\.typeSectionName\}>\{typeSectionLabel\(group\.type\)\} <span className=\{styles\.bankCount\}>\{group\.questions\.length\}<\/span><\/span>/g) || [];
+  const headerMatches = source.match(/<span className=\{styles\.typeSectionName\}>\{group\.type\} <span className=\{styles\.bankCount\}>\{group\.questions\.length\}<\/span><\/span>/g) || [];
   assert.equal(headerMatches.length, 2, 'expected one type-section header per branch (phone-screen and structured)');
   assert.match(source, /const \[collapsedTypes, setCollapsedTypes\] = useState<Set<string>>\(\(\) => new Set\(\)\);/, 'sections must start expanded (empty collapsed set)');
   assert.match(source, /function toggleTypeCollapsed\(type: string\)/);
@@ -84,14 +101,27 @@ test('each Question Type section header shows the type name and its available-qu
   assert.equal(toggleMatches.length, 2, 'both branches must reuse the same toggle function');
 });
 
-test('the Custom bucket displays as "Custom Questions" while every other section displays its type name as-is', () => {
-  assert.match(source, /function typeSectionLabel\(type: string\) \{\s*\n\s*return type === 'Custom' \? 'Custom Questions' : type;\s*\n\s*\}/);
+test('Custom is never a reusable, drag-from-the-bank category - groupByType excludes it entirely so manual-creation stays outside the alphabetized sections', () => {
+  const groupByTypeMatch = source.match(/function groupByType<T extends \{ questionType: string \}>\(questions: T\[\]\): QuestionGroup<T>\[\] \{([\s\S]*?)\n\}/);
+  assert.ok(groupByTypeMatch, 'expected groupByType');
+  assert.match(groupByTypeMatch[1], /if \(question\.questionType === 'Custom'\) continue;/);
+  assert.doesNotMatch(source, /function typeSectionLabel\(/, 'no separate "Custom Questions" label function should remain now that Custom is excluded outright');
 });
 
-test('sections are ordered by a stable canonical list, not first-seen order - Structured Interview appends Custom then General after the app\'s existing generated Question Type vocabulary', () => {
-  assert.match(source, /const STRUCTURED_QUESTION_TYPE_ORDER: readonly string\[\] = \[\.\.\.INTERVIEW_QUESTION_TYPES, 'Custom', 'General'\];/);
-  assert.match(source, /groupByType\(availablePhoneScreenQuestions, PHONE_SCREEN_QUESTION_TYPES\)/);
-  assert.match(source, /groupByType\(availableQuestions, STRUCTURED_QUESTION_TYPE_ORDER\)/);
+test('sections sort alphabetically, case-insensitively (so a capitalization difference never splits one category into two), by Question Type - not a fixed canonical order or first-seen order', () => {
+  const groupByTypeMatch = source.match(/function groupByType<T extends \{ questionType: string \}>\(questions: T\[\]\): QuestionGroup<T>\[\] \{([\s\S]*?)\n\}/);
+  assert.ok(groupByTypeMatch);
+  assert.match(groupByTypeMatch[1], /\.trim\(\)\.toLocaleLowerCase\(\)/, 'grouping key must be normalized so capitalization differences merge into one category');
+  assert.match(groupByTypeMatch[1], /\.sort\(\(a, b\) => a\.type\.localeCompare\(b\.type, undefined, \{ sensitivity: 'base' \}\)\)/, 'groups must be sorted alphabetically, case-insensitively');
+  assert.doesNotMatch(source, /STRUCTURED_QUESTION_TYPE_ORDER|PHONE_SCREEN_QUESTION_TYPE_ORDER/, 'no fixed canonical ordering list should remain');
+  assert.match(source, /const phoneScreenGroups = useMemo\(\s*\n\s*\(\) => groupByType\(availablePhoneScreenQuestions\),/);
+  assert.match(source, /const structuredGroups = useMemo\(\s*\n\s*\(\) => groupByType\(availableQuestions\),/);
+});
+
+test('empty categories never render - groupByType only returns groups with at least one available question', () => {
+  const groupByTypeMatch = source.match(/function groupByType<T extends \{ questionType: string \}>\(questions: T\[\]\): QuestionGroup<T>\[\] \{([\s\S]*?)\n\}/);
+  assert.ok(groupByTypeMatch);
+  assert.match(groupByTypeMatch[1], /\.filter\(\(group\) => group\.questions\.length > 0\)/);
 });
 
 test('every question card shows its cardTitle as a compact header above the question text, in both branches', () => {
@@ -99,17 +129,47 @@ test('every question card shows its cardTitle as a compact header above the ques
   assert.equal(cardTitleMatches.length, 2, 'expected a cardTitle header on both the phone-screen and structured question cards');
 });
 
-test('a freshly generated batch of questions is tagged, client-side, with the recruiter\'s selected Question Type (or "General" if none was selected) - the generator itself only returns text/areas', () => {
+test('a freshly generated batch of questions is categorized using the server-validated, real per-question Question Type from the response\'s `generated` field - never a single client-side guessed label for the whole batch', () => {
   const generateMoreMatch = source.match(/async function generateMore\(\) \{([\s\S]*?)\n {2}\}/);
   assert.ok(generateMoreMatch, 'expected generateMore');
-  assert.match(generateMoreMatch[1], /const batchType = selectedQuestionType \|\| 'General';/);
-  assert.match(generateMoreMatch[1], /questionType: batchType, cardTitle: batchType/);
+  assert.doesNotMatch(generateMoreMatch[1], /const batchType = selectedQuestionType/, 'must not tag an entire mixed batch with one guessed type');
+  assert.match(generateMoreMatch[1], /Array\.isArray\(result\.generated\)/, 'must read the server-computed per-question metadata');
+  assert.match(generateMoreMatch[1], /questionType: question\.questionType,\s*\n\s*cardTitle: question\.questionType/);
 });
 
-test('a wildcard-dragged custom question defaults to questionType Custom / cardTitle "Custom Question" the same way the button-created one does elsewhere in the builder', () => {
+test('generateMore and generatePhoneScreenQuestionsAction both auto-expand every Question Type category their batch just populated', () => {
+  const generateMoreMatch = source.match(/async function generateMore\(\) \{([\s\S]*?)\n {2}\}/);
+  assert.ok(generateMoreMatch);
+  assert.match(generateMoreMatch[1], /const newTypes = new Set\(questions\.map\(\(question\) => question\.questionType\)\);/);
+  assert.match(generateMoreMatch[1], /next\.delete\(type\)/);
+
+  const phoneScreenGenerateMatch = source.match(/async function generatePhoneScreenQuestionsAction\(\) \{([\s\S]*?)\n {2}\}/);
+  assert.ok(phoneScreenGenerateMatch, 'expected generatePhoneScreenQuestionsAction');
+  assert.match(phoneScreenGenerateMatch[1], /const newTypes = new Set\(questions\.map\(\(question\) => question\.questionType\)\);/);
+});
+
+test('generatePhoneScreenQuestionsAction posts stage: \'phone-screen\' and merges the server\'s validated per-question metadata (including its reconstructed response spec) into the Phone Screen bank', () => {
+  const phoneScreenGenerateMatch = source.match(/async function generatePhoneScreenQuestionsAction\(\) \{([\s\S]*?)\n {2}\}/);
+  assert.ok(phoneScreenGenerateMatch);
+  assert.match(phoneScreenGenerateMatch[1], /body: JSON\.stringify\(\{ stage: 'phone-screen', questionType: phoneScreenQuestionType \|\| null \}\)/);
+  assert.match(phoneScreenGenerateMatch[1], /responseSpecFromParts\(question\.responseKind, question\.responseOptions, question\.responseUnit\)/);
+  assert.match(phoneScreenGenerateMatch[1], /setGeneratedPhoneScreenQuestions\(/);
+});
+
+test('a wildcard-dragged custom question (Structured Interview) defaults to questionType Custom / cardTitle "Custom Question"', () => {
   const blankDragMatch = source.match(/function startBlankDrag\(event: DragEvent<HTMLDivElement>\) \{([\s\S]*?)\n {2}\}/);
   assert.ok(blankDragMatch, 'expected startBlankDrag');
   assert.match(blankDragMatch[1], /questionType: 'Custom',/);
-  assert.match(blankDragMatch[1], /cardTitle: 'Custom Question',/);
+  assert.match(blankDragMatch[1], /cardTitle: 'Custom Question'/);
+});
+
+test('the Phone Screen "+ Custom Screen Question" button dispatches the same INTERVIEW_BANK_ADD_EVENT the drag-and-drop transport uses, with a fresh, unique id and Custom questionType/cardTitle', () => {
+  const addCustomMatch = source.match(/function addCustomPhoneScreenQuestion\(\) \{([\s\S]*?)\n {2}\}/);
+  assert.ok(addCustomMatch, 'expected addCustomPhoneScreenQuestion');
+  assert.match(addCustomMatch[1], /id: `custom-phone-screen-\$\{suffix\}`/);
+  assert.match(addCustomMatch[1], /questionType: 'Custom',/);
+  assert.match(addCustomMatch[1], /cardTitle: 'Custom Question',/);
+  assert.match(addCustomMatch[1], /response: \{ kind: 'short-answer' \}/);
+  assert.match(addCustomMatch[1], /dispatchEvent\(new CustomEvent\(INTERVIEW_BANK_ADD_EVENT, \{ detail: \{ question \} \}\)\)/);
 });
 

@@ -24,7 +24,12 @@
 export type PhoneScreenResponseSpec =
   | { kind: 'yes-no' }
   | { kind: 'yes-no-needs-discussion' }
-  | { kind: 'single-choice'; options: string[] }
+  // qualifying: which options count as meeting the requirement (e.g.
+  // Location's "Within commuting distance"/"Willing to relocate" qualify,
+  // "Neither" does not). Optional persistable qualification-rule
+  // metadata - only populated where a real qualify/disqualify split
+  // applies; absent for a plain informational choice.
+  | { kind: 'single-choice'; options: string[]; qualifying?: string[] }
   | { kind: 'numeric'; unit?: string }
   | { kind: 'short-answer' };
 
@@ -66,14 +71,14 @@ export const PHONE_SCREEN_DEFAULT_QUESTIONS: PhoneScreenQuestionSeed[] = [
   {
     id: 'phone-screen-default-1',
     text: 'Are you within commuting distance of the work location, or prepared to relocate?',
-    response: { kind: 'single-choice', options: ['Within commuting distance', 'Willing to relocate', 'Neither'] },
+    response: { kind: 'single-choice', options: ['Within commuting distance', 'Willing to relocate', 'Neither'], qualifying: ['Within commuting distance', 'Willing to relocate'] },
     questionType: 'Location',
     cardTitle: 'Location'
   },
   {
     id: 'phone-screen-default-2',
     text: 'Is the stated compensation range acceptable?',
-    response: { kind: 'yes-no-needs-discussion' },
+    response: { kind: 'yes-no' },
     questionType: 'Compensation',
     cardTitle: 'Compensation'
   },
@@ -134,6 +139,27 @@ export function findPhoneScreenSeed(id: string): PhoneScreenQuestionSeed | undef
   return PHONE_SCREEN_ALL_QUESTIONS.find((seed) => seed.id === id);
 }
 
+// The one canonical template per real (non-Custom) Question Type - the
+// coherent default package (wording + response control + choices/unit/
+// qualifying rule) Question Type selection loads synchronously. Where a
+// type has more than one canonical question (e.g. Education appears in
+// both the defaults and the bank), the first match wins, deterministically.
+export const PHONE_SCREEN_TEMPLATE_BY_TYPE: Partial<Record<Exclude<PhoneScreenQuestionType, 'Custom'>, PhoneScreenQuestionSeed>> = (() => {
+  const byType: Partial<Record<Exclude<PhoneScreenQuestionType, 'Custom'>, PhoneScreenQuestionSeed>> = {};
+  for (const seed of PHONE_SCREEN_ALL_QUESTIONS) {
+    if (!byType[seed.questionType]) byType[seed.questionType] = seed;
+  }
+  return byType;
+})();
+
+// Question Type "doing real work": selecting a non-Custom type must
+// synchronously load its whole coherent package (text, response,
+// cardTitle). Custom has no template - the recruiter builds it manually.
+// Returns undefined for Custom or a type with no canonical template.
+export function templateForPhoneScreenType(type: string): PhoneScreenQuestionSeed | undefined {
+  return PHONE_SCREEN_TEMPLATE_BY_TYPE[type as Exclude<PhoneScreenQuestionType, 'Custom'>];
+}
+
 // The only honest mapping onto the current two-boolean persistence
 // shape. yes-no and short-answer have an exact match; the other three
 // kinds persist as neither flag set - a truthful "not yet
@@ -158,9 +184,37 @@ export function wireFlagsToResponseSpec(flags: { commentBox: boolean; yesNo: boo
 // response-type selector to a new kind, preserving what can be
 // preserved from whatever kind it was previously.
 export function responseSpecForKind(kind: PhoneScreenResponseKind, previous?: PhoneScreenResponseSpec): PhoneScreenResponseSpec {
-  if (kind === 'single-choice') return { kind, options: previous?.kind === 'single-choice' ? previous.options : [] };
+  if (kind === 'single-choice') {
+    const priorChoice = previous?.kind === 'single-choice' ? previous : undefined;
+    return { kind, options: priorChoice?.options ?? [], ...(priorChoice?.qualifying ? { qualifying: priorChoice.qualifying } : {}) };
+  }
   if (kind === 'numeric') return { kind, unit: previous?.kind === 'numeric' ? previous.unit : undefined };
   if (kind === 'yes-no') return { kind };
   if (kind === 'yes-no-needs-discussion') return { kind };
   return { kind: 'short-answer' };
+}
+
+// Reconstructs a discriminated PhoneScreenResponseSpec from the flat
+// kind/options/unit/qualifying parts persistence and generation both
+// use on the wire. Shared by the plan loader (InterviewPlan.tsx) and
+// the Question Bank panel so a question's exact response package - not
+// just yes-no/short-answer - round-trips identically wherever it is
+// reconstructed. An unrecognized kind falls back to short-answer, the
+// same neutral default wireFlagsToResponseSpec uses when nothing more
+// specific is known.
+export function responseSpecFromParts(kind: string | undefined, options?: string[], unit?: string, qualifying?: string[]): PhoneScreenResponseSpec {
+  switch (kind) {
+    case 'single-choice':
+      return { kind: 'single-choice', options: options ?? [], ...(qualifying && qualifying.length > 0 ? { qualifying } : {}) };
+    case 'numeric':
+      return { kind: 'numeric', ...(unit ? { unit } : {}) };
+    case 'yes-no':
+      return { kind: 'yes-no' };
+    case 'yes-no-needs-discussion':
+      return { kind: 'yes-no-needs-discussion' };
+    case 'short-answer':
+      return { kind: 'short-answer' };
+    default:
+      return { kind: 'short-answer' };
+  }
 }

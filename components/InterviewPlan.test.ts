@@ -122,10 +122,13 @@ test('Phone Screen default questions are editable, removable, and reorderable us
   assert.match(source, /function reorderQuestion\(sourceId: string, targetId: string\)/);
 });
 
-test('a flexible Custom Question action is visibly available on the Phone Screen (not the Structured Interview\'s CSS-hidden .addManual button)', () => {
-  assert.match(source, /function addCustomPhoneScreenQuestion\(\) \{/);
-  assert.match(source, /<button type="button" className=\{styles\.addCustomQuestion\} onClick=\{addCustomPhoneScreenQuestion\}>\+ Custom Question<\/button>/);
-  assert.doesNotMatch(source, /addCustomQuestion\{display:none/, 'unlike .addManual, the Phone Screen custom-question action must not be hidden');
+test('Phone Screen custom-question creation has exactly one entry point (the Question Bank panel\'s "+ Custom Screen Question" button) - InterviewPlan.tsx no longer duplicates it with its own button/function', () => {
+  assert.doesNotMatch(source, /function addCustomPhoneScreenQuestion\(\)/, 'the old, now-redundant per-form custom-question function must be removed');
+  assert.doesNotMatch(source, /\+ Custom Question</, 'the old duplicate toolbar button must be removed');
+  // Manual creation for every stage, including Phone Screen, now flows through the one shared bank-add listener.
+  const addFromPanelMatch = source.match(/function addFromBankPanel\(event: Event\) \{([\s\S]*?)\n {4}\}/);
+  assert.ok(addFromPanelMatch, 'expected the shared addFromBankPanel listener');
+  assert.match(addFromPanelMatch[1], /addBankQuestion\(detail\.question\)/);
 });
 
 // --- Correction 1: rich, semantically-required response kinds ---
@@ -218,18 +221,18 @@ test('Phone Screen questions render in a full-width vertical sequence, reusing t
   assert.match(phoneScreen, /\{questions\.map\(\(question, index\) => \{/);
 });
 
-test('a built-in Phone Screen question never shows a duplicate heading (e.g. both "Location" and "Location") - the free-text card-title input only renders once the question is genuinely Custom', () => {
-  const { phoneScreen } = extractStageBranches();
-  const headerMatch = phoneScreen.match(/<div className=\{styles\.cardHeaderRow\}>([\s\S]*?)<\/div>/);
-  assert.ok(headerMatch, 'expected the Phone Screen card header row');
-  assert.match(headerMatch[1], /question\.questionType === 'Custom' && \(/, 'the cardTitle input must be gated on questionType === Custom, not always shown');
-  assert.match(headerMatch[1], /className=\{styles\.questionTypeSelect\}/, 'the Question Type selector is always shown - it is the sole header for a built-in question');
+test('the free-text card-title field is gone entirely - neither Phone Screen nor Structured Interview shows a cardTitle input; the Question Type dropdown is the sole header', () => {
+  const { phoneScreen, structured } = extractStageBranches();
+  for (const branch of [phoneScreen, structured]) {
+    assert.doesNotMatch(branch, /styles\.cardTitleInput/, 'no card renders a cardTitle input');
+    assert.doesNotMatch(branch, /placeholder="Custom Question"/, 'no free-text placeholder for a title remains');
+  }
+  assert.doesNotMatch(source, /function setCardTitle\(/, 'setCardTitle is dead code now that nothing calls it');
 });
 
-test('a Custom Phone Screen question still shows its editable card title, defaulting to "Custom Question", alongside its (reassignable) Custom type', () => {
-  assert.match(source, /questionType: 'Custom', cardTitle: 'Custom Question'/, 'addCustomPhoneScreenQuestion must still seed this default');
-  const { phoneScreen } = extractStageBranches();
-  assert.match(phoneScreen, /placeholder="Custom Question"/);
+test('cardTitle is retained on the Question type only as an internal, backward-compatible field, always derived from questionType via deriveCardTitle - never independently editable', () => {
+  assert.match(source, /function deriveCardTitle\(questionType: string\): string \{/);
+  assert.match(source, /return questionType === 'Custom' \? 'Custom Question' : questionType;/);
 });
 
 test('Response Type and its applicable configuration still render beneath the question text inside the shared full-width card, unaffected by the layout change', () => {
@@ -287,48 +290,125 @@ test('selecting a legacy round routes through the existing Structured Interview 
 
 // --- Question Type metadata (questionType / cardTitle) ---
 
-test('every question-creation path sets both questionType and cardTitle - a custom question defaults to Custom / "Custom Question"', () => {
+test('every question-creation path sets questionType (and its derived cardTitle) - a manually-added question always defaults to Custom / "Custom Question"', () => {
   assert.match(source, /questionType: string;\s*\n\s*cardTitle: string;/, 'expected both fields on the Question type');
   const manualMatch = source.match(/function addManualQuestion\(\) \{([\s\S]*?)\n {2}\}/);
   assert.ok(manualMatch);
   assert.match(manualMatch[1], /questionType: 'Custom', cardTitle: 'Custom Question'/);
-  const customPhoneScreenMatch = source.match(/function addCustomPhoneScreenQuestion\(\) \{([\s\S]*?)\n {2}\}/);
-  assert.ok(customPhoneScreenMatch);
-  assert.match(customPhoneScreenMatch[1], /questionType: 'Custom', cardTitle: 'Custom Question'/);
 });
 
-test('renaming a card title (setCardTitle) never touches questionType, and reassigning a Question Type (setQuestionType) never touches cardTitle - the two are decoupled', () => {
-  const setCardTitleMatch = source.match(/function setCardTitle\(questionId: string, cardTitle: string\) \{([\s\S]*?)\n {2}\}/);
-  assert.ok(setCardTitleMatch, 'expected setCardTitle');
-  assert.match(setCardTitleMatch[1], /\{ \.\.\.question, cardTitle \}/);
-  assert.doesNotMatch(setCardTitleMatch[1], /questionType/, 'setCardTitle must not touch questionType');
-
-  const setQuestionTypeMatch = source.match(/function setQuestionType\(questionId: string, questionType: string\) \{([\s\S]*?)\n {2}\}/);
+test('every Question Type reassignment - Phone Screen or Structured - goes through the single setQuestionType function, which applies that type\'s canonical template synchronously unless the question is already customized', () => {
+  const setQuestionTypeMatch = source.match(/function setQuestionType\(questionId: string, questionType: string\) \{([\s\S]*?)\n {2}\}\n\n {2}function reorderQuestion/);
   assert.ok(setQuestionTypeMatch, 'expected setQuestionType');
-  assert.match(setQuestionTypeMatch[1], /\{ \.\.\.question, questionType \}/);
-  assert.doesNotMatch(setQuestionTypeMatch[1], /cardTitle/, 'setQuestionType must not touch cardTitle');
+  const body = setQuestionTypeMatch[1];
+  assert.match(body, /templateForPhoneScreenType\(questionType\)/, 'Phone Screen path must look up a template for the target type');
+  assert.match(body, /templateForStructuredType\(bank, selectedKey, questionType\)/, 'Structured path must look up a stage-scoped template for the target type');
+  assert.match(body, /isQuestionTextCustomized\(question\.text, currentTemplate\?\.text\)/, 'must decide via the shared customization check, not its own ad hoc logic');
+  assert.match(body, /window\.confirm\(/, 'a customized question must be confirmed before its content is replaced');
 });
 
-test('a question\'s questionType/cardTitle is reconstructed on load by looking the sourceId up in the bank (covering every stage, not just phone-screen), falling back to Custom for a question the bank can\'t resolve', () => {
-  const reconstructMatch = source.match(/function reconstructTypeMetadata\(sourceId: string \| undefined, bank: BankQuestion\[\]\): \{ questionType: string; cardTitle: string \} \{([\s\S]*?)\n\}/);
+test('a plain reassignment (no template for the target type, e.g. Custom) only ever changes questionType/cardTitle - it never touches text, response, or areas', () => {
+  const applyLabelOnlyMatch = source.match(/const applyLabelOnly = \(\) => \{([\s\S]*?)\n {4}\};/);
+  assert.ok(applyLabelOnlyMatch, 'expected the label-only fallback inside setQuestionType');
+  assert.match(applyLabelOnlyMatch[1], /\{ \.\.\.item, questionType, cardTitle: deriveCardTitle\(questionType\) \}/);
+  assert.doesNotMatch(applyLabelOnlyMatch[1], /text:|responseSpec:|areas:/, 'a plain type reassignment must not touch content fields');
+});
+
+test('cancelling the replace-content confirmation leaves the question\'s data exactly as it was, and still forces the controlled Question Type <select> back in sync with that unchanged data', () => {
+  // Both apply() closures are only invoked from inside the `if (window.confirm(...)) apply();` guard,
+  // so declining the confirmation never calls apply() - no code path can still mutate the question's content.
+  const confirmGuards = source.match(/if \(window\.confirm\([\s\S]*?\)\) apply\(\);/g);
+  assert.ok(confirmGuards && confirmGuards.length >= 2, 'expected a guarded apply() call for both the Phone Screen and Structured paths');
+  // A native <select> already shows the just-picked option before this handler runs, so Cancel must still
+  // patch (with an identity update) to force React to reconcile the controlled value back to the unchanged data.
+  const noOpPatches = source.match(/else patchQuestions\(selectedKey, \(current\) => current\.map\(\(item\) => item\.id === questionId \? \{ \.\.\.item \} : item\)\);/g);
+  assert.ok(noOpPatches && noOpPatches.length >= 2, 'expected a no-op patch on Cancel for both the Phone Screen and Structured paths');
+});
+
+test('a question\'s questionType/cardTitle is reconstructed on load, preferring the persisted questionType (so a generated question survives reload) and falling back to a sourceId bank lookup, then Custom, only when nothing was persisted', () => {
+  const reconstructMatch = source.match(/function reconstructTypeMetadata\(question: \{ sourceId\?: string; questionType\?: string \}, bank: BankQuestion\[\]\): \{ questionType: string; cardTitle: string \} \{([\s\S]*?)\n\}/);
   assert.ok(reconstructMatch, 'expected reconstructTypeMetadata');
-  assert.match(reconstructMatch[1], /bank\.find\(\(question\) => question\.id === sourceId\)/);
+  assert.match(reconstructMatch[1], /if \(question\.questionType\) return \{ questionType: question\.questionType, cardTitle: deriveCardTitle\(question\.questionType\) \};/, 'a persisted questionType must win first');
+  assert.match(reconstructMatch[1], /bank\.find\(\(item\) => item\.id === question\.sourceId\)/);
   assert.match(reconstructMatch[1], /return \{ questionType: 'Custom', cardTitle: 'Custom Question' \};/);
 });
 
-test('every Phone Screen and Structured Interview question card shows an editable cardTitle header and a Question Type reassignment selector', () => {
+test('every Phone Screen and Structured Interview question card shows a Question Type reassignment selector, immediately above its response/AOE configuration - no separate cardTitle input alongside it', () => {
   const { phoneScreen, structured } = extractStageBranches();
   for (const branch of [phoneScreen, structured]) {
-    assert.match(branch, /className=\{styles\.cardTitleInput\}/);
-    assert.match(branch, /onChange=\{\(event\) => setCardTitle\(question\.id, event\.target\.value\)\}/);
     assert.match(branch, /className=\{styles\.questionTypeSelect\}/);
     assert.match(branch, /onChange=\{\(event\) => setQuestionType\(question\.id, event\.target\.value\)\}/);
   }
   assert.match(phoneScreen, /PHONE_SCREEN_QUESTION_TYPE_OPTIONS\.map\(/, 'Phone Screen must offer its own controlled type list');
   assert.match(structured, /STRUCTURED_QUESTION_TYPE_OPTIONS\.map\(/, 'Structured Interview must offer the generated Question Type vocabulary');
+
+  // Question Type dropdown immediately above AOE for Structured; above the response config for Phone Screen.
+  const structuredTypeIndex = structured.indexOf('questionTypeSelect');
+  const structuredAreaIndex = structured.indexOf('styles.areaLine');
+  assert.ok(structuredTypeIndex >= 0 && structuredAreaIndex > structuredTypeIndex, 'Structured Question Type selector must precede the AOE row');
+
+  const phoneScreenTypeIndex = phoneScreen.indexOf('questionTypeSelect');
+  const phoneScreenResponseIndex = phoneScreen.indexOf('styles.responseKindRow');
+  assert.ok(phoneScreenTypeIndex >= 0 && phoneScreenResponseIndex > phoneScreenTypeIndex, 'Phone Screen Question Type selector must precede its response configuration');
+
+  // Question text (questionTop/textarea) leads both cards, ahead of the Question Type selector.
+  assert.ok(structured.indexOf('questionTop') < structuredTypeIndex, 'question text must render above the Structured Question Type selector');
+  assert.ok(phoneScreen.indexOf('questionTop') < phoneScreenTypeIndex, 'question text must render above the Phone Screen Question Type selector');
+});
+
+test('a canonical (non-Custom) Phone Screen Question Type hides the manual response-format dropdown - only Custom exposes it', () => {
+  const { phoneScreen } = extractStageBranches();
+  assert.match(phoneScreen, /question\.questionType === 'Custom' \? \(/, 'the response-kind <select> must be gated on Custom');
+  assert.match(phoneScreen, /Response: \{RESPONSE_KIND_OPTIONS\.find/, 'a canonical type shows a plain response-kind label instead');
 });
 
 test('the selected form is never regrouped by Question Type - questions render in the recruiter-controlled order from the questions array, with no grouping helper in this file', () => {
   assert.doesNotMatch(source, /groupByType|collapsedTypes|typeSection/, 'InterviewPlan.tsx must not group its own question list - only the Question Bank panel groups');
   assert.match(source, /\{questions\.map\(\(question, index\) => \{/, 'phone-screen form must map the flat questions array directly, preserving order');
+});
+
+// --- Available-height usage ---
+
+const editorCss = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'InterviewPlan.module.css'), 'utf8');
+
+test('the editor no longer reserves a large arbitrary fixed bottom gutter - only a modest one - so it uses the available viewport height beneath its header', () => {
+  const editorRuleMatch = editorCss.match(/\.editor\{[^}]*\}/);
+  assert.ok(editorRuleMatch, 'expected the base .editor rule');
+  assert.doesNotMatch(editorRuleMatch[0], /padding:10px 10px 96px/, 'the old, oversized fixed bottom padding must be gone');
+  assert.match(editorRuleMatch[0], /flex:1;min-height:0/, 'the editor must still grow via flex/min-height, not a fixed height');
+  assert.match(editorRuleMatch[0], /overflow-y:auto/, 'the editor must keep its own vertical scrolling');
+  assert.match(editorRuleMatch[0], /overflow-x:hidden/, 'the editor must never scroll horizontally');
+});
+
+test('the editor keeps a dedicated, larger exception only while an AOE picker menu is actually open - that is functional space for the open menu, not wasted chrome', () => {
+  assert.match(editorCss, /\.editor:has\(\.areaMenu\)\{padding-bottom:300px\}/);
+});
+
+test('switching or opening a stage resets the editor\'s own scroll position to the top, so it never opens clipped mid-question', () => {
+  const scrollResetMatch = source.match(/useEffect\(\(\) => \{\s*\n\s*if \(selectedKey && editorRef\.current\) editorRef\.current\.scrollTop = 0;\s*\n\s*\}, \[selectedKey\]\);/);
+  assert.ok(scrollResetMatch, 'expected a selectedKey-driven scroll-reset effect targeting editorRef');
+  const { phoneScreen, structured } = extractStageBranches();
+  assert.match(phoneScreen, /ref=\{editorRef\}/, 'the Phone Screen editor container must be the one being reset');
+  assert.match(structured, /ref=\{editorRef\}/, 'the Structured Interview editor container must be the one being reset');
+});
+
+// --- Persisted Question Type / Phone Screen response package ---
+
+test('serializeQuestions always emits questionType, and derives responseKind/responseOptions/responseUnit/responseQualifying from responseSpec when present - so a placed question\'s real category and response package are saved, not just its wire flags', () => {
+  const serializeMatch = source.match(/function serializeQuestions\(questions: Question\[\]\) \{([\s\S]*?)\n\}/);
+  assert.ok(serializeMatch, 'expected serializeQuestions');
+  const body = serializeMatch[1];
+  assert.match(body, /questionType: question\.questionType,/);
+  assert.match(body, /spec \? \{ responseKind: spec\.kind \} : \{\}/);
+  assert.match(body, /spec\?\.kind === 'single-choice' && spec\.options\.length > 0 \? \{ responseOptions: spec\.options \} : \{\}/);
+  assert.match(body, /spec\?\.kind === 'single-choice' && spec\.qualifying && spec\.qualifying\.length > 0 \? \{ responseQualifying: spec\.qualifying \} : \{\}/);
+  assert.match(body, /spec\?\.kind === 'numeric' && spec\.unit \? \{ responseUnit: spec\.unit \} : \{\}/);
+});
+
+test('reconstructResponseSpec prefers a persisted responseKind (via responseSpecFromParts) over the sourceId/wire-flag fallback, so a generated Phone Screen question\'s exact response package survives reload', () => {
+  const reconstructMatch = source.match(/function reconstructResponseSpec\(question: \{([\s\S]*?)\n\}\): PhoneScreenResponseSpec \{([\s\S]*?)\n\}/);
+  assert.ok(reconstructMatch, 'expected reconstructResponseSpec');
+  assert.match(reconstructMatch[2], /if \(question\.responseKind\) \{/);
+  assert.match(reconstructMatch[2], /responseSpecFromParts\(question\.responseKind, question\.responseOptions, question\.responseUnit, question\.responseQualifying\)/);
+  assert.match(reconstructMatch[2], /findPhoneScreenSeed\(question\.sourceId\)/, 'the sourceId fallback must remain for records saved before this migration');
 });

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { INTERVIEW_STAGES, buildQuestionBank } from './interviewQuestionBank.ts';
+import { INTERVIEW_STAGES, buildQuestionBank, templateForStructuredType } from './interviewQuestionBank.ts';
 import { PHONE_SCREEN_ALL_QUESTIONS } from './phoneScreenQuestions.ts';
 
 test('the four assessment stages are fixed, in order, with the specified names and taglines', () => {
@@ -54,6 +54,28 @@ test('every round-1/round-2/final starter question carries a non-empty questionT
     assert.ok(question.questionType.trim().length > 0, `${question.id} is missing a questionType`);
     assert.ok(question.cardTitle.trim().length > 0, `${question.id} is missing a cardTitle`);
   }
+});
+
+test('templateForStructuredType returns the stage-scoped canonical text/AOE for a real match, and undefined for a type not present in that stage', () => {
+  const bank = buildQuestionBank('Test Role');
+  const template = templateForStructuredType(bank, 'round-1', 'Behavioral');
+  assert.ok(template);
+  const expected = bank.find((question) => question.stage === 'round-1' && question.questionType === 'Behavioral');
+  assert.equal(template?.text, expected?.text);
+  assert.deepEqual(template?.areas, expected?.areas);
+
+  // Same Question Type label, different stage: must not cross stages -
+  // a round-1 template must never leak into round-2's lookup.
+  assert.equal(templateForStructuredType(bank, 'phone-screen', 'Behavioral'), undefined);
+  assert.equal(templateForStructuredType(bank, 'round-1', 'Not A Real Type'), undefined);
+});
+
+test('templateForStructuredType returns a defensive copy of areas, not the bank\'s own array', () => {
+  const bank = buildQuestionBank('Test Role');
+  const template = templateForStructuredType(bank, 'round-1', 'Behavioral');
+  const original = bank.find((question) => question.stage === 'round-1' && question.questionType === 'Behavioral')!;
+  template!.areas.push('Mutated');
+  assert.ok(!original.areas.includes('Mutated'));
 });
 
 test('buildQuestionBank\'s round-1/round-2/final entries are unaffected by the phone-screen consolidation - still 6 each, with stable ids', () => {

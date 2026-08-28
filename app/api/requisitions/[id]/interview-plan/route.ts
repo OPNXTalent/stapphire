@@ -7,6 +7,11 @@ type PlanQuestionInput = {
   areas: string[];
   commentBox: boolean;
   yesNo: boolean;
+  questionType?: string;
+  responseKind?: string;
+  responseOptions?: string[];
+  responseUnit?: string;
+  responseQualifying?: string[];
 };
 
 type PlanRoundInput = {
@@ -55,6 +60,9 @@ function normalizeRounds(value: unknown): PlanRoundInput[] {
       const rawAreas = question.areas;
       const commentBox = question.commentBox === true;
       const yesNo = question.yesNo === true;
+      const questionType = String(question.questionType ?? '').trim();
+      const responseKind = String(question.responseKind ?? '').trim();
+      const responseUnit = String(question.responseUnit ?? '').trim();
 
       if (text.length > 1000) {
         throw new Error('Interview question is too long.');
@@ -62,18 +70,37 @@ function normalizeRounds(value: unknown): PlanRoundInput[] {
       if (!Array.isArray(rawAreas) || rawAreas.length > 4) {
         throw new Error('Interview question Areas of Evaluation are invalid.');
       }
+      if (questionType.length > 60) {
+        throw new Error('Interview question Question Type is invalid.');
+      }
+      if (responseUnit.length > 30) {
+        throw new Error('Interview question response unit is invalid.');
+      }
 
       const areas = rawAreas.map((area) => String(area).trim()).filter(Boolean);
       if (new Set(areas).size !== areas.length) {
         throw new Error('Interview question Areas of Evaluation contain duplicates.');
       }
 
+      const normalizeStringArray = (value: unknown): string[] | undefined => {
+        if (!Array.isArray(value)) return undefined;
+        const cleaned = value.map((item) => String(item).trim()).filter(Boolean);
+        return cleaned.length > 0 ? cleaned : undefined;
+      };
+      const responseOptions = normalizeStringArray(question.responseOptions);
+      const responseQualifying = normalizeStringArray(question.responseQualifying);
+
       return {
         ...(sourceId ? { sourceId } : {}),
         text,
         areas,
         commentBox,
-        yesNo
+        yesNo,
+        ...(questionType ? { questionType } : {}),
+        ...(responseKind ? { responseKind } : {}),
+        ...(responseOptions ? { responseOptions } : {}),
+        ...(responseUnit ? { responseUnit } : {}),
+        ...(responseQualifying ? { responseQualifying } : {})
       };
     });
 
@@ -110,12 +137,17 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       comment_box: boolean;
       yes_no: boolean;
       sort_order: number;
+      question_type: string | null;
+      response_kind: string | null;
+      response_options: string[] | null;
+      response_unit: string | null;
+      response_qualifying: string[] | null;
     }> = [];
 
     if (roundIds.length > 0) {
       const { data, error } = await supabaseAdmin
         .from('phase1_interview_questions')
-        .select('id, round_id, source_id, question_text, areas, comment_box, yes_no, sort_order')
+        .select('id, round_id, source_id, question_text, areas, comment_box, yes_no, sort_order, question_type, response_kind, response_options, response_unit, response_qualifying')
         .in('round_id', roundIds)
         .order('sort_order', { ascending: true });
       if (error) throw error;
@@ -139,7 +171,12 @@ export async function GET(_request: Request, { params }: { params: { id: string 
               text: question.question_text,
               areas: question.areas ?? [],
               commentBox: Boolean(question.comment_box),
-              yesNo: Boolean(question.yes_no)
+              yesNo: Boolean(question.yes_no),
+              ...(question.question_type ? { questionType: question.question_type } : {}),
+              ...(question.response_kind ? { responseKind: question.response_kind } : {}),
+              ...(question.response_options && question.response_options.length > 0 ? { responseOptions: question.response_options } : {}),
+              ...(question.response_unit ? { responseUnit: question.response_unit } : {}),
+              ...(question.response_qualifying && question.response_qualifying.length > 0 ? { responseQualifying: question.response_qualifying } : {})
             }))
         }))
       }
