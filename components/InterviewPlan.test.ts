@@ -6,11 +6,12 @@ import { dirname, join } from 'node:path';
 
 // This project has no React/DOM testing infrastructure - these tests
 // inspect the component's own source for the four-fixed-stage Selection
-// Process redesign and the Phone Screen compact-format branch. Existing
-// Structured Interview behavior (AOE picker, star scoring, comment
-// boxes) is separately protected by interviewStabilization.test.ts and
-// is not touched here except to confirm it stays scoped to its own
-// branch.
+// Process redesign, the Phone Screen compact-format branch, its rich
+// response-kind controls, and the preservation of legacy/additional
+// rounds. Existing Structured Interview behavior (AOE picker, star
+// scoring, comment boxes) is separately protected by
+// interviewStabilization.test.ts and is not touched here except to
+// confirm it stays scoped to its own branch.
 
 const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'InterviewPlan.tsx'), 'utf8');
 
@@ -27,13 +28,13 @@ test('the not-selected view renders exactly the four fixed stages from INTERVIEW
 });
 
 test('each stage card shows its tagline (Qualify/Validate/Demonstrate/Differentiate) alongside its name', () => {
-  assert.match(source, /<span className=\{styles\.stageTagline\}>\{stage\.tagline\}<\/span>/);
+  assert.match(source, /<span className=\{`\$\{styles\.stageTagline\} \$\{info\.legacy \? styles\.legacyTagline : ''\}`\}>\{info\.tagline\}<\/span>/);
 });
 
 test('selecting a stage dispatches the existing workspace-focus/builder-context events with that exact stage id, connecting the right panel (Question Bank) to that stage', () => {
-  const effectMatch = source.match(/useEffect\(\(\) => \{\s*\n\s*if \(!selectedStage\) \{([\s\S]*?)\n {2}\}, \[selectedStage, positionTitle\]\);/);
-  assert.ok(effectMatch, 'expected the selectedStage-driven focus/context dispatch effect');
-  assert.match(effectMatch[1], /const detail = \{ stage: selectedStage, positionTitle \};/);
+  const effectMatch = source.match(/useEffect\(\(\) => \{\s*\n\s*if \(!selectedKey\) \{([\s\S]*?)\n {2}\}, \[selectedKey, positionTitle\]\);/);
+  assert.ok(effectMatch, 'expected the selectedKey-driven focus/context dispatch effect');
+  assert.match(effectMatch[1], /const detail = \{ stage: selectedKey, positionTitle \};/);
   assert.match(effectMatch[1], /dispatchEvent\(new CustomEvent\(INTERVIEW_WORKSPACE_FOCUS_EVENT, \{ detail \}\)\)/);
   assert.match(effectMatch[1], /dispatchEvent\(new CustomEvent\(INTERVIEW_BUILDER_CONTEXT_EVENT, \{ detail \}\)\)/);
 });
@@ -55,7 +56,7 @@ function extractStageBranches() {
 }
 
 test('Phone Screen and the other three stages share the same add/remove/reorder/persistence plumbing (patchQuestions, dropOnQuestion, reorderQuestion, serializePlan) rather than duplicating four separate systems', () => {
-  assert.match(source, /function patchQuestions\(stageId: InterviewStageId, updater: \(current: Question\[\]\) => Question\[\]\)/);
+  assert.match(source, /function patchQuestions\(stageKey: string, updater: \(current: Question\[\]\) => Question\[\]\)/);
   assert.match(source, /function dropOnQuestion\(event: DragEvent<HTMLDivElement>, targetId: string\)/);
   assert.match(source, /function reorderQuestion\(sourceId: string, targetId: string\)/);
   // Both branches must call into these same shared functions, not stage-specific reimplementations.
@@ -85,12 +86,6 @@ test('the Structured Interview branch keeps its existing AOE/star/scoring/commen
   assert.match(structured, /question\.areas\.length > 0 && \(/);
 });
 
-test('each Phone Screen question has an editable response-type control (Yes/No or Short Answer), set via the shared setResponseType function, mutually exclusive', () => {
-  const setResponseTypeMatch = source.match(/function setResponseType\(questionId: string, type: PhoneScreenResponseType\) \{([\s\S]*?)\n {2}\}/);
-  assert.ok(setResponseTypeMatch, 'expected setResponseType');
-  assert.match(setResponseTypeMatch[1], /yesNo: type === 'yes-no', commentBox: type === 'short-answer'/, 'the two response types must be mutually exclusive, not independently toggleable like Structured Interview\'s comment box / yes-no');
-});
-
 test('Phone Screen default questions are editable, removable, and reorderable using the same functions as every other question', () => {
   assert.match(source, /function updateQuestion\(questionId: string, patch: Partial<Question>\)/);
   assert.match(source, /function removeQuestion\(questionId: string\)/);
@@ -103,31 +98,101 @@ test('a flexible Custom Question action is visibly available on the Phone Screen
   assert.doesNotMatch(source, /addCustomQuestion\{display:none/, 'unlike .addManual, the Phone Screen custom-question action must not be hidden');
 });
 
-test('dragging a Phone Screen bank question onto the form gives it the seed\'s intended response type immediately, rather than always defaulting to the Structured Interview comment-box shape', () => {
+// --- Correction 1: rich, semantically-required response kinds ---
+
+test('each Phone Screen question has a response-kind selector offering all five semantic kinds, not just Yes/No and Short Answer', () => {
+  const { phoneScreen } = extractStageBranches();
+  assert.match(phoneScreen, /RESPONSE_KIND_OPTIONS\.map\(\(option\) => \(/, 'expected the response-kind <select> to be driven by the full RESPONSE_KIND_OPTIONS list');
+  const optionsMatch = source.match(/const RESPONSE_KIND_OPTIONS: \{ value: PhoneScreenResponseKind; label: string \}\[\] = \[([\s\S]*?)\];/);
+  assert.ok(optionsMatch, 'expected RESPONSE_KIND_OPTIONS');
+  for (const kind of ['yes-no', 'yes-no-needs-discussion', 'single-choice', 'numeric', 'short-answer']) {
+    assert.match(optionsMatch[1], new RegExp(`value: '${kind}'`), `expected ${kind} to be offered as a response kind`);
+  }
+});
+
+test('changing a question\'s response kind goes through the single setResponseSpec function, which keeps responseSpec and its wire-flag derivation in sync', () => {
+  const setResponseSpecMatch = source.match(/function setResponseSpec\(questionId: string, spec: PhoneScreenResponseSpec\) \{([\s\S]*?)\n {2}\}/);
+  assert.ok(setResponseSpecMatch, 'expected setResponseSpec');
+  assert.match(setResponseSpecMatch[1], /const flags = responseSpecToWireFlags\(spec\);/);
+  assert.match(setResponseSpecMatch[1], /responseSpec: spec, commentBox: flags\.commentBox, yesNo: flags\.yesNo/);
+});
+
+test('single-choice questions expose an editable options control, and numeric questions expose an editable unit control, conditionally rendered by response kind', () => {
+  const { phoneScreen } = extractStageBranches();
+  assert.match(phoneScreen, /spec\.kind === 'single-choice' &&/);
+  assert.match(phoneScreen, /spec\.kind === 'numeric' &&/);
+  assert.match(phoneScreen, /placeholder="Options, comma separated"/);
+  assert.match(phoneScreen, /placeholder="Unit \(optional, e\.g\. years\)"/);
+});
+
+test('the old two-button Yes/No-vs-Short-Answer toggle and its narrow PhoneScreenResponseType are gone', () => {
+  assert.doesNotMatch(source, /function setResponseType\(/);
+  assert.doesNotMatch(source, /PhoneScreenResponseType/);
+  assert.doesNotMatch(source, /responseTypeOf\(/);
+  assert.doesNotMatch(source, /styles\.responseTypeRow/);
+});
+
+test('dragging a Phone Screen bank question onto the form gives it the seed\'s intended response spec immediately, reading it straight off the BankQuestion the canonical adapter already carries - not re-imported/re-derived from a second question list', () => {
   const cloneMatch = source.match(/function cloneBankQuestion\(question: BankQuestion\): Question \{([\s\S]*?)\n\}/);
   assert.ok(cloneMatch, 'expected cloneBankQuestion');
-  assert.match(cloneMatch[1], /const phoneScreenSeed = PHONE_SCREEN_BANK_QUESTIONS\.find\(\(seed\) => seed\.id === question\.id\);/);
-  assert.match(cloneMatch[1], /commentBox: phoneScreenSeed\.responseType === 'short-answer'/);
-  assert.match(cloneMatch[1], /yesNo: phoneScreenSeed\.responseType === 'yes-no'/);
-  // The pre-existing Structured Interview fallback (protected by interviewStabilization.test.ts) must still exist for non-phone-screen bank ids.
+  assert.match(cloneMatch[1], /if \(question\.response\) \{/);
+  assert.match(cloneMatch[1], /const flags = responseSpecToWireFlags\(question\.response\);/);
+  assert.match(cloneMatch[1], /responseSpec: question\.response/);
+  // The pre-existing Structured Interview fallback (protected by interviewStabilization.test.ts) must still exist for non-phone-screen bank entries.
   assert.match(cloneMatch[1], /commentBox: true \};/);
+  assert.doesNotMatch(source, /import \{ PHONE_SCREEN_BANK_QUESTIONS/, 'cloneBankQuestion must not need a direct import of the bank list - the canonical response travels through BankQuestion itself');
 });
 
-test('the persisted plan always serializes exactly the four fixed stage ids, in a stable order, reusing the same wire shape as before (no schema/migration change)', () => {
-  const serializeMatch = source.match(/function serializePlan\([\s\S]*?\) \{([\s\S]*?)\n\}/);
-  assert.ok(serializeMatch, 'expected serializePlan');
-  assert.match(serializeMatch[1], /rounds: INTERVIEW_STAGES\.map\(\(stage\) => \(\{/, 'rounds must be derived from the fixed INTERVIEW_STAGES list, not a dynamic rounds array');
-  assert.match(serializeMatch[1], /stage: stage\.id,/);
-  assert.match(serializeMatch[1], /commentBox: Boolean\(question\.commentBox\),/);
-  assert.match(serializeMatch[1], /yesNo: Boolean\(question\.yesNo\)/);
-});
-
-test('loading a persisted plan backfills any missing fixed stage with its defaults, and ignores any legacy non-fixed stage keys, instead of crashing or losing the other three stages', () => {
-  const loadMatch = source.match(/for \(const stage of INTERVIEW_STAGES\) \{\s*\n\s*const persisted = persistedRounds\.find\(\(round\) => round\.stage === stage\.id\);\s*\n\s*if \(!persisted\) continue;/);
-  assert.ok(loadMatch, 'expected the load loop to iterate the fixed stages and skip (keep defaults for) any stage with no matching persisted round');
+test('a Phone Screen question\'s response kind (and single-choice options / numeric unit) can only be represented up to what the two persisted flags allow - only yes-no and short-answer are honestly wire-representable, the rest defer to a client-side view model', () => {
+  assert.match(source, /function reconstructResponseSpec\(/, 'expected a reconstruction helper used on load');
+  assert.match(source, /return wireFlagsToResponseSpec\(\{ commentBox: Boolean\(question\.commentBox\), yesNo: Boolean\(question\.yesNo\) \}\);/);
 });
 
 test('a candidate whose stage tab was never persisted (e.g. a requisition created before this feature) still gets Phone Screen\'s six default questions, not an empty form', () => {
   assert.match(source, /function phoneScreenDefaultQuestions\(\): Question\[\] \{/);
-  assert.match(source, /PHONE_SCREEN_DEFAULT_QUESTIONS\.map\(\(seed\) => \(\{/);
+  assert.match(source, /PHONE_SCREEN_DEFAULT_QUESTIONS\.map\(\(seed\) => \{/);
+});
+
+test('round-1\'s starter/default questions are filtered by stage, not positionally sliced across the whole flattened bank - phone-screen now contributing 20 entries must not crowd them out', () => {
+  const starterMatch = source.match(/function starterQuestionsFor\(stageId: InterviewStageId, bank: BankQuestion\[\]\): Question\[\] \{([\s\S]*?)\n\}/);
+  assert.ok(starterMatch, 'expected starterQuestionsFor');
+  assert.match(starterMatch[1], /bank\.filter\(\(question\) => question\.stage === 'round-1'\)\.slice\(0, 5\)\.map\(cloneBankQuestion\)/);
+  assert.doesNotMatch(starterMatch[1], /bank\.slice\(0, 11\)/, 'must not positionally slice the flattened bank');
+});
+
+// --- Correction 3: preserving non-fixed/legacy rounds ---
+
+test('loading a persisted plan backfills any missing fixed stage with its defaults, and never guesses a canonical stage for a non-fixed round', () => {
+  const loadMatch = source.match(/for \(const stage of INTERVIEW_STAGES\) \{\s*\n\s*const persisted = persistedRounds\.find\(\(round\) => round\.stage === stage\.id\);\s*\n\s*if \(!persisted\) continue;/);
+  assert.ok(loadMatch, 'expected the load loop to iterate the fixed stages and skip (keep defaults for) any stage with no matching persisted round');
+});
+
+test('any persisted round whose stage is not one of the four canonical ids is kept, verbatim and in order, as an additionalKeys entry - never mapped, dropped, or mutated', () => {
+  const legacyLoadMatch = source.match(/for \(const round of persistedRounds\) \{\s*\n\s*if \(isCanonicalStage\(round\.stage\)\) continue;\s*\n\s*loadedTitles\[round\.stage\] = String\(round\.title \|\| round\.stage\);\s*\n\s*loadedQuestions\[round\.stage\] = parsePersistedQuestions\(round, false\);\s*\n\s*loadedAdditionalKeys\.push\(round\.stage\);\s*\n\s*\}/);
+  assert.ok(legacyLoadMatch, 'expected the legacy-round preservation loop to read the round\'s stage/title/questions verbatim, with no title-based guessing of a canonical stage');
+  assert.doesNotMatch(source, /guessStage|inferStage|mapTitleToStage/i, 'must never attempt to guess a canonical stage from a legacy round\'s title');
+});
+
+test('serializePlan re-emits every additionalKeys round on every save, so autosave (delete-then-reinsert on the server) never silently drops a legacy round', () => {
+  const serializeMatch = source.match(/function serializePlan\([\s\S]*?\) \{([\s\S]*?)\n\}/);
+  assert.ok(serializeMatch, 'expected serializePlan');
+  assert.match(serializeMatch[1], /\.\.\.INTERVIEW_STAGES\.map\(\(stage\) => \(\{/, 'the four fixed stages must still come from the fixed INTERVIEW_STAGES list');
+  assert.match(serializeMatch[1], /\.\.\.additionalKeys\.map\(\(key\) => \(\{/, 'every additionalKeys round must also be serialized');
+  assert.match(serializeMatch[1], /stage: key,/);
+});
+
+test('a legacy/additional round is rendered in a clearly-labeled, distinct section of the not-selected view - not merged silently into the four fixed stage cards', () => {
+  assert.match(source, /\{additionalKeys\.length > 0 && \(/);
+  assert.match(source, /data-additional-interviews="true"/);
+  assert.match(source, /legacyCardInfoFor\(key, titlesByKey\[key\]\)/);
+});
+
+test('a legacy round\'s card is visibly distinguished ("Needs stage assignment"), not given one of the four canonical taglines', () => {
+  const legacyInfoMatch = source.match(/function legacyCardInfoFor\(key: string, title: string\): StageCardInfo \{([\s\S]*?)\n\}/);
+  assert.ok(legacyInfoMatch, 'expected legacyCardInfoFor');
+  assert.match(legacyInfoMatch[1], /tagline: 'Needs stage assignment'/);
+});
+
+test('selecting a legacy round routes through the existing Structured Interview editor branch (its full AOE/star/scoring/comment-box configuration stays reachable), never the Phone Screen compact branch', () => {
+  assert.match(source, /const isPhoneScreen = selectedKey === 'phone-screen';/, 'a legacy key can never equal the literal phone-screen id, so it always falls into the structured branch');
 });

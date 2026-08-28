@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { AREAS_OF_EVALUATION, INTERVIEW_STAGES, type BankQuestion, type InterviewStageId } from '@/lib/interviewQuestionBank';
-import { PHONE_SCREEN_BANK_QUESTIONS } from '@/lib/phoneScreenQuestions';
+import { PHONE_SCREEN_BANK_QUESTIONS, type PhoneScreenResponseKind, type PhoneScreenResponseSpec } from '@/lib/phoneScreenQuestions';
 import { AOE_PREFERENCES_CHANGED_EVENT, type AoePreferences } from '@/lib/aoePreferences';
 import { INTERVIEW_QUESTION_TYPES, type InterviewQuestionType } from '@/lib/interviewQuestionTypes';
 import {
@@ -14,8 +14,19 @@ import {
 } from '@/lib/interviewQuestionBankEvents';
 import styles from './InterviewQuestionBankPanel.module.css';
 
-type AvailableQuestion = { id: string; text: string; areas: string[] };
+type AvailableQuestion = { id: string; text: string; areas: string[]; response?: PhoneScreenResponseSpec };
 type JsonRecord = Record<string, unknown>;
+
+// Short badge copy for each response kind, shown on Phone Screen bank
+// items so a recruiter can see the intended response format before
+// dragging a question onto the form.
+const RESPONSE_KIND_LABELS: Record<PhoneScreenResponseKind, string> = {
+  'yes-no': 'Yes / No',
+  'yes-no-needs-discussion': 'Yes / No / Needs discussion',
+  'single-choice': 'Single choice',
+  numeric: 'Numeric',
+  'short-answer': 'Short answer'
+};
 
 const UNSAVED_STARTER_USED_IDS = new Set([
   'phone-screen-default-1','phone-screen-default-2','phone-screen-default-3','phone-screen-default-4','phone-screen-default-5','phone-screen-default-6',
@@ -100,7 +111,7 @@ export function InterviewQuestionBankPanel({
   const availablePhoneScreenQuestions = useMemo<AvailableQuestion[]>(
     () => PHONE_SCREEN_BANK_QUESTIONS
       .filter((question) => !usedIds.has(question.id))
-      .map((question) => ({ id: question.id, text: question.text, areas: [] })),
+      .map((question) => ({ id: question.id, text: question.text, areas: [], response: question.response })),
     [usedIds]
   );
 
@@ -241,7 +252,13 @@ export function InterviewQuestionBankPanel({
 
   function startBlankDrag(event: DragEvent<HTMLDivElement>) {
     const suffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`;
-    writeDragData(event, { id: `custom-${stage}-${suffix}`, stage, text: '', areas: [] });
+    writeDragData(event, {
+      id: `custom-${stage}-${suffix}`,
+      stage,
+      text: '',
+      areas: [],
+      ...(isPhoneScreen ? { response: { kind: 'short-answer' } as PhoneScreenResponseSpec } : {})
+    });
   }
 
   function toggleSelectedArea(area: string) {
@@ -316,7 +333,7 @@ export function InterviewQuestionBankPanel({
               <span className={styles.drag} aria-hidden="true">⠿</span>
               <div>
                 <p>Create Your Own Question</p>
-                <span className={styles.wildcardCopy}>Drag this onto the Phone Screen, then write your question and choose Yes/No or Short Answer.</span>
+                <span className={styles.wildcardCopy}>Drag this onto the Phone Screen, then write your question and choose its response type.</span>
               </div>
             </div>
           </div>
@@ -327,6 +344,11 @@ export function InterviewQuestionBankPanel({
                 <span className={styles.drag} aria-hidden="true">⠿</span>
                 <p>{question.text}</p>
               </div>
+              {question.response && (
+                <div className={styles.chips}>
+                  <span>{RESPONSE_KIND_LABELS[question.response.kind]}</span>
+                </div>
+              )}
             </div>
           ))}
           {availablePhoneScreenQuestions.length === 0 && <p className={styles.empty}>All screening questions are currently on the form.</p>}

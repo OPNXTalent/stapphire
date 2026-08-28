@@ -9,12 +9,22 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+// This endpoint (and the AOE-driven generator it backs) is the
+// Structured Interview bank - Phone Screen now has its own dedicated,
+// fixed canonical bank (lib/phoneScreenQuestions.ts, served directly by
+// InterviewQuestionBankPanel's phone-screen branch) and never reads
+// this response. phone-screen is excluded here so its 20 canonical
+// entries cannot crowd out round-1/round-2/final's own starter
+// questions in this positional slice.
 function starterQuestions(positionTitle: string) {
-  return buildQuestionBank(positionTitle).slice(0, 15).map((question) => ({
-    id: question.id,
-    text: question.text,
-    areas: question.areas
-  }));
+  return buildQuestionBank(positionTitle)
+    .filter((question) => question.stage !== 'phone-screen')
+    .slice(0, 15)
+    .map((question) => ({
+      id: question.id,
+      text: question.text,
+      areas: question.areas
+    }));
 }
 
 async function loadRequisition(requisitionId: string) {

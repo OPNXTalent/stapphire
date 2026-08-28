@@ -1,3 +1,5 @@
+import { PHONE_SCREEN_ALL_QUESTIONS, type PhoneScreenResponseSpec } from './phoneScreenQuestions.ts';
+
 export const AREAS_OF_EVALUATION = [
   'Adaptability','Budget','Communication','Computer Skills','Conflict Management','Customer Service','Decision Making','Dependability','Employee Development','Employee Management','Ethics','Initiative','Innovation','Interpersonal Skills','Job Knowledge','Leadership','Organizational Skills','Problem Solving','Product Expertise','Productivity','Project Management','Quality','Results Driven','Sales Goals','Sales Skills','Self-Development','Sense of Urgency','Strategic Thought','Teamwork','Technical Skills'
 ] as const;
@@ -9,6 +11,11 @@ export type BankQuestion = {
   stage: InterviewStageId;
   text: string;
   areas: string[];
+  // Populated only for phone-screen entries, carried through from the
+  // one canonical source (lib/phoneScreenQuestions.ts) so any consumer
+  // of this adapter can access the intended response semantics too, not
+  // just the question text.
+  response?: PhoneScreenResponseSpec;
 };
 
 // tagline is the one-word purpose of each stage in the Selection
@@ -26,15 +33,13 @@ export const INTERVIEW_STAGES: { id: InterviewStageId; label: string; shortLabel
 ];
 
 export function buildQuestionBank(positionTitle = 'this role'): BankQuestion[] {
-  const bank: Record<InterviewStageId, Omit<BankQuestion, 'id' | 'stage'>[]> = {
-    'phone-screen': [
-      { text: `What drew your attention to the ${positionTitle} role as a potential next step?`, areas: ['Communication', 'Job Knowledge'] },
-      { text: 'Tell me about the experience in your background that feels most relevant to the day-to-day duties of this role.', areas: ['Job Knowledge', 'Communication'] },
-      { text: 'How do you typically keep track of important issues, deadlines, or updates during your work?', areas: ['Organizational Skills', 'Dependability'] },
-      { text: 'Tell me about a time a customer or coworker came to you with a difficult problem. What did you do?', areas: ['Customer Service', 'Problem Solving', 'Interpersonal Skills'] },
-      { text: 'What systems, tools, or processes have you used to keep work moving accurately and on time?', areas: ['Computer Skills', 'Productivity', 'Quality'] },
-      { text: 'What would you want us to understand about your background that may not be obvious from your resume?', areas: ['Communication', 'Job Knowledge', 'Self-Development'] }
-    ],
+  // phone-screen is not defined here - it is adapted from the one
+  // canonical source (lib/phoneScreenQuestions.ts) below, preserving
+  // that source's own ids so a bank question dragged through this
+  // adapter (e.g. by the pre-production InterviewBuilder prototype) and
+  // one added directly from InterviewQuestionBankPanel's Phone Screen
+  // branch are recognized as the exact same question, not duplicates.
+  const bank: Record<Exclude<InterviewStageId, 'phone-screen'>, Omit<BankQuestion, 'id' | 'stage'>[]> = {
     'round-1': [
       { text: 'Walk us through a recent responsibility that is similar to one of the core duties of this role. What was your personal contribution?', areas: ['Job Knowledge', 'Results Driven'] },
       { text: 'Tell us about a time you had to learn a new process, system, or body of information quickly.', areas: ['Adaptability', 'Computer Skills', 'Self-Development'] },
@@ -61,9 +66,20 @@ export function buildQuestionBank(positionTitle = 'this role'): BankQuestion[] {
     ]
   };
 
-  return INTERVIEW_STAGES.flatMap((stage) => bank[stage.id].map((question, index) => ({
-    ...question,
-    id: `${stage.id}-${index + 1}`,
-    stage: stage.id
-  })));
+  const phoneScreenEntries: BankQuestion[] = PHONE_SCREEN_ALL_QUESTIONS.map((seed) => ({
+    id: seed.id,
+    stage: 'phone-screen',
+    text: seed.text,
+    areas: [],
+    response: seed.response
+  }));
+
+  const structuredEntries: BankQuestion[] = (Object.keys(bank) as Exclude<InterviewStageId, 'phone-screen'>[])
+    .flatMap((stageId) => bank[stageId].map((question, index) => ({
+      ...question,
+      id: `${stageId}-${index + 1}`,
+      stage: stageId
+    })));
+
+  return [...phoneScreenEntries, ...structuredEntries];
 }

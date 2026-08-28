@@ -8,7 +8,15 @@ import {
   type BankQuestion,
   type InterviewStageId
 } from '@/lib/interviewQuestionBank';
-import { PHONE_SCREEN_BANK_QUESTIONS, PHONE_SCREEN_DEFAULT_QUESTIONS, type PhoneScreenResponseType } from '@/lib/phoneScreenQuestions';
+import {
+  PHONE_SCREEN_DEFAULT_QUESTIONS,
+  findPhoneScreenSeed,
+  responseSpecForKind,
+  responseSpecToWireFlags,
+  wireFlagsToResponseSpec,
+  type PhoneScreenResponseKind,
+  type PhoneScreenResponseSpec
+} from '@/lib/phoneScreenQuestions';
 import { AOE_PREFERENCES_CHANGED_EVENT } from '@/lib/aoePreferences';
 import {
   INTERVIEW_BANK_ADD_EVENT,
@@ -28,6 +36,12 @@ type Question = {
   areas: string[];
   commentBox?: boolean;
   yesNo?: boolean;
+  // Phone-screen only. The richer, semantic response kind (single
+  // choice, numeric, yes/no/needs-discussion, etc) - a client-side view
+  // model, never itself sent to the server. Only its derived commentBox/
+  // yesNo wire flags are persisted (see responseSpecToWireFlags); this
+  // field is reconstructed on load, not read back from the API.
+  responseSpec?: PhoneScreenResponseSpec;
 };
 
 type PersistedRound = {
@@ -43,6 +57,11 @@ type PersistedRound = {
   }>;
 };
 
+// A stage "card" descriptor unifies the four fixed stages with any
+// preserved legacy/additional round for rendering purposes (the list
+// view and the selected-stage header both need this for either kind).
+type StageCardInfo = { key: string; label: string; tagline: string; legacy?: boolean };
+
 function localId() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
@@ -51,6 +70,10 @@ function localId() {
 
 function stageConfig(stageId: InterviewStageId) {
   return INTERVIEW_STAGES.find((item) => item.id === stageId)!;
+}
+
+function isCanonicalStage(key: string): key is InterviewStageId {
+  return INTERVIEW_STAGES.some((item) => item.id === key);
 }
 
 function defaultTitleFor(stageId: InterviewStageId) {
@@ -64,39 +87,62 @@ function defaultTitles(): Record<InterviewStageId, string> {
   return result;
 }
 
+function stageCardInfoFor(stage: typeof INTERVIEW_STAGES[number]): StageCardInfo {
+  return { key: stage.id, label: stage.label, tagline: stage.tagline };
+}
+
+// A round whose persisted stage key isn't one of the four canonical
+// ids - kept visible, never mapped onto a canonical stage by guessing
+// from its title. "Needs stage assignment" names what it is without
+// implying it was silently reclassified.
+function legacyCardInfoFor(key: string, title: string): StageCardInfo {
+  return { key, label: title || key, tagline: 'Needs stage assignment', legacy: true };
+}
+
 // A Structured Interview bank question always carries commentBox: true
 // (the existing narrative-comment format). A Phone Screen bank question
-// instead carries the compact response type its seed specifies, so a
-// dragged-in bank question lands with the right control immediately
-// rather than needing to be reconfigured every time.
+// instead carries the response kind its canonical seed specifies -
+// buildQuestionBank() already adapts that seed's response onto every
+// phone-screen BankQuestion, so this reads it directly rather than
+// re-deriving it from a second, separately-imported question list.
 function cloneBankQuestion(question: BankQuestion): Question {
-  const phoneScreenSeed = PHONE_SCREEN_BANK_QUESTIONS.find((seed) => seed.id === question.id);
-  if (phoneScreenSeed) {
+  if (question.response) {
+    const flags = responseSpecToWireFlags(question.response);
     return {
       id: localId(),
       sourceId: question.id,
       text: question.text,
       areas: [],
-      commentBox: phoneScreenSeed.responseType === 'short-answer',
-      yesNo: phoneScreenSeed.responseType === 'yes-no'
+      commentBox: flags.commentBox,
+      yesNo: flags.yesNo,
+      responseSpec: question.response
     };
   }
   return { id: localId(), sourceId: question.id, text: question.text, areas: [...question.areas], commentBox: true };
 }
 
 function phoneScreenDefaultQuestions(): Question[] {
-  return PHONE_SCREEN_DEFAULT_QUESTIONS.map((seed) => ({
-    id: localId(),
-    text: seed.text,
-    areas: [],
-    commentBox: seed.responseType === 'short-answer',
-    yesNo: seed.responseType === 'yes-no'
-  }));
+  return PHONE_SCREEN_DEFAULT_QUESTIONS.map((seed) => {
+    const flags = responseSpecToWireFlags(seed.response);
+    return {
+      id: localId(),
+      sourceId: seed.id,
+      text: seed.text,
+      areas: [],
+      commentBox: flags.commentBox,
+      yesNo: flags.yesNo,
+      responseSpec: seed.response
+    };
+  });
 }
 
 function starterQuestionsFor(stageId: InterviewStageId, bank: BankQuestion[]): Question[] {
   if (stageId === 'phone-screen') return phoneScreenDefaultQuestions();
-  if (stageId === 'round-1') return bank.slice(0, 11).map(cloneBankQuestion);
+  // Filtered by stage rather than positionally sliced across the whole
+  // flattened bank - phone-screen's canonical bank now contributes 20
+  // entries (not the 6 it once did), so a positional slice here would
+  // silently pull phone-screen content into round-1's starters.
+  if (stageId === 'round-1') return bank.filter((question) => question.stage === 'round-1').slice(0, 5).map(cloneBankQuestion);
   return [];
 }
 
@@ -106,19 +152,62 @@ function defaultQuestionsByStage(bank: BankQuestion[]): Record<InterviewStageId,
   return result;
 }
 
-function serializePlan(titlesByStage: Record<InterviewStageId, string>, questionsByStage: Record<InterviewStageId, Question[]>) {
+// Reconstructs a phone-screen question's response kind after a reload.
+// A sourceId links it back to the one canonical source, which is the
+// only way to recover a kind the two persisted booleans can't
+// represent (single-choice, numeric, yes-no-needs-discussion) - a
+// disclosed limitation, not a bug: a custom question with no sourceId,
+// or a kind change to a bank/default question that isn't itself
+// wire-representable, only round-trips as far as yes-no/short-answer.
+function reconstructResponseSpec(question: { sourceId?: string; commentBox?: boolean; yesNo?: boolean }): PhoneScreenResponseSpec {
+  const seed = question.sourceId ? findPhoneScreenSeed(question.sourceId) : undefined;
+  if (seed) return seed.response;
+  return wireFlagsToResponseSpec({ commentBox: Boolean(question.commentBox), yesNo: Boolean(question.yesNo) });
+}
+
+function parsePersistedQuestions(round: PersistedRound, isPhoneScreenStage: boolean): Question[] {
+  if (!Array.isArray(round.questions)) return [];
+  return round.questions.map((question) => {
+    const base: Question = {
+      id: question.id || localId(),
+      ...(question.sourceId ? { sourceId: question.sourceId } : {}),
+      text: String(question.text ?? ''),
+      areas: Array.isArray(question.areas) ? [...question.areas] : [],
+      commentBox: Boolean(question.commentBox),
+      yesNo: Boolean(question.yesNo)
+    };
+    return isPhoneScreenStage ? { ...base, responseSpec: reconstructResponseSpec(base) } : base;
+  });
+}
+
+function serializeQuestions(questions: Question[]) {
+  return questions.map((question) => ({
+    ...(question.sourceId ? { sourceId: question.sourceId } : {}),
+    text: question.text,
+    areas: question.areas,
+    commentBox: Boolean(question.commentBox),
+    yesNo: Boolean(question.yesNo)
+  }));
+}
+
+function serializePlan(titlesByKey: Record<string, string>, questionsByKey: Record<string, Question[]>, additionalKeys: string[]) {
   return JSON.stringify({
-    rounds: INTERVIEW_STAGES.map((stage) => ({
-      stage: stage.id,
-      title: titlesByStage[stage.id],
-      questions: (questionsByStage[stage.id] || []).map((question) => ({
-        ...(question.sourceId ? { sourceId: question.sourceId } : {}),
-        text: question.text,
-        areas: question.areas,
-        commentBox: Boolean(question.commentBox),
-        yesNo: Boolean(question.yesNo)
+    rounds: [
+      ...INTERVIEW_STAGES.map((stage) => ({
+        stage: stage.id,
+        title: titlesByKey[stage.id],
+        questions: serializeQuestions(questionsByKey[stage.id] || [])
+      })),
+      // Legacy/additional rounds are re-emitted verbatim, in their
+      // original order, every time - phase1_replace_interview_plan
+      // deletes and reinserts every round for the plan on each save, so
+      // any round left out of this payload would be permanently lost.
+      ...additionalKeys.map((key) => ({
+        stage: key,
+        title: titlesByKey[key],
+        questions: serializeQuestions(questionsByKey[key] || [])
       }))
-    }))
+    ]
   });
 }
 
@@ -137,9 +226,13 @@ function ratingKey(questionId: string, area: string) {
   return `${questionId}::${area}`;
 }
 
-function responseTypeOf(question: Question): PhoneScreenResponseType {
-  return question.yesNo ? 'yes-no' : 'short-answer';
-}
+const RESPONSE_KIND_OPTIONS: { value: PhoneScreenResponseKind; label: string }[] = [
+  { value: 'yes-no', label: 'Yes / No' },
+  { value: 'yes-no-needs-discussion', label: 'Yes / No / Needs discussion' },
+  { value: 'single-choice', label: 'Single choice' },
+  { value: 'numeric', label: 'Numeric' },
+  { value: 'short-answer', label: 'Short answer' }
+];
 
 export function InterviewPlan({
   requisitionId,
@@ -151,30 +244,31 @@ export function InterviewPlan({
   candidateNames: string[];
 }) {
   const bank = useMemo(() => buildQuestionBank(positionTitle), [positionTitle]);
-  const [selectedStage, setSelectedStage] = useState<InterviewStageId | null>(null);
-  const [titlesByStage, setTitlesByStage] = useState<Record<InterviewStageId, string>>(() => defaultTitles());
-  const [questionsByStage, setQuestionsByStage] = useState<Record<InterviewStageId, Question[]>>(() => defaultQuestionsByStage(bank));
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [titlesByKey, setTitlesByKey] = useState<Record<string, string>>(() => defaultTitles());
+  const [questionsByKey, setQuestionsByKey] = useState<Record<string, Question[]>>(() => defaultQuestionsByStage(bank));
+  const [additionalKeys, setAdditionalKeys] = useState<string[]>([]);
   const [availableAreas, setAvailableAreas] = useState<string[]>([...AREAS_OF_EVALUATION]);
   const [openAreaId, setOpenAreaId] = useState<string | null>(null);
   const [draggedQuestionId, setDraggedQuestionId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const [dropStageId, setDropStageId] = useState<InterviewStageId | null>(null);
+  const [dropStageId, setDropStageId] = useState<string | null>(null);
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [hydrated, setHydrated] = useState(false);
   const latestPayloadRef = useRef('');
   const savedPayloadRef = useRef('');
   const savingRef = useRef(false);
 
-  const questions = selectedStage ? questionsByStage[selectedStage] || [] : [];
-  const serializedPlan = useMemo(() => serializePlan(titlesByStage, questionsByStage), [titlesByStage, questionsByStage]);
+  const questions = selectedKey ? questionsByKey[selectedKey] || [] : [];
+  const serializedPlan = useMemo(() => serializePlan(titlesByKey, questionsByKey, additionalKeys), [titlesByKey, questionsByKey, additionalKeys]);
   const usedSourceIds = useMemo(
     () => new Set(
-      Object.values(questionsByStage)
+      Object.values(questionsByKey)
         .flatMap((stageQuestions) => stageQuestions)
         .map((question) => question.sourceId)
         .filter(Boolean) as string[]
     ),
-    [questionsByStage]
+    [questionsByKey]
   );
 
   useEffect(() => {
@@ -216,32 +310,42 @@ export function InterviewPlan({
 
         if (result?.plan) {
           const persistedRounds = (result.plan.rounds ?? []) as PersistedRound[];
-          const loadedTitles: Record<InterviewStageId, string> = { ...defaultsTitles };
-          const loadedQuestions: Record<InterviewStageId, Question[]> = { ...defaultsQuestions };
+          const loadedTitles: Record<string, string> = { ...defaultsTitles };
+          const loadedQuestions: Record<string, Question[]> = { ...defaultsQuestions };
+          const loadedAdditionalKeys: string[] = [];
+
           for (const stage of INTERVIEW_STAGES) {
             const persisted = persistedRounds.find((round) => round.stage === stage.id);
             if (!persisted) continue;
             loadedTitles[stage.id] = String(persisted.title || defaultTitleFor(stage.id));
-            loadedQuestions[stage.id] = Array.isArray(persisted.questions)
-              ? persisted.questions.map((question) => ({
-                  id: question.id || localId(),
-                  ...(question.sourceId ? { sourceId: question.sourceId } : {}),
-                  text: String(question.text ?? ''),
-                  areas: Array.isArray(question.areas) ? [...question.areas] : [],
-                  commentBox: Boolean(question.commentBox),
-                  yesNo: Boolean(question.yesNo)
-                }))
-              : [];
+            loadedQuestions[stage.id] = parsePersistedQuestions(persisted, stage.id === 'phone-screen');
           }
-          setTitlesByStage(loadedTitles);
-          setQuestionsByStage(loadedQuestions);
-          const baseline = serializePlan(loadedTitles, loadedQuestions);
+
+          // Any round whose stage key isn't one of the four canonical
+          // ids predates this feature (the old freeform "+ Add
+          // Interview" builder) or otherwise can't be safely mapped onto
+          // a canonical stage. It is kept exactly as persisted, in its
+          // original order - never guessed at from its title, never
+          // dropped - so its configuration, invitations, and records
+          // stay reachable and the next autosave doesn't delete it.
+          for (const round of persistedRounds) {
+            if (isCanonicalStage(round.stage)) continue;
+            loadedTitles[round.stage] = String(round.title || round.stage);
+            loadedQuestions[round.stage] = parsePersistedQuestions(round, false);
+            loadedAdditionalKeys.push(round.stage);
+          }
+
+          setTitlesByKey(loadedTitles);
+          setQuestionsByKey(loadedQuestions);
+          setAdditionalKeys(loadedAdditionalKeys);
+          const baseline = serializePlan(loadedTitles, loadedQuestions, loadedAdditionalKeys);
           latestPayloadRef.current = baseline;
           savedPayloadRef.current = baseline;
         } else {
-          setTitlesByStage(defaultsTitles);
-          setQuestionsByStage(defaultsQuestions);
-          const baseline = serializePlan(defaultsTitles, defaultsQuestions);
+          setTitlesByKey(defaultsTitles);
+          setQuestionsByKey(defaultsQuestions);
+          setAdditionalKeys([]);
+          const baseline = serializePlan(defaultsTitles, defaultsQuestions, []);
           latestPayloadRef.current = baseline;
           savedPayloadRef.current = baseline;
         }
@@ -249,9 +353,10 @@ export function InterviewPlan({
       } catch (error) {
         console.error(error);
         if (cancelled) return;
-        setTitlesByStage(defaultsTitles);
-        setQuestionsByStage(defaultsQuestions);
-        const baseline = serializePlan(defaultsTitles, defaultsQuestions);
+        setTitlesByKey(defaultsTitles);
+        setQuestionsByKey(defaultsQuestions);
+        setAdditionalKeys([]);
+        const baseline = serializePlan(defaultsTitles, defaultsQuestions, []);
         latestPayloadRef.current = baseline;
         savedPayloadRef.current = baseline;
         setHydrated(true);
@@ -315,14 +420,14 @@ export function InterviewPlan({
   }, [openAreaId]);
 
   useEffect(() => {
-    if (!selectedStage) {
+    if (!selectedKey) {
       window.dispatchEvent(new CustomEvent(INTERVIEW_WORKSPACE_CLEAR_EVENT));
       return;
     }
-    const detail = { stage: selectedStage, positionTitle };
+    const detail = { stage: selectedKey, positionTitle };
     window.dispatchEvent(new CustomEvent(INTERVIEW_WORKSPACE_FOCUS_EVENT, { detail }));
     window.dispatchEvent(new CustomEvent(INTERVIEW_BUILDER_CONTEXT_EVENT, { detail }));
-  }, [selectedStage, positionTitle]);
+  }, [selectedKey, positionTitle]);
 
   useEffect(() => () => {
     window.dispatchEvent(new CustomEvent(INTERVIEW_WORKSPACE_CLEAR_EVENT));
@@ -338,26 +443,26 @@ export function InterviewPlan({
   useEffect(() => {
     function addFromBankPanel(event: Event) {
       const detail = (event as CustomEvent<InterviewBankAddDetail>).detail;
-      if (!selectedStage || !detail?.question) return;
+      if (!selectedKey || !detail?.question) return;
       addBankQuestion(detail.question);
     }
     window.addEventListener(INTERVIEW_BANK_ADD_EVENT, addFromBankPanel);
     return () => window.removeEventListener(INTERVIEW_BANK_ADD_EVENT, addFromBankPanel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStage]);
+  }, [selectedKey]);
 
-  function patchQuestions(stageId: InterviewStageId, updater: (current: Question[]) => Question[]) {
-    setQuestionsByStage((current) => ({ ...current, [stageId]: updater(current[stageId] || []) }));
+  function patchQuestions(stageKey: string, updater: (current: Question[]) => Question[]) {
+    setQuestionsByKey((current) => ({ ...current, [stageKey]: updater(current[stageKey] || []) }));
   }
 
   function renameInterview(title: string) {
-    if (!selectedStage) return;
-    setTitlesByStage((current) => ({ ...current, [selectedStage]: title }));
+    if (!selectedKey) return;
+    setTitlesByKey((current) => ({ ...current, [selectedKey]: title }));
   }
 
-  function addBankQuestionToStage(stageId: InterviewStageId, source: BankQuestion, targetId?: string) {
+  function addBankQuestionToStage(stageKey: string, source: BankQuestion, targetId?: string) {
     if (usedSourceIds.has(source.id)) return;
-    patchQuestions(stageId, (current) => {
+    patchQuestions(stageKey, (current) => {
       if (current.some((question) => question.sourceId === source.id)) return current;
       const next = cloneBankQuestion(source);
       if (!targetId) return [next, ...current];
@@ -370,43 +475,43 @@ export function InterviewPlan({
   }
 
   function addBankQuestion(source: BankQuestion, targetId?: string) {
-    if (!selectedStage) return;
-    addBankQuestionToStage(selectedStage, source, targetId);
+    if (!selectedKey) return;
+    addBankQuestionToStage(selectedKey, source, targetId);
   }
 
   function addManualQuestion() {
-    if (!selectedStage) return;
-    patchQuestions(selectedStage, (current) => [
+    if (!selectedKey) return;
+    patchQuestions(selectedKey, (current) => [
       { id: localId(), text: 'Add a new interview question…', areas: [], commentBox: true },
       ...current
     ]);
   }
 
   function addCustomPhoneScreenQuestion() {
-    if (!selectedStage) return;
+    if (!selectedKey) return;
     const id = localId();
-    patchQuestions(selectedStage, (current) => [
-      { id, text: '', areas: [], commentBox: true, yesNo: false },
+    patchQuestions(selectedKey, (current) => [
+      { id, text: '', areas: [], commentBox: true, yesNo: false, responseSpec: { kind: 'short-answer' } },
       ...current
     ]);
   }
 
   function updateQuestion(questionId: string, patch: Partial<Question>) {
-    if (!selectedStage) return;
-    patchQuestions(selectedStage, (current) => current.map((question) =>
+    if (!selectedKey) return;
+    patchQuestions(selectedKey, (current) => current.map((question) =>
       question.id === questionId ? { ...question, ...patch } : question
     ));
   }
 
   function removeQuestion(questionId: string) {
-    if (!selectedStage) return;
-    patchQuestions(selectedStage, (current) => current.filter((question) => question.id !== questionId));
+    if (!selectedKey) return;
+    patchQuestions(selectedKey, (current) => current.filter((question) => question.id !== questionId));
     if (openAreaId === questionId) setOpenAreaId(null);
   }
 
   function toggleArea(questionId: string, area: string) {
-    if (!selectedStage) return;
-    patchQuestions(selectedStage, (current) => current.map((question) => {
+    if (!selectedKey) return;
+    patchQuestions(selectedKey, (current) => current.map((question) => {
       if (question.id !== questionId) return question;
       if (question.areas.includes(area)) return { ...question, areas: question.areas.filter((item) => item !== area) };
       if (question.areas.length >= 4) return question;
@@ -415,29 +520,34 @@ export function InterviewPlan({
   }
 
   function toggleCommentBox(questionId: string) {
-    if (!selectedStage) return;
-    patchQuestions(selectedStage, (current) => current.map((question) =>
+    if (!selectedKey) return;
+    patchQuestions(selectedKey, (current) => current.map((question) =>
       question.id === questionId ? { ...question, commentBox: !question.commentBox } : question
     ));
   }
 
   function toggleYesNo(questionId: string) {
-    if (!selectedStage) return;
-    patchQuestions(selectedStage, (current) => current.map((question) =>
+    if (!selectedKey) return;
+    patchQuestions(selectedKey, (current) => current.map((question) =>
       question.id === questionId ? { ...question, yesNo: !question.yesNo } : question
     ));
   }
 
-  function setResponseType(questionId: string, type: PhoneScreenResponseType) {
-    if (!selectedStage) return;
-    patchQuestions(selectedStage, (current) => current.map((question) =>
-      question.id === questionId ? { ...question, yesNo: type === 'yes-no', commentBox: type === 'short-answer' } : question
+  // The single entry point for changing a Phone Screen question's
+  // response kind. It always sets both the rich view-model responseSpec
+  // and its honest wire-flag derivation together, so the two can never
+  // drift apart.
+  function setResponseSpec(questionId: string, spec: PhoneScreenResponseSpec) {
+    if (!selectedKey) return;
+    const flags = responseSpecToWireFlags(spec);
+    patchQuestions(selectedKey, (current) => current.map((question) =>
+      question.id === questionId ? { ...question, responseSpec: spec, commentBox: flags.commentBox, yesNo: flags.yesNo } : question
     ));
   }
 
   function reorderQuestion(sourceId: string, targetId: string) {
-    if (!selectedStage || sourceId === targetId) return;
-    patchQuestions(selectedStage, (current) => {
+    if (!selectedKey || sourceId === targetId) return;
+    patchQuestions(selectedKey, (current) => {
       const source = current.find((question) => question.id === sourceId);
       const targetIndex = current.findIndex((question) => question.id === targetId);
       if (!source || targetIndex < 0) return current;
@@ -477,18 +587,18 @@ export function InterviewPlan({
     );
   }
 
-  function renderStageCard(stage: typeof INTERVIEW_STAGES[number], selected = false) {
-    const stageQuestions = questionsByStage[stage.id] || [];
+  function renderStageCard(info: StageCardInfo, selected = false) {
+    const stageQuestions = questionsByKey[info.key] || [];
     return (
       <button
         type="button"
         className={`${styles.roundBar} ${selected ? styles.selectedBar : ''}`}
-        onClick={() => setSelectedStage(selected ? null : stage.id)}
+        onClick={() => setSelectedKey(selected ? null : info.key)}
         aria-expanded={selected}
       >
         <span className={styles.roundTitle}>
-          {stage.label}
-          <span className={styles.stageTagline}>{stage.tagline}</span>
+          {info.label}
+          <span className={`${styles.stageTagline} ${info.legacy ? styles.legacyTagline : ''}`}>{info.tagline}</span>
         </span>
         <span className={styles.roundMeta}>
           <span>{candidateNames.length} Candidates</span><span>•</span><span>{stageQuestions.length} Question{stageQuestions.length === 1 ? '' : 's'}</span>
@@ -497,7 +607,7 @@ export function InterviewPlan({
     );
   }
 
-  if (!selectedStage) {
+  if (!selectedKey) {
     return (
       <section className={styles.plan} data-requisition-id={requisitionId}>
         {renderHeading()}
@@ -523,31 +633,65 @@ export function InterviewPlan({
                 setDropStageId(null);
               }}
             >
-              {renderStageCard(stage)}
+              {renderStageCard(stageCardInfoFor(stage))}
             </div>
           ))}
         </div>
+
+        {additionalKeys.length > 0 && (
+          <div className={styles.additionalRounds} data-additional-interviews="true">
+            <p className={styles.additionalRoundsLabel}>Additional interviews — outside the four fixed stages. Their configuration, invitations, and records are preserved; assign a stage when ready.</p>
+            <div className={styles.roundList}>
+              {additionalKeys.map((key) => (
+                <div
+                  key={key}
+                  className={`${styles.roundShell} ${dropStageId === key ? styles.roundDropTarget : ''}`}
+                  onDragOver={(event) => {
+                    if (event.dataTransfer.types.includes(INTERVIEW_BANK_DRAG_MIME)) {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = 'copy';
+                      setDropStageId(key);
+                    }
+                  }}
+                  onDragLeave={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropStageId(null);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const bankQuestion = parseBankQuestion(event);
+                    if (bankQuestion) addBankQuestionToStage(key, bankQuestion);
+                    setDropStageId(null);
+                  }}
+                >
+                  {renderStageCard(legacyCardInfoFor(key, titlesByKey[key]))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
     );
   }
 
-  const stage = stageConfig(selectedStage);
-  const title = titlesByStage[selectedStage] ?? defaultTitleFor(selectedStage);
-  const isPhoneScreen = selectedStage === 'phone-screen';
-  const formDesignerHref = `/form-branding-preview?requisitionId=${encodeURIComponent(requisitionId)}&stage=${encodeURIComponent(selectedStage)}`;
+  const selectedCardInfo = isCanonicalStage(selectedKey)
+    ? stageCardInfoFor(stageConfig(selectedKey))
+    : legacyCardInfoFor(selectedKey, titlesByKey[selectedKey]);
+  const title = titlesByKey[selectedKey] ?? (isCanonicalStage(selectedKey) ? defaultTitleFor(selectedKey) : selectedKey);
+  const isPhoneScreen = selectedKey === 'phone-screen';
+  const formDesignerHref = `/form-branding-preview?requisitionId=${encodeURIComponent(requisitionId)}&stage=${encodeURIComponent(selectedKey)}`;
 
   return (
     <section className={styles.plan} data-requisition-id={requisitionId} data-interview-plan="selected">
       {renderHeading()}
       <div className={styles.selectedRound}>
-        {renderStageCard(stage, true)}
+        {renderStageCard(selectedCardInfo, true)}
 
         <div className={styles.roundContent}>
           <div className={styles.roundSetup}>
             <label htmlFor="interview-name">Interview name</label>
             <input id="interview-name" value={title} maxLength={200} onChange={(event) => renameInterview(event.target.value)} />
             <a className={styles.formDesignerLink} href={formDesignerHref}>Form Designer</a>
-            <button type="button" className={styles.backToStages} onClick={() => setSelectedStage(null)}>Back to stages</button>
+            <button type="button" className={styles.backToStages} onClick={() => setSelectedKey(null)}>Back to stages</button>
           </div>
 
           {isPhoneScreen ? (
@@ -558,58 +702,78 @@ export function InterviewPlan({
               </div>
 
               <div className={styles.compactGrid} onDragOver={(event) => event.preventDefault()} onDrop={dropAtEnd}>
-                {questions.map((question, index) => (
-                  <div
-                    key={question.id}
-                    className={`${styles.compactCard} ${dropTargetId === question.id ? styles.dropTarget : ''}`}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      if (draggedQuestionId !== question.id || event.dataTransfer.types.includes(INTERVIEW_BANK_DRAG_MIME)) setDropTargetId(question.id);
-                    }}
-                    onDrop={(event) => dropOnQuestion(event, question.id)}
-                  >
-                    <div className={styles.compactCardHead}>
-                      <span
-                        className={styles.dragHandle}
-                        draggable
-                        title="Drag to reorder"
-                        onDragStart={(event) => {
-                          event.dataTransfer.effectAllowed = 'move';
-                          event.dataTransfer.setData('text/plain', question.id);
-                          setDraggedQuestionId(question.id);
-                        }}
-                        onDragEnd={() => { setDraggedQuestionId(null); setDropTargetId(null); }}
-                      >⠿</span>
-                      <span className={styles.questionNumber}>Q{index + 1}</span>
-                      <button type="button" className={styles.removeQuestion} onClick={() => removeQuestion(question.id)} aria-label={`Remove question ${index + 1}`}>×</button>
+                {questions.map((question, index) => {
+                  const spec = question.responseSpec ?? { kind: 'short-answer' as const };
+                  return (
+                    <div
+                      key={question.id}
+                      className={`${styles.compactCard} ${dropTargetId === question.id ? styles.dropTarget : ''}`}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (draggedQuestionId !== question.id || event.dataTransfer.types.includes(INTERVIEW_BANK_DRAG_MIME)) setDropTargetId(question.id);
+                      }}
+                      onDrop={(event) => dropOnQuestion(event, question.id)}
+                    >
+                      <div className={styles.compactCardHead}>
+                        <span
+                          className={styles.dragHandle}
+                          draggable
+                          title="Drag to reorder"
+                          onDragStart={(event) => {
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', question.id);
+                            setDraggedQuestionId(question.id);
+                          }}
+                          onDragEnd={() => { setDraggedQuestionId(null); setDropTargetId(null); }}
+                        >⠿</span>
+                        <span className={styles.questionNumber}>Q{index + 1}</span>
+                        <button type="button" className={styles.removeQuestion} onClick={() => removeQuestion(question.id)} aria-label={`Remove question ${index + 1}`}>×</button>
+                      </div>
+                      <textarea
+                        rows={2}
+                        className={styles.compactQuestionText}
+                        value={question.text}
+                        placeholder="Type your screening question…"
+                        aria-label={`Question ${index + 1}`}
+                        onChange={(event) => updateQuestion(question.id, { text: event.target.value })}
+                      />
+                      <div className={styles.responseKindRow}>
+                        <label className={styles.responseKindLabel} htmlFor={`response-kind-${question.id}`}>Response type</label>
+                        <select
+                          id={`response-kind-${question.id}`}
+                          className={styles.responseKindSelect}
+                          value={spec.kind}
+                          onChange={(event) => setResponseSpec(question.id, responseSpecForKind(event.target.value as PhoneScreenResponseKind, question.responseSpec))}
+                        >
+                          {RESPONSE_KIND_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {spec.kind === 'single-choice' && (
+                        <input
+                          type="text"
+                          className={styles.responseKindDetail}
+                          placeholder="Options, comma separated"
+                          value={spec.options.join(', ')}
+                          aria-label={`Response options for question ${index + 1}`}
+                          onChange={(event) => setResponseSpec(question.id, { kind: 'single-choice', options: event.target.value.split(',').map((option) => option.trim()).filter(Boolean) })}
+                        />
+                      )}
+                      {spec.kind === 'numeric' && (
+                        <input
+                          type="text"
+                          className={styles.responseKindDetail}
+                          placeholder="Unit (optional, e.g. years)"
+                          value={spec.unit ?? ''}
+                          aria-label={`Response unit for question ${index + 1}`}
+                          onChange={(event) => setResponseSpec(question.id, { kind: 'numeric', unit: event.target.value || undefined })}
+                        />
+                      )}
                     </div>
-                    <textarea
-                      rows={2}
-                      className={styles.compactQuestionText}
-                      value={question.text}
-                      placeholder="Type your screening question…"
-                      aria-label={`Question ${index + 1}`}
-                      onChange={(event) => updateQuestion(question.id, { text: event.target.value })}
-                    />
-                    <div className={styles.responseTypeRow} role="radiogroup" aria-label={`Response type for question ${index + 1}`}>
-                      <button
-                        type="button"
-                        className={`${styles.responseTypeBtn} ${responseTypeOf(question) === 'yes-no' ? styles.responseTypeActive : ''}`}
-                        role="radio"
-                        aria-checked={responseTypeOf(question) === 'yes-no'}
-                        onClick={() => setResponseType(question.id, 'yes-no')}
-                      >Yes / No</button>
-                      <button
-                        type="button"
-                        className={`${styles.responseTypeBtn} ${responseTypeOf(question) === 'short-answer' ? styles.responseTypeActive : ''}`}
-                        role="radio"
-                        aria-checked={responseTypeOf(question) === 'short-answer'}
-                        onClick={() => setResponseType(question.id, 'short-answer')}
-                      >Short Answer</button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <div className={`${styles.dropEnd} ${styles.compactDropEnd}`}>Drop a Question Bank item here</div>
               </div>
             </>

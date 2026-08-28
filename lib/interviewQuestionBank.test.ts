@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { INTERVIEW_STAGES } from './interviewQuestionBank.ts';
+import { INTERVIEW_STAGES, buildQuestionBank } from './interviewQuestionBank.ts';
+import { PHONE_SCREEN_ALL_QUESTIONS } from './phoneScreenQuestions.ts';
 
 test('the four assessment stages are fixed, in order, with the specified names and taglines', () => {
   assert.deepEqual(
@@ -30,4 +31,28 @@ test('each stage carries its exact canonical one-sentence explainer, shown in th
       'Distinguish qualified finalists through judgment, leadership, strategic thinking, and potential organizational impact.'
     ]
   );
+});
+
+// Correction 2 - buildQuestionBank() must not maintain its own,
+// independent phone-screen question content. Its phone-screen entries
+// are required to be a thin, id-preserving adapter over the one
+// canonical source (lib/phoneScreenQuestions.ts), not a second array
+// with different text.
+test('buildQuestionBank\'s phone-screen entries are adapted 1:1 from the one canonical source, preserving its ids, text, and response metadata exactly', () => {
+  const bank = buildQuestionBank('Test Role');
+  const phoneScreenEntries = bank.filter((question) => question.stage === 'phone-screen');
+  assert.equal(phoneScreenEntries.length, PHONE_SCREEN_ALL_QUESTIONS.length);
+  assert.deepEqual(
+    phoneScreenEntries.map((question) => ({ id: question.id, text: question.text, response: question.response })),
+    PHONE_SCREEN_ALL_QUESTIONS.map((seed) => ({ id: seed.id, text: seed.text, response: seed.response }))
+  );
+});
+
+test('buildQuestionBank\'s round-1/round-2/final entries are unaffected by the phone-screen consolidation - still 6 each, with stable ids', () => {
+  const bank = buildQuestionBank('Test Role');
+  for (const stageId of ['round-1', 'round-2', 'final'] as const) {
+    const entries = bank.filter((question) => question.stage === stageId);
+    assert.equal(entries.length, 6, `${stageId} must still contribute exactly 6 bank questions`);
+    assert.deepEqual(entries.map((question) => question.id), [1, 2, 3, 4, 5, 6].map((n) => `${stageId}-${n}`));
+  }
 });

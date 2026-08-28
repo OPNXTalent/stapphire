@@ -16,9 +16,17 @@ test('Phone Screen gets its own early-return branch, not a duplicated right-pane
 });
 
 test('the Phone Screen bank list is sourced from the fixed PHONE_SCREEN_BANK_QUESTIONS list, filtered by the same usedIds tracking the Structured Interview bank already uses', () => {
-  assert.match(source, /import \{ PHONE_SCREEN_BANK_QUESTIONS \} from '@\/lib\/phoneScreenQuestions';/);
+  assert.match(source, /import \{ PHONE_SCREEN_BANK_QUESTIONS, type PhoneScreenResponseKind, type PhoneScreenResponseSpec \} from '@\/lib\/phoneScreenQuestions';/);
   const memoMatch = source.match(/const availablePhoneScreenQuestions = useMemo<AvailableQuestion\[\]>\(\s*\n\s*\(\) => PHONE_SCREEN_BANK_QUESTIONS\s*\n\s*\.filter\(\(question\) => !usedIds\.has\(question\.id\)\)/);
   assert.ok(memoMatch, 'expected availablePhoneScreenQuestions to filter the fixed bank list by the shared usedIds set, matching availableQuestions\' own filtering pattern');
+});
+
+test('each Phone Screen bank question carries its canonical response metadata through the drag payload, not just its text/areas', () => {
+  assert.match(source, /\.map\(\(question\) => \(\{ id: question\.id, text: question\.text, areas: \[\], response: question\.response \}\)\)/, 'availablePhoneScreenQuestions must preserve response so cloneBankQuestion on the receiving side can see the intended response kind');
+});
+
+test('a Phone Screen bank item shows a short response-kind badge, reusing the existing .chips styling', () => {
+  assert.match(source, /RESPONSE_KIND_LABELS\[question\.response\.kind\]/);
 });
 
 test('Phone Screen bank questions drag onto the form through the exact same transport as Structured Interview bank questions (startDrag / INTERVIEW_BANK_DRAG_MIME), not a new mechanism', () => {
