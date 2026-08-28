@@ -7,6 +7,7 @@ import type { ResumeOperationSummary } from '@/lib/operationTypes';
 import { isActiveOperation } from '@/lib/operationTypes';
 import { getResumeSourceType, MAX_RESUME_BATCH_SIZE, MAX_RESUME_SIZE } from '@/lib/resumeFiles';
 import { resolveTrackedOperationAuthority } from '@/lib/resumeUploadAuthority';
+import { advancePollTarget, type PollTargetState } from '@/lib/resumeOperationPolling';
 import { dispatchResumeOperationTerminal, resolveTerminalObservation } from '@/lib/resumeTerminalSync';
 
 const POLL_INTERVAL_MS = 3000;
@@ -77,26 +78,33 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     localPhase: currentLocalBatch?.phase || null,
     trackedOperationId: trackedOperation?.id || null
   };
+  // The operation id of a local batch whose every item has already
+  // finished its own upload attempt (accepted or rejected) - read by the
+  // polling loop as proof-of-deletion for a target it may never have
+  // observed present even once (see lib/resumeOperationPolling.ts).
+  const settledBatchOperationIdRef = useRef<string | null>(null);
+  settledBatchOperationIdRef.current = currentLocalBatch?.phase === 'accepted' ? currentLocalBatch.operationId : null;
 
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let inFlight = false;
-    let attemptedReconstruction = false;
-    // Set only once a target operation has actually been observed to
-    // exist in a poll response. Used below to tell "not created/visible
-    // yet" (never confirmed - keep waiting normally) apart from "existed,
-    // now gone" (confirmed, then absent - it was deleted server-side, e.g.
-    // every item in it was rejected as a duplicate and the durable
-    // operation was cleaned up along with them). Only the latter is safe
-    // to treat as resolved without ever having received a terminal status.
-    let confirmedTargetId: string | null = null;
+    // Target-resolution state for lib/resumeOperationPolling.ts's pure
+    // decision function - see that module for why both confirmedTargetId
+    // and (via settledBatchOperationIdRef) local-batch settlement are
+    // needed to tell creation lag apart from genuine deletion.
+    let pollState: PollTargetState = { targetId: null, confirmedTargetId: null, attemptedReconstruction: false };
 
     async function tick() {
       if (cancelled) return;
       if (timer) { clearTimeout(timer); timer = null; }
-      const targetId = targetOperationIdRef.current;
-      if (!targetId && attemptedReconstruction) return; // nothing to track, already tried reconstruction once
+      // targetOperationIdRef is written from outside this loop too (a new
+      // batch starting, a manual retry) - it is always the source of
+      // truth for what should be tracked right now, so it is re-synced
+      // into pollState on every tick rather than trusted from a prior one.
+      pollState = { ...pollState, targetId: targetOperationIdRef.current };
+      const targetId = pollState.targetId;
+      if (!targetId && pollState.attemptedReconstruction) return; // nothing to track, already tried reconstruction once
       if (inFlight) {
         // Already fetching - skip this trigger, the next interval
         // tick will simply try again with whatever is current then.
@@ -117,7 +125,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
             'x-stapphire-target-operation-id': targetOperationIdRef.current || '',
             'x-stapphire-target-context-operation-id': targetContextRef.current?.localOperationId || '',
             'x-stapphire-tracked-operation-id': diagnostic.trackedOperationId || '',
-            'x-stapphire-attempted-reconstruction': String(attemptedReconstruction)
+            'x-stapphire-attempted-reconstruction': String(pollState.attemptedReconstruction)
           }
         });
         if (!response.ok) throw new Error('Unable to read resume operations.');
@@ -131,31 +139,13 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
           return list.filter((operation) => visibleIds.has(operation.id) && !dismissedOperationIdsRef.current.has(operation.id));
         });
 
-        let found: ResumeOperationSummary | null = null;
-        if (targetId) {
-          found = list.find((operation) => operation.id === targetId) || null;
-          if (found) {
-            confirmedTargetId = targetId;
-          } else if (confirmedTargetId === targetId) {
-            // Confirmed to exist in an earlier tick, now missing - genuine
-            // deletion, not creation lag. Nothing further will ever appear
-            // for it; stop targeting it so the UI can settle instead of
-            // showing "Checking..." forever. Any rejection reason is
-            // already captured in the local per-item upload state.
-            targetOperationIdRef.current = null;
-          }
-        } else if (!attemptedReconstruction) {
-          // No current local batch (e.g. navigated here fresh) -
-          // recover the latest durable operation directly from
-          // persisted state, once, rather than polling indefinitely
-          // for something that may never appear.
-          attemptedReconstruction = true;
-          const newest = list[0] || null;
-          if (newest && !dismissedOperationIdsRef.current.has(newest.id)) {
-            targetOperationIdRef.current = newest.id;
-            found = newest;
-          }
-        }
+        const advanced = advancePollTarget(pollState, list, {
+          localBatchFullySettledId: settledBatchOperationIdRef.current,
+          isDismissed: (id) => dismissedOperationIdsRef.current.has(id)
+        });
+        pollState = advanced.state;
+        targetOperationIdRef.current = pollState.targetId;
+        const found = advanced.found;
 
         setPollUnavailable(false);
         if (found) {

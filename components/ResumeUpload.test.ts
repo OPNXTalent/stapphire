@@ -45,8 +45,12 @@ test('a failed poll still keeps polling for a known target - the durable work is
 });
 
 test('on mount with no known local batch, one reconstruction attempt recovers the latest persisted operation - not indefinite polling for something that may never appear', () => {
-  assert.match(source, /attemptedReconstruction/);
-  assert.match(source, /if \(!targetId && attemptedReconstruction\) return;/, 'expected polling to stop once reconstruction has been tried and found nothing, rather than continuing to poll indefinitely merely because the page remains open');
+  // The actual reconstruction decision now lives in the behaviorally-tested
+  // advancePollTarget (lib/resumeOperationPolling.test.ts); this only
+  // checks that tick() still short-circuits once pollState says
+  // reconstruction is spent, rather than fetching forever.
+  assert.match(source, /pollState\.attemptedReconstruction/);
+  assert.match(source, /if \(!targetId && pollState\.attemptedReconstruction\) return;/, 'expected polling to stop once reconstruction has been tried and found nothing, rather than continuing to poll indefinitely merely because the page remains open');
 });
 
 test('terminal notification is independent of the polling reschedule decision', () => {
@@ -151,19 +155,26 @@ test('durable operations are accumulated and rendered so prior processing, compl
   assert.match(source, /item\.status === 'completed'/);
 });
 
-test('a target operation confirmed to exist and then missing is treated as deleted, not creation lag - polling stops instead of "Checking..." forever', () => {
+// The target-resolution decision itself (found / awaiting-creation /
+// confirmed-deleted, including the duplicate-deleted-before-first-poll
+// race and the reconstruction-after-deletion hazard) is extracted into
+// lib/resumeOperationPolling.ts and has full behavioral coverage there
+// (lib/resumeOperationPolling.test.ts) - a real function called with real
+// inputs, not a source-text shape check. What remains to verify here is
+// only that tick() is actually wired to that function, not a parallel
+// reimplementation that could drift from it.
+test('the polling loop delegates its target-resolution decision to the extracted, independently-tested pure function, not an inline reimplementation', () => {
+  assert.match(source, /import \{ advancePollTarget, type PollTargetState \} from '@\/lib\/resumeOperationPolling';/, 'expected the target-resolution decision to be imported from lib/resumeOperationPolling.ts, which has its own direct behavioral tests, rather than duplicated inline where it could drift');
   const tickMatch = source.match(/async function tick\(\) \{([\s\S]*?)\n    \}\n/);
   assert.ok(tickMatch, 'expected to find tick()');
-  assert.match(tickMatch[1], /confirmedTargetId = targetId/, 'expected a target to be marked confirmed once actually observed in a poll response');
-  const notFoundBranch = tickMatch[1].match(/else if \(confirmedTargetId === targetId\) \{([\s\S]*?)\n {10}\}/);
-  assert.ok(notFoundBranch, 'expected a branch distinguishing "confirmed, now missing" from "never confirmed yet"');
-  assert.match(notFoundBranch[1], /targetOperationIdRef\.current = null/, 'a confirmed-then-vanished operation must stop being targeted so the checking state can clear');
+  assert.doesNotMatch(tickMatch[1], /confirmedTargetId === targetId|list\.find\(\(operation\) => operation\.id === targetId\)/, 'the found/confirmed/deleted decision must not be reimplemented inline inside tick()');
+  assert.match(tickMatch[1], /const advanced = advancePollTarget\(pollState, list, \{/, 'expected tick() to call the extracted decision function with the current poll state');
+  assert.match(tickMatch[1], /localBatchFullySettledId: settledBatchOperationIdRef\.current/, 'expected the local-batch-settlement proof (the fix for the duplicate-deleted-before-first-poll race) to actually be threaded into the decision function, not just computed and ignored');
+  assert.match(tickMatch[1], /pollState = advanced\.state;\s*\n\s*targetOperationIdRef\.current = pollState\.targetId;/, 'expected the resolved state to actually be written back to both the loop\'s own memory and the cross-cutting ref other code reads/writes');
 });
 
-test('an operation never confirmed to exist is not declared gone - only creation lag is tolerated, never a false "gone"', () => {
-  const foundBlock = source.match(/if \(targetId\) \{\s*found = list\.find\(\(operation\) => operation\.id === targetId\) \|\| null;([\s\S]*?)\n {8}\} else if \(!attemptedReconstruction\)/);
-  assert.ok(foundBlock, 'expected the found/not-found branch for a known target');
-  assert.match(foundBlock[1], /confirmedTargetId === targetId/, 'must only ever declare "gone" relative to a target this loop previously confirmed existed');
+test('the local-batch-settlement proof read by the polling loop is derived from the same phase the local error-visibility logic uses, not a separate/divergent notion of "settled"', () => {
+  assert.match(source, /settledBatchOperationIdRef\.current = currentLocalBatch\?\.phase === 'accepted' \? currentLocalBatch\.operationId : null;/, 'expected settlement to be keyed off phase === \'accepted\', the same condition localBatchNeedsAttention already uses, so the two mechanisms cannot disagree about when a batch has finished attempting every item');
 });
 
 test('a batch that finishes with a locally-failed item (e.g. an exact-duplicate résumé) stays visible after the batch settles, not only while genuinely uploading', () => {
