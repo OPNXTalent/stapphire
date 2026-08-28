@@ -3,10 +3,28 @@
 import { useEffect } from 'react';
 import { CANDIDATE_FILES_CLEAR_EVENT, CANDIDATE_FILES_FOCUS_EVENT } from '@/lib/candidateFilesEvents';
 
-export function CandidateDetailActions({ candidateId, sourceFilename, resumeAvailable }: { candidateId: string; sourceFilename: string; resumeAvailable: boolean }) {
+export function CandidateDetailActions({
+  candidateId,
+  candidateName: explicitCandidateName,
+  sourceFilename,
+  resumeAvailable,
+  focusInterviewId
+}: {
+  candidateId: string;
+  // Optional: callers that already know the candidate's display name
+  // (e.g. a server-resolved page that has no ".matrix-selected-banner"
+  // DOM to read it from) can pass it directly instead of relying on the
+  // CandidateMatrix-specific DOM query below.
+  candidateName?: string;
+  sourceFilename: string;
+  resumeAvailable: boolean;
+  focusInterviewId?: string;
+}) {
   useEffect(() => {
-    const candidateName = document.querySelector('.matrix-selected-banner .matrix-row-name')?.textContent?.trim() || 'Candidate';
-    const detail = { id: candidateId, name: candidateName, sourceFilename, resumeAvailable };
+    const candidateName = explicitCandidateName
+      || document.querySelector('.matrix-selected-banner .matrix-row-name')?.textContent?.trim()
+      || 'Candidate';
+    const detail = { id: candidateId, name: candidateName, sourceFilename, resumeAvailable, focusInterviewId };
     let cancelled = false;
     // Deferred to a microtask so this dispatch always lands after every
     // effect from this same commit has run - including WorkspacePanel's
@@ -25,7 +43,7 @@ export function CandidateDetailActions({ candidateId, sourceFilename, resumeAvai
       cancelled = true;
       window.dispatchEvent(new CustomEvent(CANDIDATE_FILES_CLEAR_EVENT, { detail: { id: candidateId } }));
     };
-  }, [candidateId, sourceFilename, resumeAvailable]);
+  }, [candidateId, explicitCandidateName, sourceFilename, resumeAvailable, focusInterviewId]);
 
   return null;
 }

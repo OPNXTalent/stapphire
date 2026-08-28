@@ -34,6 +34,7 @@
 .fileAction{flex:none;color:var(--sapphire);font-size:10.5px;font-weight:700}
 .interviewRow{display:flex;align-items:center;gap:4px;border-radius:5px}
 .interviewRow:hover{background:var(--sapphire-pale)}
+.interviewRowActive{background:var(--sapphire-pale);box-shadow:inset 3px 0 0 var(--sapphire)}
 .interviewRow>span{flex:none}
 .interviewView{display:flex;min-width:0;flex:1;align-items:center;justify-content:space-between;gap:10px;padding:9px 8px;color:var(--ink);text-decoration:none}
 .interviewView:focus-visible{border-radius:5px;outline:2px solid var(--sapphire);outline-offset:-2px}

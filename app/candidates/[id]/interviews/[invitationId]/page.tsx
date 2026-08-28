@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { CandidateDetailActions } from '@/components/CandidateDetailActions';
 import { CompletedInterviewActions } from '@/components/CompletedInterviewActions';
 import { AutoPrint } from '@/components/AutoPrint';
 import styles from './readOnlyInterview.module.css';
@@ -56,7 +57,7 @@ export default async function CompletedInterviewPage({
   if (!invitation || invitation.status !== 'submitted') notFound();
 
   const [{ data: candidate }, { data: requisition }] = await Promise.all([
-    supabaseAdmin.from('phase1_candidates').select('full_name').eq('id', invitation.candidate_id).maybeSingle(),
+    supabaseAdmin.from('phase1_candidates').select('full_name, source_filename, source_storage_path').eq('id', invitation.candidate_id).maybeSingle(),
     supabaseAdmin.from('phase1_requisitions').select('title').eq('id', invitation.requisition_id).maybeSingle()
   ]);
 
@@ -74,6 +75,13 @@ export default async function CompletedInterviewPage({
   return (
     <main className={`${styles.page} print-document`}>
       {searchParams?.print === '1' && <AutoPrint />}
+      <CandidateDetailActions
+        candidateId={params.id}
+        candidateName={candidate.full_name}
+        sourceFilename={String(candidate.source_filename || '')}
+        resumeAvailable={Boolean(candidate.source_storage_path)}
+        focusInterviewId={params.invitationId}
+      />
       <div className={styles.topRow}>
         <a href={backToCandidateHref} className={styles.back}>← Back to candidate</a>
         <div className={styles.topActions}>

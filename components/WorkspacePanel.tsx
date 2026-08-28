@@ -31,6 +31,14 @@ export function WorkspacePanel({
   const pathname = usePathname();
   const requisitionId = pathname.match(/^\/requisitions\/([^/]+)/)?.[1] || null;
   const isInterviewBuilder = /^\/requisitions\/[^/]+\/interviews\/builder\/?$/.test(pathname);
+  // The internal completed-interview assessment view
+  // (app/candidates/[id]/interviews/[invitationId]/page.tsx) has no
+  // /requisitions/[id] segment of its own, but it already belongs to a
+  // known candidate and requisition - CandidateDetailActions dispatches
+  // the same CANDIDATE_FILES_FOCUS_EVENT there as it does from the
+  // matrix, so Candidate Files should open there too, the same way,
+  // without requiring a /requisitions/[id] context.
+  const isCompletedInterviewRoute = /^\/candidates\/[^/]+\/interviews\/[^/]+/.test(pathname);
   const { state, update } = useRequisitionViewState(requisitionId || '');
   const tab = state.panelTab;
   const [candidate, setCandidate] = useState<CandidateFilesSelection | null>(null);
@@ -78,7 +86,7 @@ export function WorkspacePanel({
     setInterviewContext(null);
   }, [pathname]);
 
-  const showCandidateFiles = Boolean(requisitionId && state.view === 'candidates' && candidate);
+  const showCandidateFiles = Boolean(candidate && (isCompletedInterviewRoute || (requisitionId && state.view === 'candidates')));
   const showQuestionBank = Boolean(
     isInterviewBuilder ||
     (requisitionId && state.view === 'requisition' && state.requisitionTab === 'interviews')

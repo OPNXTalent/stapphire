@@ -313,9 +313,10 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
           {interviews !== null && interviews.length === 0 && <p className={styles.empty}>No completed interview assessments yet.</p>}
           {interviews?.map((interview) => {
             const href = `/candidates/${candidate.id}/interviews/${interview.id}`;
+            const isCurrent = interview.id === candidate.focusInterviewId;
             return (
-              <div key={interview.id} className={styles.interviewRow}>
-                <a className={styles.interviewView} href={href}>
+              <div key={interview.id} className={`${styles.interviewRow} ${isCurrent ? styles.interviewRowActive : ''}`}>
+                <a className={styles.interviewView} href={href} aria-current={isCurrent ? 'true' : undefined}>
                   <span className={styles.interviewInfo}>
                     <span className={styles.fileName}>{interview.roundTitle || 'Interview'}</span>
                     <span className={styles.fileMeta}>
@@ -381,7 +382,7 @@ export function CandidateFilesPanel({ candidate }: { candidate: CandidateFilesSe
             }}
             onDrop={(event) => dropOn(event, section.key)}
           >
-            <details className={styles.folder}>
+            <details className={styles.folder} open={section.key === 'interviews' && Boolean(candidate.focusInterviewId)}>
               <summary>{section.name}</summary>
               <div className={styles.folderBody}>{sectionBody(section)}</div>
             </details>
