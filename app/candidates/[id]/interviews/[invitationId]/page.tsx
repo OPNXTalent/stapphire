@@ -71,17 +71,25 @@ export default async function CompletedInterviewPage({
   const yesNoResponses = submission.yesNoResponses ?? {};
   const href = `/candidates/${params.id}/interviews/${params.invitationId}`;
   const backToCandidateHref = `/requisitions/${invitation.requisition_id}?view=candidates&candidate=${params.id}`;
+  // ?print=1 opens a dedicated, disposable print-session tab (see
+  // AutoPrint) - it exists only to run the browser print dialog and
+  // then close itself. It must never hydrate the Candidate Files/
+  // Teamwork workspace rail, or it becomes a second, fully interactive
+  // Stapphire instance instead of a tab that closes when printing ends.
+  const isPrintSession = searchParams?.print === '1';
 
   return (
     <main className={`${styles.page} print-document`}>
-      {searchParams?.print === '1' && <AutoPrint />}
-      <CandidateDetailActions
-        candidateId={params.id}
-        candidateName={candidate.full_name}
-        sourceFilename={String(candidate.source_filename || '')}
-        resumeAvailable={Boolean(candidate.source_storage_path)}
-        focusInterviewId={params.invitationId}
-      />
+      {isPrintSession && <AutoPrint />}
+      {!isPrintSession && (
+        <CandidateDetailActions
+          candidateId={params.id}
+          candidateName={candidate.full_name}
+          sourceFilename={String(candidate.source_filename || '')}
+          resumeAvailable={Boolean(candidate.source_storage_path)}
+          focusInterviewId={params.invitationId}
+        />
+      )}
       <div className={styles.topRow}>
         <a href={backToCandidateHref} className={styles.back}>← Back to candidate</a>
         <div className={styles.topActions}>

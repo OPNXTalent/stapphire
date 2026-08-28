@@ -58,3 +58,19 @@ test('the application chrome, including the right rail, is already excluded from
     'expected .side-panel (WorkspacePanel) to remain excluded from print output alongside the rest of the app chrome'
   );
 });
+
+// Print-session correction: the disposable ?print=1 tab must never
+// hydrate Candidate Files/Teamwork - only a normal (non-print) view of
+// this same page should dispatch the workspace-focus event.
+
+test('the print session (?print=1) never renders CandidateDetailActions - only a normal view does', () => {
+  assert.match(page, /const isPrintSession = searchParams\?\.print === '1';/);
+  assert.match(page, /\{isPrintSession && <AutoPrint \/>\}/);
+  assert.match(page, /\{!isPrintSession && \(\s*\n\s*<CandidateDetailActions/, 'expected CandidateDetailActions to be gated on NOT being a print session');
+});
+
+test('AutoPrint and CandidateDetailActions are mutually exclusive on this page - never both true for the same request', () => {
+  const autoPrintGate = page.match(/\{isPrintSession && <AutoPrint \/>\}/);
+  const bridgeGate = page.match(/\{!isPrintSession && \(/);
+  assert.ok(autoPrintGate && bridgeGate, 'expected to find both gates');
+});
