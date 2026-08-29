@@ -70,6 +70,10 @@ const UNSAVED_STARTER_USED_IDS = new Set([
   'round-1-1','round-1-2','round-1-3','round-1-4','round-1-5'
 ]);
 
+function createRequestId(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+}
+
 async function readJson(response: Response, fallbackMessage: string): Promise<JsonRecord> {
   const raw = await response.text();
   if (!raw.trim()) {
@@ -124,6 +128,19 @@ export function InterviewQuestionBankPanel({
   const [savingAreas, setSavingAreas] = useState(false);
   const [loadingBank, setLoadingBank] = useState(true);
   const [generating, setGenerating] = useState(false);
+  // The generation request id for an in-flight or not-yet-confirmed
+  // attempt. Minted once when a "Generate" click starts; preserved
+  // (not replaced) across a retry of that SAME attempt after an
+  // uncertain failure (the fetch itself never returned a response, so
+  // whether the server-side charge/insert happened is unknown) so the
+  // database function can recognize the retry and safely replay it
+  // instead of charging QC or inserting a duplicate batch. Cleared on
+  // any definitive outcome - success or a clean error response both
+  // count, since the new atomic RPC guarantees a clean error means
+  // nothing was charged - so the next click is a genuinely new
+  // generation action and gets a new id.
+  const [structuredRequestId, setStructuredRequestId] = useState<string | null>(null);
+  const [phoneScreenRequestId, setPhoneScreenRequestId] = useState<string | null>(null);
   const [error, setError] = useState('');
   // Collapsed Question Type sections, by section label - starts empty
   // (every section expanded). This groups the Question Bank only; the
@@ -378,18 +395,23 @@ export function InterviewQuestionBankPanel({
     if (generating) return;
     setGenerating(true);
     setError('');
+    const requestId = structuredRequestId ?? createRequestId();
+    if (!structuredRequestId) setStructuredRequestId(requestId);
+    let gotResponse = false;
     try {
       const response = await fetch(`/api/requisitions/${requisitionId}/interview-question-bank`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selectedAreas, questionType: selectedQuestionType || null })
+        body: JSON.stringify({ selectedAreas, questionType: selectedQuestionType || null, requestId })
       });
+      gotResponse = true;
       const result = await readJson(response, 'Unable to generate interview questions.');
       if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Unable to generate interview questions.');
-      // `generated` carries the server-validated, real per-question
-      // Question Type for this batch - never a single client-guessed
-      // label, since a mixed (no specific type requested) batch can
-      // legitimately return five different types.
+      // `generated` carries the database's own record of what is
+      // actually persisted - the server-validated, real per-question
+      // Question Type for this batch, atomic with its QC charge - never
+      // a single client-guessed label, since a mixed (no specific type
+      // requested) batch can legitimately return five different types.
       const generatedBatch = Array.isArray(result.generated)
         ? result.generated as Array<{ id: string; text: string; areas: string[]; questionType: InterviewQuestionType }>
         : [];
@@ -415,8 +437,16 @@ export function InterviewQuestionBankPanel({
       setSelectedQuestionType('');
       setAreaPickerOpen(false);
       setManagingAreas(false);
+      setStructuredRequestId(null);
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : 'Unable to generate interview questions.');
+      // A definitive HTTP response - even an error one - means the
+      // atomic RPC either fully committed or fully rolled back, so
+      // nothing is left ambiguously charged: the next click is a
+      // genuinely new attempt and gets a new request id. Only a
+      // network-level failure (no response at all) leaves the outcome
+      // uncertain, so the id is preserved for that retry to reuse.
+      if (gotResponse) setStructuredRequestId(null);
     } finally {
       setGenerating(false);
     }
@@ -426,12 +456,16 @@ export function InterviewQuestionBankPanel({
     if (generatingPhoneScreen) return;
     setGeneratingPhoneScreen(true);
     setPhoneScreenError('');
+    const requestId = phoneScreenRequestId ?? createRequestId();
+    if (!phoneScreenRequestId) setPhoneScreenRequestId(requestId);
+    let gotResponse = false;
     try {
       const response = await fetch(`/api/requisitions/${requisitionId}/interview-question-bank`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stage: 'phone-screen', questionType: phoneScreenQuestionType || null })
+        body: JSON.stringify({ stage: 'phone-screen', questionType: phoneScreenQuestionType || null, requestId })
       });
+      gotResponse = true;
       const result = await readJson(response, 'Unable to generate Phone Screen questions.');
       if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Unable to generate Phone Screen questions.');
       const generatedBatch = Array.isArray(result.generated)
@@ -454,8 +488,10 @@ export function InterviewQuestionBankPanel({
         return next;
       });
       setPhoneScreenQuestionType('');
+      setPhoneScreenRequestId(null);
     } catch (generationError) {
       setPhoneScreenError(generationError instanceof Error ? generationError.message : 'Unable to generate Phone Screen questions.');
+      if (gotResponse) setPhoneScreenRequestId(null);
     } finally {
       setGeneratingPhoneScreen(false);
     }

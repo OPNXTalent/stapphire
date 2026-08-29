@@ -127,32 +127,17 @@ async function loadAoePreferences(orgId: string | null): Promise<AoePreferences>
   } : DEFAULT_AOE_PREFERENCES;
 }
 
-// Backfills question_type/stage/response metadata onto rows the opaque,
-// out-of-repo consume_qc_and_add_interview_questions RPC just inserted.
-// The RPC itself is never modified or sent these fields - this is a
-// plain, additive follow-up update keyed by the same question_key it
-// already writes, so a generated question's real category (and, for
-// Phone Screen, its response package) survives a reload instead of
-// falling back to Custom/General once it's no longer freshly in memory.
-async function backfillQuestionTypeMetadata(requisitionId: string, rows: Array<{
-  id: string;
-  questionType: string;
-  stage: 'phone-screen' | null;
-  responseKind?: string;
-  responseOptions?: string[];
-  responseUnit?: string;
-}>) {
-  await Promise.all(rows.map((row) => supabaseAdmin
-    .from('phase1_interview_question_bank')
-    .update({
-      question_type: row.questionType,
-      stage: row.stage,
-      response_kind: row.responseKind ?? null,
-      response_options: row.responseOptions ?? null,
-      response_unit: row.responseUnit ?? null
-    })
-    .eq('requisition_id', requisitionId)
-    .eq('question_key', row.id)));
+// The generation request identifier the client mints once per
+// generation attempt and preserves across a retry of that same
+// attempt (see InterviewQuestionBankPanel.tsx). consume_qc_and_add_
+// interview_questions (20260829010000_atomic_interview_question_
+// generation.sql) uses it, plus the position-derived question ids
+// generateInterviewQuestions/generatePhoneScreenQuestions produce, to
+// recognize and safely replay an already-completed batch instead of
+// charging QC or inserting a duplicate one - so this route no longer
+// needs to reconstruct that decision itself.
+function isValidRequestId(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= 64;
 }
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
@@ -181,12 +166,20 @@ export async function GET(request: Request, { params }: { params: { id: string }
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
     const body = await request.json();
+    if (!isValidRequestId(body.requestId)) return NextResponse.json({ error: 'A generation request identifier is required.' }, { status: 400 });
+    const requestId = body.requestId.trim();
+
     const requisition = await loadRequisition(params.id);
     if (!requisition) return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 });
 
     const organization = await resolveOrganization();
     if (!organization) return NextResponse.json({ error: 'QC billing is not configured for this workspace.' }, { status: 409 });
-    if ((organization.credits_remaining as number) < 1) return NextResponse.json({ error: 'No QC credits remain.' }, { status: 402 });
+    // No pre-check against organization.credits_remaining here: a
+    // retry of an already-completed generation request must still
+    // succeed (as a free replay) even if credits are now at zero -
+    // the RPC itself only enforces the credit minimum on a genuinely
+    // fresh batch, after confirming this request id has not already
+    // been fully persisted.
 
     if (body.stage === 'phone-screen') {
       let phoneScreenType: Exclude<PhoneScreenQuestionType, 'Custom'> | null = null;
@@ -203,12 +196,22 @@ export async function POST(request: Request, { params }: { params: { id: string 
       if (!basis) return NextResponse.json({ error: 'Apply a Job Description or Hiring Criteria basis before generating questions.' }, { status: 409 });
 
       const existingQuestions = [...persisted.map((question) => question.text), ...planQuestions];
-      const questions = await generatePhoneScreenQuestions({ basis, questionType: phoneScreenType, existingQuestions });
+      const questions = await generatePhoneScreenQuestions({ basis, questionType: phoneScreenType, existingQuestions, requestId });
 
       const { data, error } = await supabaseAdmin.rpc('consume_qc_and_add_interview_questions', {
         p_org_id: organization.id,
         p_requisition_id: params.id,
-        p_questions: questions.map((question) => ({ id: question.id, text: question.text, areas: [] }))
+        p_questions: questions.map((question) => ({
+          id: question.id,
+          text: question.text,
+          areas: [],
+          stage: 'phone-screen',
+          questionType: question.questionType,
+          responseKind: question.responseKind,
+          ...(question.responseOptions ? { responseOptions: question.responseOptions } : {}),
+          ...(question.responseUnit ? { responseUnit: question.responseUnit } : {}),
+          requestId
+        }))
       });
       if (error) {
         if (error.message?.includes('INSUFFICIENT_QC')) return NextResponse.json({ error: 'No QC credits remain.' }, { status: 402 });
@@ -216,25 +219,15 @@ export async function POST(request: Request, { params }: { params: { id: string 
       }
       if (!data || typeof data !== 'object' || !Array.isArray(data.questions)) throw new Error('Question generation persistence returned an invalid result.');
 
-      await backfillQuestionTypeMetadata(params.id, questions.map((question) => ({
-        id: question.id,
-        questionType: question.questionType,
-        stage: 'phone-screen',
-        responseKind: question.responseKind,
-        responseOptions: question.responseOptions,
-        responseUnit: question.responseUnit
-      })));
-
-      // `generated` carries the full, validated per-question metadata
-      // (Question Type + response package) this route just computed and
-      // persisted, keyed by the same ids in `questions` - the client
-      // uses it to display the real category immediately, in this same
-      // session, rather than a client-side guess that would only match
-      // reality after a reload.
+      // data.questions is the database's own record of what is
+      // actually persisted - Question Type and response metadata
+      // included, written atomically with the questions and the QC
+      // charge (or, on a replay, read back from that atomic write) -
+      // not a client-side reconstruction that could drift from it.
       return NextResponse.json({
         questions: data.questions,
         creditsRemaining: data.creditsRemaining,
-        generated: questions
+        generated: data.questions
       }, { status: 201 });
     }
 
@@ -266,12 +259,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
       ...persisted.map((question) => question.text),
       ...planQuestions
     ];
-    const questions = await generateInterviewQuestions({ basis, selectedAreas, questionType, existingQuestions, availableAreas });
+    const questions = await generateInterviewQuestions({ basis, selectedAreas, questionType, existingQuestions, availableAreas, requestId });
 
     const { data, error } = await supabaseAdmin.rpc('consume_qc_and_add_interview_questions', {
       p_org_id: organization.id,
       p_requisition_id: params.id,
-      p_questions: questions.map((question) => ({ id: question.id, text: question.text, areas: question.areas }))
+      p_questions: questions.map((question) => ({
+        id: question.id,
+        text: question.text,
+        areas: question.areas,
+        questionType: question.questionType,
+        requestId
+      }))
     });
     if (error) {
       if (error.message?.includes('INSUFFICIENT_QC')) return NextResponse.json({ error: 'No QC credits remain.' }, { status: 402 });
@@ -279,16 +278,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
     if (!data || typeof data !== 'object' || !Array.isArray(data.questions)) throw new Error('Question generation persistence returned an invalid result.');
 
-    await backfillQuestionTypeMetadata(params.id, questions.map((question) => ({
-      id: question.id,
-      questionType: question.questionType,
-      stage: null
-    })));
-
     return NextResponse.json({
       questions: data.questions,
       creditsRemaining: data.creditsRemaining,
-      generated: questions
+      generated: data.questions
     }, { status: 201 });
   } catch (error) {
     console.error('Interview question generation failed', { requisitionId: params.id, error });

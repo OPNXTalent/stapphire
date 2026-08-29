@@ -151,7 +151,7 @@ test('generateMore and generatePhoneScreenQuestionsAction both auto-expand every
 test('generatePhoneScreenQuestionsAction posts stage: \'phone-screen\' and merges the server\'s validated per-question metadata (including its reconstructed response spec) into the Phone Screen bank', () => {
   const phoneScreenGenerateMatch = source.match(/async function generatePhoneScreenQuestionsAction\(\) \{([\s\S]*?)\n {2}\}/);
   assert.ok(phoneScreenGenerateMatch);
-  assert.match(phoneScreenGenerateMatch[1], /body: JSON\.stringify\(\{ stage: 'phone-screen', questionType: phoneScreenQuestionType \|\| null \}\)/);
+  assert.match(phoneScreenGenerateMatch[1], /body: JSON\.stringify\(\{ stage: 'phone-screen', questionType: phoneScreenQuestionType \|\| null, requestId \}\)/);
   assert.match(phoneScreenGenerateMatch[1], /responseSpecFromParts\(question\.responseKind, question\.responseOptions, question\.responseUnit\)/);
   assert.match(phoneScreenGenerateMatch[1], /setGeneratedPhoneScreenQuestions\(/);
 });
@@ -171,5 +171,57 @@ test('the Phone Screen "+ Custom Screen Question" button dispatches the same INT
   assert.match(addCustomMatch[1], /cardTitle: 'Custom Question',/);
   assert.match(addCustomMatch[1], /response: \{ kind: 'short-answer' \}/);
   assert.match(addCustomMatch[1], /dispatchEvent\(new CustomEvent\(INTERVIEW_BANK_ADD_EVENT, \{ detail: \{ question \} \}\)\)/);
+});
+
+// --- Generation request idempotency (client-side lifecycle) ---
+// The database function recognizes a retried generation attempt by its
+// requestId, so the client must mint one id per attempt and only reuse
+// it across an UNCERTAIN failure (the fetch itself never returned a
+// response - whether the server-side charge/insert happened is
+// unknown). A DEFINITIVE outcome - success or a clean error response -
+// must clear it, since the atomic RPC guarantees a clean error means
+// nothing was charged, so the next click is a genuinely new action.
+
+test('generateMore mints a request id only when none is already pending, reusing a pending one across a retry rather than replacing it', () => {
+  const generateMoreMatch = source.match(/async function generateMore\(\) \{([\s\S]*?)\n {2}\}/);
+  assert.ok(generateMoreMatch);
+  assert.match(generateMoreMatch[1], /const requestId = structuredRequestId \?\? createRequestId\(\);/);
+  assert.match(generateMoreMatch[1], /if \(!structuredRequestId\) setStructuredRequestId\(requestId\);/);
+});
+
+test('generateMore tracks whether a real HTTP response was obtained, and only clears the pending request id on a definitive outcome - preserving it when fetch itself never returned a response', () => {
+  const generateMoreMatch = source.match(/async function generateMore\(\) \{([\s\S]*?)\n {2}\}/);
+  assert.ok(generateMoreMatch);
+  const body = generateMoreMatch[1];
+  assert.match(body, /let gotResponse = false;/);
+  assert.match(body, /gotResponse = true;/);
+  // gotResponse is set immediately after fetch() resolves, before any
+  // later throw (a non-ok status, malformed JSON, etc.) - so every
+  // failure that reaches the catch block after this point is a
+  // definitive one.
+  const fetchIndex = body.indexOf('await fetch(');
+  const gotResponseIndex = body.indexOf('gotResponse = true;');
+  assert.ok(fetchIndex >= 0 && gotResponseIndex > fetchIndex);
+  assert.match(body, /setStructuredRequestId\(null\);\s*\n\s*\} catch \(generationError\) \{/, 'success must clear the pending id');
+  assert.match(body, /if \(gotResponse\) setStructuredRequestId\(null\);/, 'a definitive error response must also clear it, but only when a response was actually obtained');
+});
+
+test('generatePhoneScreenQuestionsAction has the exact same request id lifecycle as generateMore, using its own independent pending id', () => {
+  const match = source.match(/async function generatePhoneScreenQuestionsAction\(\) \{([\s\S]*?)\n {2}\}/);
+  assert.ok(match);
+  const body = match[1];
+  assert.match(body, /const requestId = phoneScreenRequestId \?\? createRequestId\(\);/);
+  assert.match(body, /if \(!phoneScreenRequestId\) setPhoneScreenRequestId\(requestId\);/);
+  assert.match(body, /let gotResponse = false;/);
+  assert.match(body, /gotResponse = true;/);
+  assert.match(body, /setPhoneScreenRequestId\(null\);\s*\n\s*\} catch \(generationError\) \{/);
+  assert.match(body, /if \(gotResponse\) setPhoneScreenRequestId\(null\);/);
+});
+
+test('createRequestId is a single shared helper, not duplicated per call site', () => {
+  const definitions = source.match(/function createRequestId\(\)/g) || [];
+  assert.equal(definitions.length, 1);
+  const usages = source.match(/createRequestId\(\)/g) || [];
+  assert.equal(usages.length, 3, 'expected the definition plus exactly two call sites (structured and Phone Screen)');
 });
 

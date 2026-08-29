@@ -1,6 +1,7 @@
 import 'server-only';
 import OpenAI from 'openai';
 import type { EvaluationBasis } from './evaluationBasis';
+import { generatedQuestionId } from './generationRequestId';
 import { INTERVIEW_QUESTION_TYPE_GUIDANCE, INTERVIEW_QUESTION_TYPES, isInterviewQuestionType, type InterviewQuestionType } from './interviewQuestionTypes';
 import { PHONE_SCREEN_QUESTION_TYPES, type PhoneScreenQuestionType, type PhoneScreenResponseKind } from './phoneScreenQuestions';
 
@@ -107,13 +108,15 @@ export async function generateInterviewQuestions({
   selectedAreas,
   questionType,
   existingQuestions,
-  availableAreas
+  availableAreas,
+  requestId
 }: {
   basis: EvaluationBasis;
   selectedAreas: string[];
   questionType: InterviewQuestionType | null;
   existingQuestions: string[];
   availableAreas: string[];
+  requestId: string;
 }): Promise<GeneratedInterviewQuestion[]> {
   if (availableAreas.length === 0) throw new Error('No Areas of Evaluation are available.');
 
@@ -165,10 +168,10 @@ export async function generateInterviewQuestions({
   // compliance never depends on the model's fidelity; for mixed
   // generation the model's own (schema-constrained, so always one of
   // the controlled vocabulary) choice is kept as-is.
-  const questions: GeneratedInterviewQuestion[] = parsed.questions.map((question) => {
+  const questions: GeneratedInterviewQuestion[] = parsed.questions.map((question, index) => {
     if (!isInterviewQuestionType(question.questionType)) throw new Error('Interview question generation returned an invalid Question Type.');
     return {
-      id: `ai-${crypto.randomUUID()}`,
+      id: generatedQuestionId(requestId, index),
       text: String(question.text || '').trim(),
       areas: Array.isArray(question.areas) ? question.areas : [],
       questionType: questionType ?? question.questionType
@@ -189,11 +192,13 @@ export async function generateInterviewQuestions({
 export async function generatePhoneScreenQuestions({
   basis,
   questionType,
-  existingQuestions
+  existingQuestions,
+  requestId
 }: {
   basis: EvaluationBasis;
   questionType: Exclude<PhoneScreenQuestionType, 'Custom'> | null;
   existingQuestions: string[];
+  requestId: string;
 }): Promise<GeneratedPhoneScreenQuestion[]> {
   const requestedType = questionType
     ? `The recruiter selected the Phone Screen Question Type "${questionType}". All five questions must be about that exact subject and carry that exact questionType.`
@@ -231,7 +236,7 @@ export async function generatePhoneScreenQuestions({
 
   const realTypeSet = new Set<string>(REAL_PHONE_SCREEN_TYPES);
   const kindSet = new Set<string>(RESPONSE_KINDS);
-  const questions: GeneratedPhoneScreenQuestion[] = parsed.questions.map((question) => {
+  const questions: GeneratedPhoneScreenQuestion[] = parsed.questions.map((question, index) => {
     if (typeof question.questionType !== 'string' || !realTypeSet.has(question.questionType)) throw new Error('Phone Screen question generation returned an invalid Question Type.');
     if (typeof question.responseKind !== 'string' || !kindSet.has(question.responseKind)) throw new Error('Phone Screen question generation returned an invalid response format.');
     const text = String(question.text || '').trim();
@@ -239,7 +244,7 @@ export async function generatePhoneScreenQuestions({
     const resolvedType = (questionType ?? question.questionType) as Exclude<PhoneScreenQuestionType, 'Custom'>;
     const resolvedKind = question.responseKind as PhoneScreenResponseKind;
     return {
-      id: `ai-${crypto.randomUUID()}`,
+      id: generatedQuestionId(requestId, index),
       text,
       questionType: resolvedType,
       responseKind: resolvedKind,
