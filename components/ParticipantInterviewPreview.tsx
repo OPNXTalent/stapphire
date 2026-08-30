@@ -22,6 +22,7 @@ export function ParticipantInterviewPreview({
   branding,
   invitationToken,
   participantName = '',
+  initiallySubmitted = false,
   shareEnabled = true
 }: {
   stage: string;
@@ -33,6 +34,7 @@ export function ParticipantInterviewPreview({
   branding?: FormBranding;
   invitationToken?: string;
   participantName?: string;
+  initiallySubmitted?: boolean;
   shareEnabled?: boolean;
 }) {
   const formQuestions = useMemo<FormQuestion[]>(() => {
@@ -63,7 +65,7 @@ export function ParticipantInterviewPreview({
   const [participantNameValue, setParticipantNameValue] = useState(participantName);
   const [identityStatus, setIdentityStatus] = useState('');
   const [submitStatus, setSubmitStatus] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(initiallySubmitted);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(formQuestions[0]?.id ?? null);
 
   const progress = interviewProgress(formQuestions, { ratings, questionComments, yesNoResponses });
@@ -190,6 +192,24 @@ export function ParticipantInterviewPreview({
     }
   }
 
+  if (submitted) {
+    return (
+      <div className={styles.page} style={brandedStyle}>
+        <section className={`${styles.submitted} ${overrides.submittedConfirmation}`} role="status" aria-live="polite">
+          <div className={overrides.submittedBrand}>
+            {branding?.logoUrl
+              ? <img src={branding.logoUrl} alt={branding.logoName || 'Company logo'} />
+              : <StapphireBrand decorative />}
+          </div>
+          <span className={styles.preview}>SUBMISSION RECEIVED</span>
+          <h1>Thank you</h1>
+          <p>Your {stage === 'phone-screen' ? 'Phone Screen' : 'interview'} assessment for {candidateName} has been submitted successfully.</p>
+          <small>You may close this window.</small>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.page} style={brandedStyle}>
       <header className={`${styles.header} ${overrides.headerAdaptive}`}>
@@ -209,7 +229,7 @@ export function ParticipantInterviewPreview({
             </div>
           )}
         </div>
-        <span className={`${styles.preview} ${overrides.headerMuted}`}>INTERVIEW EVALUATION</span>
+        <span className={`${styles.preview} ${overrides.headerMuted}`}>{stage === 'phone-screen' ? 'PHONE SCREEN ASSESSMENT' : 'INTERVIEW EVALUATION'}</span>
         <h1>{stageLabel} — {positionTitle}</h1>
         <div className={`${styles.context} ${overrides.headerText} ${overrides.headerBorder}`}>
           <span><strong>Candidate</strong>{candidateName}</span>
@@ -314,12 +334,12 @@ export function ParticipantInterviewPreview({
 
         <section className={styles.assessment} aria-labelledby="interview-assessment-heading">
           <div className={styles.assessmentHeader}>
-            <h2 id="interview-assessment-heading">Interview Assessment</h2>
+            <h2 id="interview-assessment-heading">{stage === 'phone-screen' ? 'Phone Screen Summary' : 'Interview Assessment'}</h2>
             <span>Required</span>
           </div>
 
           <div className={styles.assessmentField}>
-            <label htmlFor="overall-comments">Overall Comments</label>
+            <label htmlFor="overall-comments">{stage === 'phone-screen' ? 'Screening Notes' : 'Overall Comments'}</label>
             <textarea
               id="overall-comments"
               required
@@ -348,7 +368,7 @@ export function ParticipantInterviewPreview({
         <div className={styles.submitRow}>
           <span>{submitStatus || (assessmentReady ? 'Interview assessment complete — ready to submit' : internalSubmission ? 'Complete all required responses, comments, and recommendation' : 'Complete all required responses, your name, comments, and recommendation')}</span>
           <button type="button" disabled={(!invitationToken && !candidateId) || !assessmentReady || submitted} onClick={submitInterview}>
-            {submitted ? 'Submitted' : 'Submit Interview'}
+            {stage === 'phone-screen' ? 'Submit Phone Screen' : 'Submit Interview'}
           </button>
         </div>
       </main>

@@ -5,6 +5,7 @@ import { buildQuestionBank } from '@/lib/interviewQuestionBank';
 import { printStapphireDocument } from '@/lib/printDocument';
 import { ClientPrintFrame, type ClientPrintBranding } from '@/components/ClientPrintHeader';
 import { summarizeInterviewDecision, type InterviewRecommendation } from '@/lib/interviewDecision';
+import { phoneScreenResponseLabel, summarizePhoneScreenRecommendation, summarizePhoneScreenResponses } from '@/lib/phoneScreenResults';
 import styles from './CandidateInterviewRounds.module.css';
 
 type ViewId = 'evaluation' | string | null;
@@ -20,6 +21,7 @@ type ParticipantAssessment = {
   contributor: string;
   recommendation: InterviewRecommendation;
   comments: string;
+  screenResponses?: Array<{ question: string; response: string; kind: 'yes-no' | 'written' }>;
   questionComments: Array<{ question: string; comment: string }>;
   yesNoResponses: Array<{ question: string; response: 'Yes' | 'No' }>;
 };
@@ -275,6 +277,9 @@ export function CandidateInterviewRounds({
   const assessmentsVisible = assessmentOpen[round.id] ?? false;
   const branding = printBranding.byStage?.[round.id] ?? printBranding.defaultBranding;
   const decisionSummary = summarizeInterviewDecision(round.overall, round.assessments.map((assessment) => assessment.recommendation));
+  const isPhoneScreen = round.id === 'phone-screen';
+  const phoneScreenResponses = isPhoneScreen ? summarizePhoneScreenResponses(round.assessments) : [];
+  const phoneScreenRecommendation = summarizePhoneScreenRecommendation(round.assessments.map((assessment) => assessment.recommendation));
 
   return (
     <section className={styles.records}>
@@ -283,12 +288,27 @@ export function CandidateInterviewRounds({
         <button type="button" className="candidate-record-print-action" onClick={() => printStapphireDocument('interview-summary')}>Print</button>
       </div>
       <div className={`${styles.aggregateCanvas} interview-summary-print-document print-document`} style={brandingStyle(branding)}>
-        <ClientPrintFrame branding={branding} documentTitle="Interview Summary">
+        <ClientPrintFrame branding={branding} documentTitle={isPhoneScreen ? 'Phone Screen Summary' : 'Interview Summary'}>
         <div className="interview-summary-print-meta">
           <h1>{candidateName}</h1>
           <p>{positionTitle}</p>
           <strong>{round.title}</strong>
         </div>
+        {isPhoneScreen ? (
+          <div className={styles.screeningTable} role="table" aria-label={`${round.title} qualification responses`}>
+            <div className={`${styles.screeningRow} ${styles.headerRow}`} role="row">
+              <span>Qualification Question</span>
+              <span>Response</span>
+            </div>
+            {phoneScreenResponses.map((response) => (
+              <div className={styles.screeningRow} role="row" key={response.question}>
+                <span>{response.question}</span>
+                <strong>{phoneScreenResponseLabel(response)}</strong>
+              </div>
+            ))}
+            {phoneScreenResponses.length === 0 && <div className={styles.assessmentEmpty}>No qualification responses submitted yet.</div>}
+          </div>
+        ) : <>
         <div className={styles.aggregateTable} role="table" aria-label={`${round.title} aggregate results`}>
           <div className={`${styles.aggregateRow} ${styles.headerRow}`} role="row">
             <span>Area of Evaluation</span>
@@ -308,9 +328,10 @@ export function CandidateInterviewRounds({
           <span>Overall Interview Average</span>
           <strong>{round.overall === null ? '—' : `★ ${round.overall.toFixed(2)} / 5`}</strong>
         </div>
+        </>}
         <div className={styles.decisionSummary} aria-label="Advisory interview decision summary">
-          <div><span>Panel Recommendation</span><strong>{decisionSummary.composition}</strong></div>
-          <div><span>Suggested Decision</span><strong>{decisionSummary.label}</strong></div>
+          <div><span>{isPhoneScreen ? 'Screen Recommendation' : 'Panel Recommendation'}</span><strong>{isPhoneScreen ? phoneScreenRecommendation.composition : decisionSummary.composition}</strong></div>
+          <div><span>{isPhoneScreen ? 'Suggested Next Step' : 'Suggested Decision'}</span><strong>{isPhoneScreen ? phoneScreenRecommendation.label : decisionSummary.label}</strong></div>
           <small>Advisory only — not a final hiring decision.</small>
         </div>
 
@@ -321,7 +342,7 @@ export function CandidateInterviewRounds({
             aria-expanded={assessmentsVisible}
             onClick={() => setAssessmentOpen((current) => ({ ...current, [round.id]: !current[round.id] }))}
           >
-            <span>Participant Assessments</span>
+            <span>{isPhoneScreen ? 'Screen Submissions' : 'Participant Assessments'}</span>
             <span>{round.assessments.length} Submitted</span>
           </button>
 
@@ -336,7 +357,7 @@ export function CandidateInterviewRounds({
           )}
         </section>
         <div className="interview-summary-print-assessments">
-          <h2>Participant Assessments</h2>
+          <h2>{isPhoneScreen ? 'Screen Submissions' : 'Participant Assessments'}</h2>
           {round.assessments.length > 0
             ? round.assessments.map((assessment, index) => renderAssessment(assessment, `print-panel-${index}`, index + 1))
             : <p>No participant assessments submitted yet.</p>}

@@ -67,6 +67,7 @@ export default async function InterviewInvitationPage({ params }: { params: { to
       branding={snapshot?.branding}
       invitationToken={params.token}
       participantName={invitation.participant_name || ''}
+      initiallySubmitted={invitation.status === 'submitted'}
       shareEnabled={false}
     />
   );

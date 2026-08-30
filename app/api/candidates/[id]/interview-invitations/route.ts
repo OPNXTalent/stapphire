@@ -45,6 +45,7 @@ type ParticipantAssessment = {
   contributor: string;
   recommendation: string;
   comments: string;
+  screenResponses: Array<{ question: string; response: string; kind: 'yes-no' | 'written' }>;
   questionComments: Array<{ question: string; comment: string }>;
   yesNoResponses: Array<{ question: string; response: 'Yes' | 'No' }>;
 };
@@ -114,11 +115,23 @@ function buildRoundResults(stage: string, rows: InvitationRow[], configuredAreas
         response: yesNoResponses[question.id] === 'yes' ? 'Yes' as const : yesNoResponses[question.id] === 'no' ? 'No' as const : null
       }))
       .filter((item): item is { question: string; response: 'Yes' | 'No' } => item.response !== null);
+    const screenResponses = questions.flatMap((question) => {
+      const responses: Array<{ question: string; response: string; kind: 'yes-no' | 'written' }> = [];
+      if (question.yesNo && (yesNoResponses[question.id] === 'yes' || yesNoResponses[question.id] === 'no')) {
+        responses.push({ question: question.text, response: yesNoResponses[question.id] === 'yes' ? 'Yes' : 'No', kind: 'yes-no' });
+      }
+      if (question.commentBox) {
+        const response = String(questionComments[question.id] ?? '').trim();
+        if (response) responses.push({ question: question.text, response, kind: 'written' });
+      }
+      return responses;
+    });
 
     assessments.push({
       contributor: row.participant_name || 'Interview participant',
       recommendation: String(payload.recommendation ?? ''),
       comments: String(payload.comments ?? ''),
+      screenResponses,
       questionComments: assessmentQuestionComments,
       yesNoResponses: assessmentYesNoResponses
     });
