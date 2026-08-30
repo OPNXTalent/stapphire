@@ -1969,12 +1969,12 @@ begin
   select * into selected_version from phase1_hiring_criteria_versions
   where id = selected_basis.hiring_criteria_version_id
     and requisition_id = selected_operation.requisition_id;
-  if selected_version.id is null or jsonb_typeof(selected_version.criteria_snapshot) <> 'array' then
+  if selected_version.id is null or jsonb_typeof(selected_version.criteria_snapshot) is distinct from 'array' then
     raise exception 'Captured Hiring Criteria version is unavailable or malformed.';
   end if;
 
   expected_count := jsonb_array_length(selected_version.criteria_snapshot);
-  if expected_count = 0 or jsonb_typeof(p_findings) <> 'array' or jsonb_array_length(p_findings) <> expected_count then
+  if expected_count = 0 or jsonb_typeof(p_findings) is distinct from 'array' or jsonb_array_length(p_findings) <> expected_count then
     raise exception 'Hiring Criteria findings must cover every captured criterion exactly once.';
   end if;
   if nullif(btrim(p_model_identifier), '') is null or nullif(btrim(p_prompt_schema_version), '') is null then
@@ -1984,6 +1984,8 @@ begin
   if exists (
     select 1 from jsonb_array_elements(selected_version.criteria_snapshot) criterion
     where nullif(criterion->>'id', '') is null
+      or nullif(btrim(criterion->>'category'), '') is null
+      or nullif(btrim(criterion->>'label'), '') is null
   ) or (
     select count(*) from (
       select criterion->>'id' from jsonb_array_elements(selected_version.criteria_snapshot) criterion
@@ -1995,13 +1997,14 @@ begin
 
   if exists (
     select 1 from jsonb_array_elements(p_findings) finding
-    where jsonb_typeof(finding) <> 'object'
+    where jsonb_typeof(finding) is distinct from 'object'
       or nullif(finding->>'criterionId', '') is null
-      or (finding->>'alignmentScore')::integer not in (0, 25, 50, 75, 100)
-      or finding->>'satisfactionStatus' not in ('MET', 'NOT_MET', 'UNABLE_TO_DETERMINE')
+      or coalesce((finding->>'alignmentScore')::integer not in (0, 25, 50, 75, 100), true)
+      or coalesce(finding->>'satisfactionStatus' not in ('MET', 'NOT_MET', 'UNABLE_TO_DETERMINE'), true)
       or nullif(btrim(finding->>'evidence'), '') is null
       or nullif(btrim(finding->>'assessment'), '') is null
-      or finding->>'semanticFingerprintVersion' <> 'criterion_semantics_v1'
+      or finding->>'semanticFingerprintVersion' is distinct from 'criterion_semantics_v1'
+      or finding->>'criterionSemanticFingerprint' is null
       or finding->>'criterionSemanticFingerprint' !~ '^[0-9a-f]{64}$'
   ) then
     raise exception 'Hiring Criteria finding payload is invalid.';

@@ -66,7 +66,15 @@ test('migration executes in disposable Postgres and completion is complete, atom
   const db = new PGlite({ extensions: { pgcrypto } });
   try {
     await db.exec(prelude);
+    await db.exec(`
+      insert into phase1_requisitions(id,title,job_description) values('12000000-0000-4000-8000-000000000000','Legacy','JD');
+      insert into phase1_candidates(id,requisition_id,full_name,source_filename,resume_text) values('22000000-0000-4000-8000-000000000000','12000000-0000-4000-8000-000000000000','Legacy Candidate','legacy.pdf','legacy resume');
+      insert into phase1_evaluations(id,requisition_id,candidate_id,overall_match,verdict,assessment) values('32000000-0000-4000-8000-000000000000','12000000-0000-4000-8000-000000000000','22000000-0000-4000-8000-000000000000',50,'consider','{"legacy":true}');
+    `);
     await db.exec(migration);
+
+    const historical = await db.query<{ assessment: { legacy: boolean }; model_identifier: string | null; prompt_schema_version: string | null; neutral_findings_provenance: string | null }>(`select assessment,model_identifier,prompt_schema_version,neutral_findings_provenance from phase1_evaluations where id='32000000-0000-4000-8000-000000000000'`);
+    assert.deepEqual(historical.rows[0], { assessment: { legacy: true }, model_identifier: null, prompt_schema_version: null, neutral_findings_provenance: null });
 
     const parity = await db.query<{ canonical: string; fingerprint: string }>(`select phase1_criterion_semantic_canonical_json(' hard_skills ','Café\t administration','  Five  years\r\nrequired ',null) canonical, phase1_criterion_semantic_fingerprint(' hard_skills ','Café\t administration','  Five  years\r\nrequired ',null) fingerprint`);
     assert.equal(parity.rows[0].canonical, '{"category":"hard_skills","label":"Café administration","rationale":"Five years\\nrequired","jdEvidence":null}');
@@ -85,8 +93,8 @@ test('migration executes in disposable Postgres and completion is complete, atom
 
     const good = await seedCompletionFixture(db, '1');
     await complete(db, good);
-    const persisted = await db.query<{ evaluations: number; findings: number; status: string; model_identifier: string; prompt_schema_version: string; neutral_findings_provenance: string; assessment: { frozen: boolean } }>(`select (select count(*)::int from phase1_evaluations) evaluations,(select count(*)::int from phase1_evaluation_criterion_findings) findings,i.status,e.model_identifier,e.prompt_schema_version,e.neutral_findings_provenance,e.assessment from phase1_operation_items i join phase1_evaluations e on e.id=i.evaluation_id where i.id=$1`, [good.itemId]);
-    assert.deepEqual(persisted.rows[0], { evaluations: 1, findings: 1, status: 'completed', model_identifier: 'gpt-test-actual', prompt_schema_version: 'criteria_evaluation_neutral_findings_v1', neutral_findings_provenance: 'model_observed', assessment: { frozen: true } });
+    const persisted = await db.query<{ evaluations: number; findings: number; status: string; model_identifier: string; prompt_schema_version: string; neutral_findings_provenance: string; assessment: { frozen: boolean }; alignment_score: number; satisfaction_status: string }>(`select (select count(*)::int from phase1_evaluations where operation_item_id=$1) evaluations,(select count(*)::int from phase1_evaluation_criterion_findings where evaluation_id=e.id) findings,i.status,e.model_identifier,e.prompt_schema_version,e.neutral_findings_provenance,e.assessment,f.alignment_score,f.satisfaction_status from phase1_operation_items i join phase1_evaluations e on e.id=i.evaluation_id join phase1_evaluation_criterion_findings f on f.evaluation_id=e.id where i.id=$1`, [good.itemId]);
+    assert.deepEqual(persisted.rows[0], { evaluations: 1, findings: 1, status: 'completed', model_identifier: 'gpt-test-actual', prompt_schema_version: 'criteria_evaluation_neutral_findings_v1', neutral_findings_provenance: 'model_observed', assessment: { frozen: true }, alignment_score: 75, satisfaction_status: 'MET' });
     await assert.rejects(complete(db, good), /lease is no longer authoritative/);
     assert.equal((await db.query<{ count: number }>(`select count(*)::int count from phase1_evaluation_criterion_findings`)).rows[0].count, 1);
 
@@ -94,7 +102,11 @@ test('migration executes in disposable Postgres and completion is complete, atom
       ['2', () => [], /cover every captured criterion/],
       ['3', (f: Fixture) => [f.findings[0], f.findings[0]], /cover every captured criterion|duplicate/],
       ['4', (f: Fixture) => [{ ...f.findings[0], criterionId: '00000000-0000-4000-8000-999999999999' }], /unknown or missing/],
-      ['5', (f: Fixture) => [{ ...f.findings[0], criterionSemanticFingerprint: '0'.repeat(64) }], /fingerprint does not match/]
+      ['5', (f: Fixture) => [{ ...f.findings[0], criterionSemanticFingerprint: '0'.repeat(64) }], /fingerprint does not match/],
+      ['8', (f: Fixture) => [{ ...f.findings[0], alignmentScore: undefined }], /payload is invalid/],
+      ['9', (f: Fixture) => [{ ...f.findings[0], satisfactionStatus: undefined }], /payload is invalid/],
+      ['10', (f: Fixture) => [{ ...f.findings[0], semanticFingerprintVersion: undefined }], /payload is invalid/],
+      ['11', (f: Fixture) => [{ ...f.findings[0], assessment: ' ' }], /payload is invalid/]
     ] as const) {
       const fixture = await seedCompletionFixture(db, suffix);
       if (suffix === '3') {

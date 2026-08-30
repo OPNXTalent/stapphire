@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { buildNeutralCriterionFindingArraySchema, validateNeutralCriterionFindings, type AppliedCriterion } from './criteriaEvaluation.ts';
 
 const criteria: AppliedCriterion[] = [
@@ -25,4 +26,16 @@ test('new model findings reject null treatment dimensions and incomplete coverag
   assert.throws(() => validateNeutralCriterionFindings(criteria, [{ ...valid[0], satisfactionStatus: null }, valid[1]]), /invalid satisfaction status/);
   assert.throws(() => validateNeutralCriterionFindings(criteria, valid.slice(1)), /every applied criterion/);
   assert.throws(() => validateNeutralCriterionFindings(criteria, [{ ...valid[0], evidence: ' ' }, valid[1]]), /blank evidence/);
+});
+
+test('worker persistence wiring captures actual provenance without changing JD completion', () => {
+  const evaluator = readFileSync(new URL('./criteriaEvaluator.ts', import.meta.url), 'utf8');
+  const candidateEvaluation = readFileSync(new URL('./candidateEvaluation.ts', import.meta.url), 'utf8');
+  const worker = readFileSync(new URL('./resumeEvaluationOperation.ts', import.meta.url), 'utf8');
+  assert.match(evaluator, /modelIdentifier: response\.model/);
+  assert.match(evaluator, /CRITERIA_EVALUATION_PROMPT_SCHEMA_VERSION = 'criteria_evaluation_neutral_findings_v1'/);
+  assert.match(candidateEvaluation, /neutralFindingsPersistence:/);
+  assert.doesNotMatch(candidateEvaluation, /evaluationBasis\.criteria\.find/);
+  assert.match(worker, /\? 'complete_phase1_hiring_criteria_resume_operation_item_v1'\s*: 'complete_phase1_resume_operation_item'/);
+  assert.equal((worker.match(/evaluateResumeAgainstBasis\(/g) || []).length, 1, 'persistence must not introduce another model evaluation');
 });

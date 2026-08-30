@@ -39,8 +39,10 @@ test('line endings, boundary whitespace, horizontal formatting, and object key o
 
 test('weight, treatment, zero-weight state, IDs, and projection metadata are excluded', () => {
   const baseline = fingerprintCriterionSemantics(base);
-  assert.equal(fingerprintCriterionSemantics({ ...base, id: 'different', appliedWeight: 0, isKnockout: true }), baseline);
-  assert.equal(fingerprintCriterionSemantics({ ...base, defaultWeight: 5, knockoutSuggested: true, createdAt: 'later' }), baseline);
+  const treatmentChanged = { ...base, id: 'different', appliedWeight: 0, isKnockout: true };
+  const projectionMetadataChanged = { ...base, defaultWeight: 5, knockoutSuggested: true, createdAt: 'later' };
+  assert.equal(fingerprintCriterionSemantics(treatmentChanged), baseline);
+  assert.equal(fingerprintCriterionSemantics(projectionMetadataChanged), baseline);
 });
 
 test('each semantic field changes the fingerprint when its meaning changes', () => {

@@ -29,6 +29,15 @@ export async function evaluateResumeAgainstBasis(evaluationBasis: EvaluationBasi
     : null;
   if (criteriaProjection && !criteriaProjection.complete) throw new Error('Criteria evaluation output is incomplete.');
   const findingsById = criteriaModelAssessment ? new Map(criteriaModelAssessment.criterionFindings.map((finding) => [finding.criterionId, finding])) : null;
+  const persistenceFindings = criteriaModelAssessment && criteriaById ? criteriaModelAssessment.criterionFindings.map((finding) => {
+    const criterion = criteriaById.get(finding.criterionId);
+    if (!criterion) throw new Error('Criteria evaluation returned an unknown criterion.');
+    return {
+      ...finding,
+      criterionSemanticFingerprint: criterion.semanticFingerprint ?? fingerprintCriterionSemantics(criterion),
+      semanticFingerprintVersion: CRITERION_SEMANTIC_FINGERPRINT_VERSION
+    };
+  }) : null;
   const appliedCriteria = evaluationBasis.basisType === 'hiring_criteria' ? evaluationBasis.criteria : [];
   const assessment = legacyAssessment ?? (criteriaModelAssessment && criteriaProjection && criteriaById && findingsById ? {
     ...criteriaModelAssessment,
@@ -68,16 +77,11 @@ export async function evaluateResumeAgainstBasis(evaluationBasis: EvaluationBasi
       keywords: legacyAssessment?.keyword_terminology_score ?? criteriaProjection!.categoryScores.keywords,
       match: overallMatch
     },
-    neutralFindingsPersistence: evaluationBasis.basisType === 'hiring_criteria' && criteriaModelAssessment && criteriaModelResult ? {
+    neutralFindingsPersistence: evaluationBasis.basisType === 'hiring_criteria' && criteriaModelResult && persistenceFindings ? {
       hiringCriteriaVersionId: evaluationBasis.hiringCriteriaVersionId,
       modelIdentifier: criteriaModelResult.modelIdentifier,
       promptSchemaVersion: CRITERIA_EVALUATION_PROMPT_SCHEMA_VERSION,
-      findings: criteriaModelAssessment.criterionFindings.map((finding) => ({
-        ...finding,
-        criterionSemanticFingerprint: evaluationBasis.criteria.find((criterion) => criterion.id === finding.criterionId)!.semanticFingerprint
-          ?? fingerprintCriterionSemantics(evaluationBasis.criteria.find((criterion) => criterion.id === finding.criterionId)!),
-        semanticFingerprintVersion: CRITERION_SEMANTIC_FINGERPRINT_VERSION
-      }))
+      findings: persistenceFindings
     } : null
   };
 }
