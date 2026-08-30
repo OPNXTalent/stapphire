@@ -917,14 +917,6 @@ export function InterviewPlan({
 
                       <div className={styles.questionMain}>
                         <div className={styles.cardHeaderRow}>
-                          <input
-                            className={styles.cardTitleInput}
-                            value={question.cardTitle}
-                            maxLength={60}
-                            placeholder="Custom Question"
-                            aria-label={`Card title for question ${index + 1}`}
-                            onChange={(event) => setCardTitle(question.id, event.target.value)}
-                          />
                           <select
                             className={styles.questionTypeSelect}
                             value={question.questionType}

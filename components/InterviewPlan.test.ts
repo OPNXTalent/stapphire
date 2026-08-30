@@ -15,6 +15,7 @@ import { dirname, join } from 'node:path';
 // confirm it stays scoped to its own branch.
 
 const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'InterviewPlan.tsx'), 'utf8');
+const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'InterviewPlan.module.css'), 'utf8');
 
 test('the four stages are fixed - no freeform add/remove/reorder of interviews remains', () => {
   assert.doesNotMatch(source, /function addInterview/);
@@ -316,16 +317,24 @@ test('a question\'s questionType/cardTitle is reconstructed on load by looking t
   assert.match(reconstructMatch[1], /return \{ questionType: 'Custom', cardTitle: 'Custom Question' \};/);
 });
 
-test('every Phone Screen and Structured Interview question card shows an editable cardTitle header and a Question Type reassignment selector', () => {
+test('Phone Screen keeps its conditional custom title, while Structured Interview removes the redundant title bar and keeps Question Type', () => {
   const { phoneScreen, structured } = extractStageBranches();
+  assert.match(phoneScreen, /className=\{styles\.cardTitleInput\}/);
+  assert.match(phoneScreen, /onChange=\{\(event\) => setCardTitle\(question\.id, event\.target\.value\)\}/);
+  assert.doesNotMatch(structured, /className=\{styles\.cardTitleInput\}/, 'the long Structured Interview title bar must be removed');
   for (const branch of [phoneScreen, structured]) {
-    assert.match(branch, /className=\{styles\.cardTitleInput\}/);
-    assert.match(branch, /onChange=\{\(event\) => setCardTitle\(question\.id, event\.target\.value\)\}/);
     assert.match(branch, /className=\{styles\.questionTypeSelect\}/);
     assert.match(branch, /onChange=\{\(event\) => setQuestionType\(question\.id, event\.target\.value\)\}/);
   }
   assert.match(phoneScreen, /PHONE_SCREEN_QUESTION_TYPE_OPTIONS\.map\(/, 'Phone Screen must offer its own controlled type list');
   assert.match(structured, /STRUCTURED_QUESTION_TYPE_OPTIONS\.map\(/, 'Structured Interview must offer the generated Question Type vocabulary');
+});
+
+test('the sole Question Type control is compact and left-aligned, and the question number no longer indents the textarea', () => {
+  assert.match(css, /\.cardHeaderRow \.questionTypeSelect:only-child\{grid-column:1;max-width:150px;justify-self:start\}/);
+  assert.match(css, /\.questionTop\{display:grid;grid-template-columns:minmax\(0,1fr\) auto;/);
+  assert.match(css, /\.questionNumber\{grid-column:1\/-1;/, 'the question number must sit above rather than left of the textarea');
+  assert.match(css, /\.questionTop textarea\{grid-column:1;box-sizing:border-box;width:100%;/, 'the textarea must begin at the question-content left edge');
 });
 
 test('the selected form is never regrouped by Question Type - questions render in the recruiter-controlled order from the questions array, with no grouping helper in this file', () => {
