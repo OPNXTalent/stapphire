@@ -23,6 +23,45 @@ export type CriteriaScores = {
   categoryWeights: Record<CriteriaCategory, number>;
 };
 
+export function buildNeutralCriterionFindingArraySchema(criteria: AppliedCriterion[]) {
+  const ids = criteria.map((criterion) => criterion.id);
+  return {
+    type: 'array' as const,
+    minItems: ids.length,
+    maxItems: ids.length,
+    items: {
+      type: 'object' as const,
+      additionalProperties: false,
+      required: ['criterionId', 'alignmentScore', 'satisfactionStatus', 'evidence', 'assessment'],
+      properties: {
+        criterionId: criterionIdSchema(ids),
+        alignmentScore: { type: ['integer', 'null'] as const, enum: [...CRITERION_SCORES, null] },
+        satisfactionStatus: { type: ['string', 'null'] as const, enum: [...KNOCKOUT_STATUSES, null] },
+        evidence: { type: 'string' as const },
+        assessment: { type: 'string' as const }
+      }
+    }
+  };
+}
+
+export function validateNeutralCriterionFindings(criteria: AppliedCriterion[], findings: Array<{
+  criterionId: string;
+  alignmentScore: CriterionScore | null;
+  satisfactionStatus: KnockoutStatus | null;
+}>): void {
+  if (!Array.isArray(findings)) throw new Error('Criteria evaluation output is incomplete.');
+  const expected = new Set(criteria.map((criterion) => criterion.id));
+  const seen = new Set<string>();
+  for (const finding of findings) {
+    if (!expected.has(finding.criterionId)) throw new Error('Criteria evaluation returned an unknown criterion.');
+    if (seen.has(finding.criterionId)) throw new Error('Criteria evaluation returned a duplicate criterion.');
+    if (!CRITERION_SCORES.includes(finding.alignmentScore as CriterionScore)) throw new Error('Criteria evaluation returned an invalid alignment score.');
+    if (!KNOCKOUT_STATUSES.includes(finding.satisfactionStatus as KnockoutStatus)) throw new Error('Criteria evaluation returned an invalid satisfaction status.');
+    seen.add(finding.criterionId);
+  }
+  if (seen.size !== criteria.length) throw new Error('Criteria evaluation did not evaluate every applied criterion exactly once.');
+}
+
 function criterionIdSchema(ids: string[]) {
   return ids.length > 0 ? { type: 'string' as const, enum: ids } : { type: 'string' as const };
 }
