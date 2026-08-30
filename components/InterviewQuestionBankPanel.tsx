@@ -410,13 +410,13 @@ export function InterviewQuestionBankPanel({
                       <div className={styles.questionBody}>
                         <p className={styles.cardTitle}>{question.cardTitle}</p>
                         <p>{question.text}</p>
+                        {question.response && (
+                          <div className={styles.chips}>
+                            <span>{RESPONSE_KIND_LABELS[question.response.kind]}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    {question.response && (
-                      <div className={styles.chips}>
-                        <span>{RESPONSE_KIND_LABELS[question.response.kind]}</span>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -552,10 +552,10 @@ export function InterviewQuestionBankPanel({
                     <div className={styles.questionBody}>
                       <p className={styles.cardTitle}>{question.cardTitle}</p>
                       <p>{question.text}</p>
+                      <div className={styles.chips}>
+                        {question.areas.map((area) => <span key={area}>{area}</span>)}
+                      </div>
                     </div>
-                  </div>
-                  <div className={styles.chips}>
-                    {question.areas.map((area) => <span key={area}>{area}</span>)}
                   </div>
                 </div>
               ))}

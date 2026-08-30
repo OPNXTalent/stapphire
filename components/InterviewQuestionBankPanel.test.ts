@@ -29,6 +29,11 @@ test('a Phone Screen bank item shows a short response-kind badge, reusing the ex
   assert.match(source, /RESPONSE_KIND_LABELS\[question\.response\.kind\]/);
 });
 
+test('question badges are nested in the same content column as the question text, rather than restarting at the card edge beneath the drag handle', () => {
+  const alignedBadgeBlocks = source.match(/<div className=\{styles\.questionBody\}>[\s\S]*?<div className=\{styles\.chips\}>/g) || [];
+  assert.equal(alignedBadgeBlocks.length, 2, 'expected both Phone Screen response badges and Structured Interview AOE badges to live inside questionBody');
+});
+
 test('Phone Screen bank questions drag onto the form through the exact same transport as Structured Interview bank questions (startDrag / INTERVIEW_BANK_DRAG_MIME), not a new mechanism', () => {
   const phoneScreenReturnMatch = source.match(/if \(isPhoneScreen\) \{([\s\S]*?)\n {2}\}\n\n {2}return \(/);
   assert.ok(phoneScreenReturnMatch);
@@ -112,4 +117,3 @@ test('a wildcard-dragged custom question defaults to questionType Custom / cardT
   assert.match(blankDragMatch[1], /questionType: 'Custom',/);
   assert.match(blankDragMatch[1], /cardTitle: 'Custom Question',/);
 });
-
