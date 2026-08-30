@@ -10,10 +10,15 @@ import { type CriterionFinding } from './criterionProjection';
 
 const EVALUATION_MODEL = process.env.OPENAI_EVALUATION_MODEL || 'gpt-5.6';
 const MAX_OUTPUT_TOKENS = 16000;
+export const CRITERIA_EVALUATION_PROMPT_SCHEMA_VERSION = 'criteria_evaluation_neutral_findings_v1';
 
 type NarrativeEvaluation = Omit<ModelEvaluation, 'job_responsibilities_score' | 'hard_skills_score' | 'soft_skills_score' | 'keyword_terminology_score'>;
 export type CriteriaAwareModelEvaluation = NarrativeEvaluation & {
   criterionFindings: CriterionFinding[];
+};
+export type CriteriaAwareModelResult = {
+  evaluation: CriteriaAwareModelEvaluation;
+  modelIdentifier: string;
 };
 
 function getOpenAIClient() {
@@ -58,7 +63,7 @@ Absence of evidence is not NOT_MET. Knockouts are separate from Match.
 
 Use only resume evidence. Treat grounded transferable evidence meaningfully, identify unknowns as items to verify, and do not invent experience. Return every supplied criterion exactly once and preserve the existing evidence-based narrative fields required by the schema. Do not make an employment disposition or hiring decision.`;
 
-export async function evaluateCandidateAgainstCriteria(jobDescription: string, criteria: AppliedCriterion[], resumeText: string, evaluationBasisId: string): Promise<CriteriaAwareModelEvaluation> {
+export async function evaluateCandidateAgainstCriteria(jobDescription: string, criteria: AppliedCriterion[], resumeText: string, evaluationBasisId: string): Promise<CriteriaAwareModelResult> {
   const openai = getOpenAIClient();
   const response = await openai.responses.create({
     model: EVALUATION_MODEL,
@@ -90,5 +95,5 @@ export async function evaluateCandidateAgainstCriteria(jobDescription: string, c
     });
     throw error;
   }
-  return evaluation;
+  return { evaluation, modelIdentifier: response.model };
 }

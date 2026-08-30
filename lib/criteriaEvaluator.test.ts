@@ -18,10 +18,11 @@ test('model contract requires both neutral dimensions for every criterion regard
 
 test('new model findings reject null treatment dimensions and incomplete coverage', () => {
   const valid = [
-    { criterionId: 'weighted', alignmentScore: 75 as const, satisfactionStatus: 'MET' as const, evidence: '', assessment: '' },
-    { criterionId: 'knockout', alignmentScore: 25 as const, satisfactionStatus: 'UNABLE_TO_DETERMINE' as const, evidence: '', assessment: '' }
+    { criterionId: 'weighted', alignmentScore: 75 as const, satisfactionStatus: 'MET' as const, evidence: 'Resume evidence', assessment: 'Supported' },
+    { criterionId: 'knockout', alignmentScore: 25 as const, satisfactionStatus: 'UNABLE_TO_DETERMINE' as const, evidence: 'Resume is silent', assessment: 'Verify' }
   ];
   validateNeutralCriterionFindings(criteria, valid);
   assert.throws(() => validateNeutralCriterionFindings(criteria, [{ ...valid[0], satisfactionStatus: null }, valid[1]]), /invalid satisfaction status/);
   assert.throws(() => validateNeutralCriterionFindings(criteria, valid.slice(1)), /every applied criterion/);
+  assert.throws(() => validateNeutralCriterionFindings(criteria, [{ ...valid[0], evidence: ' ' }, valid[1]]), /blank evidence/);
 });

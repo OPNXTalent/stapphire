@@ -5,6 +5,8 @@ export type CriterionScore = typeof CRITERION_SCORES[number];
 export const KNOCKOUT_STATUSES = ['MET', 'NOT_MET', 'UNABLE_TO_DETERMINE'] as const;
 export type KnockoutStatus = typeof KNOCKOUT_STATUSES[number];
 
+import { CRITERION_SEMANTIC_FINGERPRINT_VERSION, fingerprintCriterionSemantics } from './criterionSemantics.ts';
+
 export type AppliedCriterion = {
   id: string;
   category: CriteriaCategory;
@@ -13,6 +15,8 @@ export type AppliedCriterion = {
   jdEvidence: string | null;
   appliedWeight: number;
   isKnockout: boolean;
+  semanticFingerprint?: string;
+  semanticFingerprintVersion?: 'criterion_semantics_v1';
 };
 
 export type WeightedCriterionResult = { criterion_id: string; score: CriterionScore; evidence: string; assessment: string };
@@ -48,6 +52,8 @@ export function validateNeutralCriterionFindings(criteria: AppliedCriterion[], f
   criterionId: string;
   alignmentScore: CriterionScore | null;
   satisfactionStatus: KnockoutStatus | null;
+  evidence?: string;
+  assessment?: string;
 }>): void {
   if (!Array.isArray(findings)) throw new Error('Criteria evaluation output is incomplete.');
   const expected = new Set(criteria.map((criterion) => criterion.id));
@@ -57,6 +63,8 @@ export function validateNeutralCriterionFindings(criteria: AppliedCriterion[], f
     if (seen.has(finding.criterionId)) throw new Error('Criteria evaluation returned a duplicate criterion.');
     if (!CRITERION_SCORES.includes(finding.alignmentScore as CriterionScore)) throw new Error('Criteria evaluation returned an invalid alignment score.');
     if (!KNOCKOUT_STATUSES.includes(finding.satisfactionStatus as KnockoutStatus)) throw new Error('Criteria evaluation returned an invalid satisfaction status.');
+    if (typeof finding.evidence !== 'string' || !finding.evidence.trim()) throw new Error('Criteria evaluation returned blank evidence.');
+    if (typeof finding.assessment !== 'string' || !finding.assessment.trim()) throw new Error('Criteria evaluation returned a blank assessment.');
     seen.add(finding.criterionId);
   }
   if (seen.size !== criteria.length) throw new Error('Criteria evaluation did not evaluate every applied criterion exactly once.');
@@ -103,14 +111,27 @@ export function validateAppliedCriteriaSnapshot(value: unknown): AppliedCriterio
     }
     if (isKnockout && appliedWeight !== 0) throw new Error('A Knockout criterion cannot carry applied weight.');
     seen.add(id);
-    return {
-      id,
+    const semantics = {
       category: category as CriteriaCategory,
       label,
       rationale: typeof item?.rationale === 'string' ? item.rationale : null,
-      jdEvidence: typeof item?.jdEvidence === 'string' ? item.jdEvidence : null,
+      jdEvidence: typeof item?.jdEvidence === 'string' ? item.jdEvidence : null
+    };
+    const derivedFingerprint = fingerprintCriterionSemantics(semantics);
+    const storedFingerprint = item?.semanticFingerprint;
+    const storedVersion = item?.semanticFingerprintVersion;
+    if (storedFingerprint !== undefined || storedVersion !== undefined) {
+      if (storedVersion !== CRITERION_SEMANTIC_FINGERPRINT_VERSION || storedFingerprint !== derivedFingerprint) {
+        throw new Error('Applied Hiring Criteria snapshot semantic fingerprint is invalid.');
+      }
+    }
+    return {
+      id,
+      ...semantics,
       appliedWeight: Number(appliedWeight),
-      isKnockout
+      isKnockout,
+      semanticFingerprint: derivedFingerprint,
+      semanticFingerprintVersion: CRITERION_SEMANTIC_FINGERPRINT_VERSION
     };
   });
   const weightedTotal = criteria.reduce((sum, criterion) => sum + (criterion.isKnockout ? 0 : criterion.appliedWeight), 0);

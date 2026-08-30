@@ -2,8 +2,9 @@ import 'server-only';
 import type { EvaluationBasis } from './evaluationBasis';
 import { evaluateCandidate } from './evaluator';
 import { calculateMatch, calculateLegacyVerdict } from './evaluation';
-import { evaluateCandidateAgainstCriteria } from './criteriaEvaluator';
+import { CRITERIA_EVALUATION_PROMPT_SCHEMA_VERSION, evaluateCandidateAgainstCriteria } from './criteriaEvaluator';
 import { projectCriterionFindings } from './criterionProjection';
+import { CRITERION_SEMANTIC_FINGERPRINT_VERSION, fingerprintCriterionSemantics } from './criterionSemantics';
 
 export async function evaluateResumeAgainstBasis(evaluationBasis: EvaluationBasis, resumeText: string) {
   const legacyAssessment = evaluationBasis.basisType === 'job_description'
@@ -16,9 +17,10 @@ export async function evaluateResumeAgainstBasis(evaluationBasis: EvaluationBasi
     }
   }
 
-  const criteriaModelAssessment = evaluationBasis.basisType === 'hiring_criteria'
+  const criteriaModelResult = evaluationBasis.basisType === 'hiring_criteria'
     ? await evaluateCandidateAgainstCriteria(evaluationBasis.jobDescriptionSnapshot, evaluationBasis.criteria, resumeText, evaluationBasis.id)
     : null;
+  const criteriaModelAssessment = criteriaModelResult?.evaluation ?? null;
   const criteriaProjection = criteriaModelAssessment && evaluationBasis.basisType === 'hiring_criteria'
     ? projectCriterionFindings(evaluationBasis.criteria, criteriaModelAssessment.criterionFindings)
     : null;
@@ -65,6 +67,17 @@ export async function evaluateResumeAgainstBasis(evaluationBasis: EvaluationBasi
       softSkills: legacyAssessment?.soft_skills_score ?? criteriaProjection!.categoryScores.soft_skills,
       keywords: legacyAssessment?.keyword_terminology_score ?? criteriaProjection!.categoryScores.keywords,
       match: overallMatch
-    }
+    },
+    neutralFindingsPersistence: evaluationBasis.basisType === 'hiring_criteria' && criteriaModelAssessment && criteriaModelResult ? {
+      hiringCriteriaVersionId: evaluationBasis.hiringCriteriaVersionId,
+      modelIdentifier: criteriaModelResult.modelIdentifier,
+      promptSchemaVersion: CRITERIA_EVALUATION_PROMPT_SCHEMA_VERSION,
+      findings: criteriaModelAssessment.criterionFindings.map((finding) => ({
+        ...finding,
+        criterionSemanticFingerprint: evaluationBasis.criteria.find((criterion) => criterion.id === finding.criterionId)!.semanticFingerprint
+          ?? fingerprintCriterionSemantics(evaluationBasis.criteria.find((criterion) => criterion.id === finding.criterionId)!),
+        semanticFingerprintVersion: CRITERION_SEMANTIC_FINGERPRINT_VERSION
+      }))
+    } : null
   };
 }

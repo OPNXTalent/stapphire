@@ -192,7 +192,10 @@ export async function processResumeEvaluationOperationItem(itemId: string): Prom
 
     const result = await evaluateResumeAgainstBasis(evaluationBasis, resumeText);
     const candidateName = result.candidateName || filename.replace(/\.[^.]+$/, '');
-    const { error: completionError } = await supabaseAdmin.rpc('complete_phase1_resume_operation_item', {
+    const completionRpc = result.neutralFindingsPersistence
+      ? 'complete_phase1_hiring_criteria_resume_operation_item_v1'
+      : 'complete_phase1_resume_operation_item';
+    const completionArguments = {
       p_item_id: item.id,
       p_lease_token: leaseToken,
       p_full_name: candidateName,
@@ -200,8 +203,14 @@ export async function processResumeEvaluationOperationItem(itemId: string): Prom
       p_scores: result.scores,
       p_verdict: result.verdict,
       p_assessment: result.assessment,
-      p_raw_model_response: result.rawModelResponse
-    });
+      p_raw_model_response: result.rawModelResponse,
+      ...(result.neutralFindingsPersistence ? {
+        p_findings: result.neutralFindingsPersistence.findings,
+        p_model_identifier: result.neutralFindingsPersistence.modelIdentifier,
+        p_prompt_schema_version: result.neutralFindingsPersistence.promptSchemaVersion
+      } : {})
+    };
+    const { error: completionError } = await supabaseAdmin.rpc(completionRpc, completionArguments);
     if (completionError) throw completionError;
     console.info('Resume evaluation item completed', { operationId: item.operationId, operationItemId: item.id, requisitionId: item.requisitionId });
     await reconcileQueuedResumeCapacity();
