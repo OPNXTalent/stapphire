@@ -3,7 +3,7 @@ import { getVercelOidcToken } from '@vercel/oidc';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
-const AI_MODEL = process.env.AI_GATEWAY_MODEL || 'openai/gpt-5.6-sol';
+const AI_MODEL = process.env.AI_GATEWAY_MODEL || 'openai/gpt-5.4';
 
 const sourceSchema = { type: 'object', additionalProperties: false, required: ['title', 'url'], properties: { title: { type: 'string' }, url: { type: 'string' } } };
 const schema = {
