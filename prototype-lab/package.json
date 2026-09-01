@@ -4,6 +4,7 @@
   "private": true,
   "scripts": { "build": "next build", "start": "next start" },
   "dependencies": {
+    "@vercel/oidc": "^3.0.5",
     "next": "14.2.5",
     "openai": "^7.4.0",
     "react": "^18.3.1",

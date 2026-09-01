@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { getVercelOidcToken } from '@vercel/oidc';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -13,8 +14,8 @@ const schema = {
   }
 };
 
-function openai() {
-  const apiKey = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
+async function openai() {
+  const apiKey = process.env.AI_GATEWAY_API_KEY || await getVercelOidcToken();
   if (!apiKey) throw new Error('AI Gateway authentication is unavailable.');
   return new OpenAI({ apiKey, baseURL: 'https://ai-gateway.vercel.sh/v1' });
 }
@@ -37,13 +38,17 @@ function verifySources(response, requested) {
 }
 
 export async function POST(request) {
+  const startedAt = Date.now();
+  const requestId = request.headers.get('x-vercel-id');
   try {
     const { title, jobDescription, criteria } = await request.json();
     if (!title?.trim() || !jobDescription?.trim() || !Array.isArray(criteria) || !criteria.length) return Response.json({ error: 'Position, job description, and weighted criteria are required.' }, { status: 400 });
     const total = criteria.reduce((sum, item) => sum + Number(item.weight || 0), 0);
     if (total !== 100) return Response.json({ error: `Criteria weights total ${total}%. They must equal 100%.` }, { status: 400 });
 
-    const response = await openai().responses.create({
+    console.log(JSON.stringify({ level: 'info', message: 'Prospect search started', requestId }));
+    const client = await openai();
+    const response = await client.responses.create({
       model: 'openai/gpt-5.6',
       instructions: `You are Stapphire's public-web talent sourcing researcher. Translate the supplied weighted criteria into a precise Boolean search strategy, then use web search to identify up to 8 real people with identity-resolved public professional evidence.
 
@@ -56,9 +61,15 @@ Prioritize the highest weights and exact occupational context. A similar title i
     const result = JSON.parse(response.output_text);
     result.prospects = result.prospects.map((prospect) => ({ ...prospect, sources: verifySources(response, prospect.sources) })).filter((prospect) => prospect.fullName?.trim() && prospect.publicEvidence?.trim() && prospect.sources.length).sort((a, b) => b.preliminaryScore - a.preliminaryScore);
     if (!result.prospects.length) return Response.json({ error: 'The search found no people with sufficiently verified public evidence. Refine the criteria and try again.' }, { status: 422 });
+    console.log(JSON.stringify({ level: 'info', message: 'Prospect search completed', requestId, prospects: result.prospects.length, durationMs: Date.now() - startedAt }));
     return Response.json(result);
   } catch (error) {
-    console.error('Prospect Lab search failed', error);
-    return Response.json({ error: 'The public-web search failed. Try again.' }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(JSON.stringify({ level: 'error', message: 'Prospect search failed', requestId, error: message, durationMs: Date.now() - startedAt }));
+    const authenticationFailed = message.includes('authentication is unavailable');
+    return Response.json(
+      { error: authenticationFailed ? 'The preview search service is not authenticated yet.' : 'The public-web search failed. Try again.' },
+      { status: authenticationFailed ? 503 : 500 }
+    );
   }
 }
