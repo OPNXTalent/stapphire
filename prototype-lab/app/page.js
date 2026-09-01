@@ -29,6 +29,7 @@ export default function Page() {
   const [title, setTitle] = useState('Senior Capital Improvement Manager');
   const [targetLocation, setTargetLocation] = useState('Richmond, VA');
   const [searchScope, setSearchScope] = useState('50_MILES');
+  const [targetCompensation, setTargetCompensation] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [gatesText, setGatesText] = useState(DEFAULT_GATES);
   const [criteriaText, setCriteriaText] = useState(DEFAULT_CRITERIA);
@@ -55,7 +56,7 @@ export default function Page() {
     if (evaluations[id]) { setOpenId(openId === id ? null : id); return; }
     if (qc < 1) { setError('No test QC remains. Refresh the page to reset the lab.'); return; }
     setBusy(id); setError('');
-    try { const response = await fetch('/api/evaluate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, targetLocation, searchScope, jobDescription, gates, criteria, prospect }) }); const body = await response.json(); if (!response.ok) throw new Error(body.error); setEvaluations((current) => ({ ...current, [id]: body })); setQc((current) => current - 1); setOpenId(id); }
+    try { const response = await fetch('/api/evaluate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, targetLocation, searchScope, targetCompensation, jobDescription, gates, criteria, prospect }) }); const body = await response.json(); if (!response.ok) throw new Error(body.error); setEvaluations((current) => ({ ...current, [id]: body })); setQc((current) => current - 1); setOpenId(id); }
     catch (caught) { setError(caught.message || 'Evaluation failed.'); }
     finally { setBusy(''); }
   }
@@ -66,6 +67,7 @@ export default function Page() {
     <section className="inputs">
       <label>Position title<input value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <div className="locationControls"><label>Target work location <small>Used for geographic feasibility—not qualification scoring</small><input value={targetLocation} onChange={(event) => setTargetLocation(event.target.value)} placeholder="City, state, region, remote, or hybrid expectation" /></label><label>Search radius or reach <small>Defines which prospect locations are in scope</small><select value={searchScope} onChange={(event) => setSearchScope(event.target.value)}><option value="25_MILES">Within 25 miles</option><option value="50_MILES">Within 50 miles</option><option value="100_MILES">Within 100 miles</option><option value="500_MILES">Within 500 miles</option><option value="NATIONAL">National</option><option value="GLOBAL">Global</option></select></label></div>
+      <label>Target compensation range <small>Optional. Used only for compensation alignment—not qualification scoring.</small><input value={targetCompensation} onChange={(event) => setTargetCompensation(event.target.value)} placeholder="Example: $120,000–$145,000 base" /></label>
       <label>Job description<textarea value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} placeholder="Paste the complete difficult-to-fill requisition here…" /></label>
       <label>Non-negotiable sourcing gates <small>One per line. A contradiction excludes the prospect; missing evidence marks the prospect Possible.</small><textarea className="criteria" value={gatesText} onChange={(event) => setGatesText(event.target.value)} /></label>
       <label>Weighted criteria <small>One per line: criterion | weight</small><textarea className="criteria" value={criteriaText} onChange={(event) => setCriteriaText(event.target.value)} /></label>

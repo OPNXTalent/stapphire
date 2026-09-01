@@ -88,7 +88,7 @@ export async function POST(request) {
   const startedAt = Date.now();
   const requestId = request.headers.get('x-vercel-id');
   try {
-    const { title, targetLocation, searchScope, jobDescription, gates, criteria, prospect } = await request.json();
+    const { title, targetLocation, searchScope, targetCompensation, jobDescription, gates, criteria, prospect } = await request.json();
     if (!title || !jobDescription || !Array.isArray(gates) || !gates.length || !Array.isArray(criteria) || !prospect?.fullName) return Response.json({ error: 'Evaluation input is incomplete.' }, { status: 400 });
     console.log(JSON.stringify({ level: 'info', message: 'Prospect evaluation started', requestId, prospect: prospect.fullName }));
     const client = await openai();
@@ -99,7 +99,7 @@ export async function POST(request) {
 First evaluate every non-negotiable sourcing gate exactly once. Similar titles and transferable skills do not satisfy an occupational or industry gate. Missing, ambiguous, stale, or inaccessible evidence is UNABLE_TO_DETERMINE—not NOT_MET. NOT_MET requires an explicit contradiction.
 
 Then evaluate every weighted criterion exactly once. Score only 0, 25, 50, 75, or 100. Estimate market compensation as a broad range from role, seniority, geography, employer context, and reliable public benchmarks; do not claim to know present salary. Treat opportunity receptivity as an outreach hypothesis based only on observable professional signals. Use UNKNOWN and LOW confidence when evidence is weak. Compensation and receptivity must never affect qualification scoring. Return direct public sources. This is sourcing intelligence, not an employment decision.`,
-      input: `POSITION\n${title}\n\nTARGET WORK LOCATION\n${targetLocation?.trim() || 'Not specified'}\n\nSEARCH SCOPE\n${searchScope || '50_MILES'}\n\nJOB DESCRIPTION\n${jobDescription}\n\nNON-NEGOTIABLE SOURCING GATES\n${JSON.stringify(gates)}\n\nWEIGHTED CRITERIA\n${JSON.stringify(criteria)}\n\nPROSPECT\n${JSON.stringify(prospect)}`,
+      input: `POSITION\n${title}\n\nTARGET WORK LOCATION\n${targetLocation?.trim() || 'Not specified'}\n\nSEARCH SCOPE\n${searchScope || '50_MILES'}\n\nTARGET COMPENSATION RANGE\n${targetCompensation?.trim() || 'Not specified; return UNKNOWN alignment'}\n\nJOB DESCRIPTION\n${jobDescription}\n\nNON-NEGOTIABLE SOURCING GATES\n${JSON.stringify(gates)}\n\nWEIGHTED CRITERIA\n${JSON.stringify(criteria)}\n\nPROSPECT\n${JSON.stringify(prospect)}`,
       tools: [{ type: 'web_search' }], include: ['web_search_call.action.sources'], store: false, max_output_tokens: 14000,
       text: { format: { type: 'json_schema', name: 'prospect_evaluation', strict: true, schema: schema(criteria, gates) } }
     });
