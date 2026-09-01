@@ -9,8 +9,36 @@ const sourceSchema = { type: 'object', additionalProperties: false, required: ['
 
 function schema(criteria, gates) {
   return {
-    type: 'object', additionalProperties: false, required: ['booleanQuery', 'strategyRationale', 'prospects'], properties: {
+    type: 'object', additionalProperties: false, required: ['booleanQuery', 'strategyRationale', 'marketAnalysis', 'prospects'], properties: {
       booleanQuery: { type: 'string' }, strategyRationale: { type: 'string' },
+      marketAnalysis: {
+        type: 'object', additionalProperties: false,
+        required: ['scarcityLevel', 'confidence', 'summary', 'constraintDrivers', 'relaxationLevers', 'evidenceCaveat'],
+        properties: {
+          scarcityLevel: { type: 'string', enum: ['BROAD', 'COMPETITIVE', 'SCARCE', 'UNICORN'] },
+          confidence: { type: 'string', enum: ['HIGH', 'MODERATE', 'LOW'] },
+          summary: { type: 'string' },
+          constraintDrivers: {
+            type: 'array', items: {
+              type: 'object', additionalProperties: false, required: ['constraint', 'impact', 'explanation'], properties: {
+                constraint: { type: 'string' },
+                impact: { type: 'string', enum: ['HIGH', 'MODERATE', 'LOW'] },
+                explanation: { type: 'string' }
+              }
+            }
+          },
+          relaxationLevers: {
+            type: 'array', items: {
+              type: 'object', additionalProperties: false, required: ['change', 'likelyEffect', 'tradeoff'], properties: {
+                change: { type: 'string' },
+                likelyEffect: { type: 'string' },
+                tradeoff: { type: 'string' }
+              }
+            }
+          },
+          evidenceCaveat: { type: 'string' }
+        }
+      },
       prospects: { type: 'array', maxItems: 8, items: {
         type: 'object', additionalProperties: false,
         required: ['fullName', 'headline', 'location', 'geographicFit', 'publicEvidence', 'gateFindings', 'criterionSignals', 'sources'],
@@ -94,7 +122,7 @@ Treat SOURCING GATES as non-negotiable occupational identity checks, not weighte
 Apply SEARCH SCOPE to the target work location. For a mileage radius, use credible location evidence and ordinary geographic distance. National means anywhere in the target location's country; Global means no country restriction. Do not return a prospect known to be outside scope. A strong prospect with uncertain location may be returned as UNABLE_TO_DETERMINE.
 
 Search public professional profiles, employer and government bios, associations, conferences, portfolios, certifications, and publications. Never seek contact details, current salary, or protected traits. Never merge namesakes. Return a person only when sources establish identity and relevant experience. Location must be reported only at the precision supported by public evidence; use UNKNOWN when it cannot be established. Criterion scores describe available-evidence alignment, not a hiring decision. Missing evidence is unknown, not negative.`,
-      input: `POSITION\n${title}\n\nTARGET WORK LOCATION\n${targetLocation?.trim() || 'Not specified'}\n\nSEARCH SCOPE\n${searchScope || '50_MILES'}\n\nJOB DESCRIPTION\n${jobDescription}\n\nNON-NEGOTIABLE SOURCING GATES\n${JSON.stringify(gates)}\n\nWEIGHTED CRITERIA\n${JSON.stringify(criteria)}`,
+      input: `POSITION\n${title}\n\nTARGET WORK LOCATION\n${targetLocation?.trim() || 'Not specified'}\n\nSEARCH SCOPE\n${searchScope || '50_MILES'}\n\nJOB DESCRIPTION\n${jobDescription}\n\nNON-NEGOTIABLE SOURCING GATES\n${JSON.stringify(gates)}\n\nWEIGHTED CRITERIA\n${JSON.stringify(criteria)}\n\nMARKET ANALYSIS STANDARD\nClassify the discoverable talent market as BROAD, COMPETITIVE, SCARCE, or UNICORN. UNICORN means the intersection of occupational domain, seniority, required experience, geography, and other gates appears exceptionally rare—not merely that one search returned few people. Distinguish genuine labor-market scarcity from weak public visibility or uncertain evidence. Identify the strongest constraint drivers and practical relaxation levers with their tradeoffs.`,
       tools: [{ type: 'web_search' }], include: ['web_search_call.action.sources'], store: false, max_output_tokens: 12000,
       text: { format: { type: 'json_schema', name: 'prospect_search', strict: true, schema: schema(criteria, gates) } }
     });
@@ -116,7 +144,7 @@ Search public professional profiles, employer and government bios, associations,
       const preliminaryScore = Math.round(criteria.reduce((sum, criterion) => sum + (byId.get(criterion.id)?.score || 0) * criterion.weight, 0) / 100);
       return [{ ...prospect, sources, sourcingFit, preliminaryScore }];
     }).sort((a, b) => (a.sourcingFit === b.sourcingFit ? b.preliminaryScore - a.preliminaryScore : a.sourcingFit === 'QUALIFIED' ? -1 : 1));
-    if (!result.prospects.length) return Response.json({ error: 'The search found no people with sufficiently verified public evidence. Refine the criteria and try again.' }, { status: 422 });
+    result.marketAnalysis.observedProspects = result.prospects.length;
     console.log(JSON.stringify({ level: 'info', message: 'Prospect search completed', requestId, prospects: result.prospects.length, durationMs: Date.now() - startedAt }));
     return Response.json(result);
   } catch (error) {
