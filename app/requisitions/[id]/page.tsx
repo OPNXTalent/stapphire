@@ -4,6 +4,7 @@ import { RequisitionViewToggle } from '@/components/RequisitionViewToggle';
 import { DNSBin, type DNSCandidate } from '@/components/DNSBin';
 import { HiringCriteria } from '@/components/HiringCriteria';
 import { InterviewPlan } from '@/components/InterviewPlan';
+import { ProspectSourcing } from '@/components/ProspectSourcing';
 import { getHiringCriteriaModel } from '@/lib/hiringCriteria';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -201,6 +202,7 @@ export default async function RequisitionPage({ params }: { params: { id: string
       jobDescription={req.job_description}
       dnsAction={<DNSBin candidates={dnsCandidates} />}
       hiringCriteriaView={hiringCriteriaView}
+      sourcingView={<ProspectSourcing requisitionId={req.id} />}
       interviewsView={interviewsView}
       candidatesView={candidatesView}
     />
