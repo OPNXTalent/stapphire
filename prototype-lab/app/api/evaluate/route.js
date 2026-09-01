@@ -3,6 +3,7 @@ import { getVercelOidcToken } from '@vercel/oidc';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
+const AI_MODEL = process.env.AI_GATEWAY_MODEL || 'openai/gpt-5.6-sol';
 
 const sourceSchema = { type: 'object', additionalProperties: false, required: ['title', 'url'], properties: { title: { type: 'string' }, url: { type: 'string' } } };
 
@@ -59,7 +60,7 @@ export async function POST(request) {
     console.log(JSON.stringify({ level: 'info', message: 'Prospect evaluation started', requestId, prospect: prospect.fullName }));
     const client = await openai();
     const response = await client.responses.create({
-      model: 'openai/gpt-5.6',
+      model: AI_MODEL,
       instructions: `Research the named person using public professional sources and evaluate only the supplied weighted criteria. Resolve identity carefully; never merge namesakes. Never seek contact details or protected traits. Do not invent experience. Missing, ambiguous, stale, or inaccessible evidence is UNABLE_TO_DETERMINE—not NOT_MET. NOT_MET requires an explicit contradiction. Score only 0, 25, 50, 75, or 100. Return every criterion exactly once with direct public sources. This is a sourcing evaluation, not an employment decision.`,
       input: `POSITION\n${title}\n\nJOB DESCRIPTION\n${jobDescription}\n\nWEIGHTED CRITERIA\n${JSON.stringify(criteria)}\n\nPROSPECT\n${JSON.stringify(prospect)}`,
       tools: [{ type: 'web_search' }], include: ['web_search_call.action.sources'], store: false, max_output_tokens: 14000,

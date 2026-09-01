@@ -3,6 +3,7 @@ import { getVercelOidcToken } from '@vercel/oidc';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
+const AI_MODEL = process.env.AI_GATEWAY_MODEL || 'openai/gpt-5.6-sol';
 
 const sourceSchema = { type: 'object', additionalProperties: false, required: ['title', 'url'], properties: { title: { type: 'string' }, url: { type: 'string' } } };
 const schema = {
@@ -49,7 +50,7 @@ export async function POST(request) {
     console.log(JSON.stringify({ level: 'info', message: 'Prospect search started', requestId }));
     const client = await openai();
     const response = await client.responses.create({
-      model: 'openai/gpt-5.6',
+      model: AI_MODEL,
       instructions: `You are Stapphire's public-web talent sourcing researcher. Translate the supplied weighted criteria into a precise Boolean search strategy, then use web search to identify up to 8 real people with identity-resolved public professional evidence.
 
 Prioritize the highest weights and exact occupational context. A similar title is not proof of relevant duties. Explicitly exclude false-positive industries and meanings. Search public professional profiles, employer and government bios, associations, conferences, portfolios, certifications, and publications. Never seek contact details or protected traits. Never merge namesakes. Return a person only when sources establish both identity and relevant experience. Preliminary score means available-evidence alignment—not a hiring decision. Missing evidence is unknown, not negative.`,
