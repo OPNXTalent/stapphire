@@ -25,6 +25,12 @@ test('search requires an applied Hiring Criteria basis and does not perform QC b
   assert.doesNotMatch(searchRoute, /credits_remaining|consume_qc/);
 });
 
+test('a complete criteria draft can be applied directly from the sourcing workspace', () => {
+  assert.match(component, /Apply Criteria & Enable Sourcing/);
+  assert.match(component, /action: 'apply'/);
+  assert.match(searchRoute, /criteriaReadyToApply/);
+});
+
 test('evaluation charges only through the atomic persistence RPC after generation', () => {
   const generation = evaluationRoute.indexOf('await evaluateProspect');
   const billing = evaluationRoute.indexOf("rpc('consume_qc_and_unlock_prospect_evaluation_v1'");

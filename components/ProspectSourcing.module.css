@@ -60,6 +60,15 @@
   color: var(--amber);
   font-size: 13px;
 }
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.notice button {
+  flex: none;
+}
 .error {
   border-color: var(--red);
   background: var(--red-tint);

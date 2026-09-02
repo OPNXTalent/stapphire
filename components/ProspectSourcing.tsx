@@ -28,7 +28,7 @@ type Search = {
   created_at: string;
   prospects: Prospect[];
 };
-type Payload = { criteriaApplied: boolean; currentEvaluationBasisId: string | null; criteria: Criterion[]; defaults: { targetLocation: string; targetCompensation: string; searchScope: string; gates: Gate[] }; search: Search | null; stale: boolean };
+type Payload = { criteriaApplied: boolean; criteriaReadyToApply: boolean; currentEvaluationBasisId: string | null; criteria: Criterion[]; defaults: { targetLocation: string; targetCompensation: string; searchScope: string; gates: Gate[] }; search: Search | null; stale: boolean };
 
 function List({ items, empty }: { items: string[]; empty: string }) {
   return items.length ? <ul>{items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul> : <p className={styles.muted}>{empty}</p>;
@@ -38,6 +38,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [evaluatingId, setEvaluatingId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -80,6 +81,28 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
       setError(caught instanceof Error ? caught.message : 'Unable to source prospects.');
     } finally {
       setSearching(false);
+    }
+  }
+
+  async function applyCriteria() {
+    setApplying(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/requisitions/${requisitionId}/hiring-criteria`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'apply' }) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || 'Unable to apply Hiring Criteria.');
+      const refreshed = await fetch(`/api/requisitions/${requisitionId}/prospects`, { cache: 'no-store' });
+      const payloadBody = await refreshed.json();
+      if (!refreshed.ok) throw new Error(payloadBody.error || 'Unable to refresh sourcing.');
+      setPayload(payloadBody);
+      setTargetLocation(payloadBody.defaults?.targetLocation || '');
+      setTargetCompensation(payloadBody.defaults?.targetCompensation || '');
+      setSearchScope(payloadBody.defaults?.searchScope || '50_MILES');
+      setGateText((payloadBody.defaults?.gates || []).map((gate: Gate) => gate.label).join('\n'));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to apply Hiring Criteria.');
+    } finally {
+      setApplying(false);
     }
   }
 
@@ -137,7 +160,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
         <label className={styles.gates}>Non-negotiable sourcing gates <span>one per line</span><textarea value={gateText} onChange={(event) => setGateText(event.target.value)} rows={3} /></label>
       </div>}
 
-      {!payload?.criteriaApplied && <div className={styles.notice}>Apply Hiring Criteria with a total weight of 100% before sourcing.</div>}
+      {!payload?.criteriaApplied && <div className={styles.notice}>{payload?.criteriaReadyToApply ? <><span>Your Hiring Criteria are complete and total 100%. Apply them to create the immutable sourcing basis.</span><button type="button" onClick={applyCriteria} disabled={applying}>{applying ? 'Applying…' : 'Apply Criteria & Enable Sourcing'}</button></> : 'Complete and apply Hiring Criteria with a total weight of 100% before sourcing.'}</div>}
       {payload?.stale && <div className={styles.notice}>The Hiring Criteria changed after this search. Run a new search before unlocking evaluations.</div>}
       {error && <div className={styles.error} role="alert">{error}</div>}
 

@@ -18,6 +18,23 @@ async function loadRequisition(requisitionId: string) {
   return data;
 }
 
+async function criteriaReadyToApply(requisitionId: string) {
+  const { data: model, error: modelError } = await supabaseAdmin
+    .from('phase1_hiring_criteria_models')
+    .select('id,extraction_status')
+    .eq('requisition_id', requisitionId)
+    .maybeSingle();
+  if (modelError) throw modelError;
+  if (!model || model.extraction_status !== 'ready') return false;
+  const { data: items, error: itemsError } = await supabaseAdmin
+    .from('phase1_hiring_criteria_items')
+    .select('draft_weight,is_knockout')
+    .eq('model_id', model.id);
+  if (itemsError) throw itemsError;
+  const weighted = (items || []).filter((item) => !item.is_knockout);
+  return weighted.length > 0 && weighted.reduce((sum, item) => sum + Number(item.draft_weight || 0), 0) === 100;
+}
+
 async function latestSearch(requisitionId: string) {
   const { data: search, error: searchError } = await supabaseAdmin
     .from('phase1_prospect_searches')
@@ -54,15 +71,17 @@ async function latestSearch(requisitionId: string) {
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
-    const [requisition, basis, search, intelligence] = await Promise.all([
+    const [requisition, basis, search, intelligence, readyToApply] = await Promise.all([
       loadRequisition(params.id),
       resolveCurrentEvaluationBasis(params.id),
       latestSearch(params.id),
-      getLatestRequisitionIntelligence(params.id)
+      getLatestRequisitionIntelligence(params.id),
+      criteriaReadyToApply(params.id)
     ]);
     if (!requisition) return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 });
     return NextResponse.json({
       criteriaApplied: basis?.basisType === 'hiring_criteria',
+      criteriaReadyToApply: basis?.basisType !== 'hiring_criteria' && readyToApply,
       currentEvaluationBasisId: basis?.id ?? null,
       criteria: basis?.basisType === 'hiring_criteria' ? basis.criteria.map((criterion) => ({
         id: criterion.id,
