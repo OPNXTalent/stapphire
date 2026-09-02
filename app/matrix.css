@@ -6,7 +6,7 @@
 .requisition-workspace.requisition-active{height:100%;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .requisition-workspace.requisition-active>.requisition-view-tabs,.requisition-workspace.requisition-active>.requisition-title-row{flex:none}
 .requisition-detail-view:not([hidden]){display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden}
-.requisition-workspace-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));flex:none;margin-bottom:8px;border:1px solid var(--line-strong);border-radius:6px;overflow:hidden;background:var(--paper)}
+.requisition-workspace-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));flex:none;margin-bottom:8px;border:1px solid var(--line-strong);border-radius:6px;overflow:hidden;background:var(--paper)}
 .requisition-workspace-tabs button{min-width:0;padding:8px 10px;border:0;border-right:1px solid var(--line-strong);border-radius:0;background:var(--paper);color:var(--deep);font-size:11.5px;white-space:nowrap}
 .requisition-workspace-tabs button:last-child{border-right:0}
 .requisition-workspace-tabs button:hover:not(.active){position:relative;box-shadow:inset 0 0 0 1px var(--sapphire);background:var(--paper);color:var(--deep)}
