@@ -105,7 +105,9 @@ export function validateAppliedCriteriaSnapshot(value: unknown): AppliedCriterio
     const category = item?.category;
     const label = typeof item?.label === 'string' ? item.label.trim() : '';
     const appliedWeight = item?.appliedWeight;
-    const isKnockout = item?.isKnockout;
+    // Versions created before Knockout criteria existed omit this field. Their
+    // historical meaning is weighted, not knockout.
+    const isKnockout = item?.isKnockout === undefined ? false : item.isKnockout;
     if (!id || seen.has(id) || !CRITERIA_CATEGORIES.includes(category as CriteriaCategory) || !label || !Number.isInteger(appliedWeight) || Number(appliedWeight) < 0 || Number(appliedWeight) > 100 || typeof isKnockout !== 'boolean') {
       throw new Error('Applied Hiring Criteria snapshot is malformed.');
     }

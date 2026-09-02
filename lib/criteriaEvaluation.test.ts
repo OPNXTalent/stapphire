@@ -59,6 +59,8 @@ test('coverage rejects missing, duplicate, unknown, and wrong-array criteria', (
 
 test('applied snapshots require valid exhaustive weighting', () => {
   assert.equal(validateAppliedCriteriaSnapshot(criteria).length, criteria.length);
+  const legacy = criteria.filter((criterion) => !criterion.isKnockout).map(({ isKnockout: _omitted, ...criterion }) => criterion);
+  assert.ok(validateAppliedCriteriaSnapshot(legacy).every((criterion) => criterion.isKnockout === false));
   assert.throws(() => validateAppliedCriteriaSnapshot(null), /malformed/);
   assert.throws(() => validateAppliedCriteriaSnapshot(criteria.map((item) => item.id === 'r1' ? { ...item, appliedWeight: 34 } : item)), /exactly 100/);
   assert.throws(() => validateAppliedCriteriaSnapshot([...criteria, criteria[0]]), /malformed/);
