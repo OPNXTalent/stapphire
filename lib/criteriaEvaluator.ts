@@ -2,20 +2,23 @@ import OpenAI from 'openai';
 import type { ModelEvaluation } from './evaluation';
 import { candidateEvaluationSchema } from './evaluator';
 import {
-  buildCriterionResultArraySchema,
-  validateCriterionResults,
+  buildNeutralCriterionFindingArraySchema,
+  validateNeutralCriterionFindings,
   type AppliedCriterion,
-  type KnockoutCriterionResult,
-  type WeightedCriterionResult
 } from './criteriaEvaluation';
+import { type CriterionFinding } from './criterionProjection';
 
 const EVALUATION_MODEL = process.env.OPENAI_EVALUATION_MODEL || 'gpt-5.6';
 const MAX_OUTPUT_TOKENS = 16000;
+export const CRITERIA_EVALUATION_PROMPT_SCHEMA_VERSION = 'criteria_evaluation_neutral_findings_v1';
 
 type NarrativeEvaluation = Omit<ModelEvaluation, 'job_responsibilities_score' | 'hard_skills_score' | 'soft_skills_score' | 'keyword_terminology_score'>;
 export type CriteriaAwareModelEvaluation = NarrativeEvaluation & {
-  weighted_criteria: WeightedCriterionResult[];
-  knockout_criteria: KnockoutCriterionResult[];
+  criterionFindings: CriterionFinding[];
+};
+export type CriteriaAwareModelResult = {
+  evaluation: CriteriaAwareModelEvaluation;
+  modelIdentifier: string;
 };
 
 function getOpenAIClient() {
@@ -31,18 +34,19 @@ export function buildCriteriaEvaluationSchema(criteria: AppliedCriterion[]) {
   return {
     type: 'object',
     additionalProperties: false,
-    required: [...narrativeRequired, 'weighted_criteria', 'knockout_criteria'],
+    required: [...narrativeRequired, 'criterionFindings'],
     properties: {
       ...narrativeProperties,
-      weighted_criteria: buildCriterionResultArraySchema(criteria, false),
-      knockout_criteria: buildCriterionResultArraySchema(criteria, true)
+      criterionFindings: buildNeutralCriterionFindingArraySchema(criteria)
     }
   } as const;
 }
 
 const SYSTEM_PROMPT = `You are Stapphire's evidence-based candidate evaluator. Evaluate the complete resume against the exact immutable Hiring Criteria supplied by the application.
 
-For every non-knockout criterion, return exactly one result using only this scale:
+For every supplied criterion, return exactly one treatment-neutral finding. Populate both alignmentScore and satisfactionStatus regardless of the criterion's current treatment.
+
+Use only this alignmentScore scale:
 100 = strongly and directly demonstrated
 75 = substantially demonstrated
 50 = partially or transferably demonstrated
@@ -51,15 +55,15 @@ For every non-knockout criterion, return exactly one result using only this scal
 
 Evaluate zero-weight non-knockout criteria too. Do not calculate Match, category totals, weights, or category rollups. Do not change criterion IDs, labels, categories, or weights.
 
-For every Knockout, return exactly one status:
+Use exactly one satisfactionStatus for every criterion:
 MET when the resume explicitly demonstrates it;
 NOT_MET only when the resume explicitly contradicts it or clearly establishes it is not satisfied;
 UNABLE_TO_DETERMINE when the resume is silent, ambiguous, outdated, or insufficient.
 Absence of evidence is not NOT_MET. Knockouts are separate from Match.
 
-Use only resume evidence. Treat grounded transferable evidence meaningfully, identify unknowns as items to verify, and do not invent experience. Return every supplied criterion exactly once in the correct array and preserve the existing evidence-based narrative fields required by the schema. Do not make an employment disposition or hiring decision.`;
+Use only resume evidence. Treat grounded transferable evidence meaningfully, identify unknowns as items to verify, and do not invent experience. Return every supplied criterion exactly once and preserve the existing evidence-based narrative fields required by the schema. Do not make an employment disposition or hiring decision.`;
 
-export async function evaluateCandidateAgainstCriteria(jobDescription: string, criteria: AppliedCriterion[], resumeText: string, evaluationBasisId: string): Promise<CriteriaAwareModelEvaluation> {
+export async function evaluateCandidateAgainstCriteria(jobDescription: string, criteria: AppliedCriterion[], resumeText: string, evaluationBasisId: string): Promise<CriteriaAwareModelResult> {
   const openai = getOpenAIClient();
   const response = await openai.responses.create({
     model: EVALUATION_MODEL,
@@ -81,17 +85,15 @@ export async function evaluateCandidateAgainstCriteria(jobDescription: string, c
     throw new Error('OpenAI returned an invalid structured criteria evaluation. Please try again.');
   }
   try {
-    validateCriterionResults(criteria, evaluation.weighted_criteria, evaluation.knockout_criteria);
+    validateNeutralCriterionFindings(criteria, evaluation.criterionFindings);
   } catch (error) {
     console.error('Criteria evaluation validation failed', {
       failureType: error instanceof Error ? error.message : 'Unknown criteria validation failure.',
       evaluationBasisId,
-      expectedWeightedCriterionIds: criteria.filter((criterion) => !criterion.isKnockout).map((criterion) => criterion.id),
-      expectedKnockoutCriterionIds: criteria.filter((criterion) => criterion.isKnockout).map((criterion) => criterion.id),
-      returnedWeightedCriterionIds: Array.isArray(evaluation.weighted_criteria) ? evaluation.weighted_criteria.map((criterion) => criterion?.criterion_id).filter((id): id is string => typeof id === 'string') : [],
-      returnedKnockoutCriterionIds: Array.isArray(evaluation.knockout_criteria) ? evaluation.knockout_criteria.map((criterion) => criterion?.criterion_id).filter((id): id is string => typeof id === 'string') : []
+      expectedCriterionIds: criteria.map((criterion) => criterion.id),
+      returnedCriterionIds: Array.isArray(evaluation.criterionFindings) ? evaluation.criterionFindings.map((criterion) => criterion?.criterionId).filter((id): id is string => typeof id === 'string') : []
     });
     throw error;
   }
-  return evaluation;
+  return { evaluation, modelIdentifier: response.model };
 }

@@ -9,6 +9,7 @@ import { subscribeToResumeOperationTerminal } from '@/lib/resumeTerminalSync';
 const requisitionTabs: { id: RequisitionTab; label: string }[] = [
   { id: 'job-description', label: 'Job Description' },
   { id: 'hiring-criteria', label: 'Hiring Criteria' },
+  { id: 'sourcing', label: 'Sourcing' },
   { id: 'interviews', label: 'Interviews' }
 ];
 
@@ -18,6 +19,7 @@ export function RequisitionViewToggle({
   jobDescription,
   dnsAction,
   hiringCriteriaView,
+  sourcingView,
   interviewsView,
   candidatesView
 }: {
@@ -26,6 +28,7 @@ export function RequisitionViewToggle({
   jobDescription: string;
   dnsAction: ReactNode;
   hiringCriteriaView: ReactNode;
+  sourcingView: ReactNode;
   interviewsView: ReactNode;
   candidatesView: ReactNode;
 }) {
@@ -41,6 +44,8 @@ export function RequisitionViewToggle({
 
   const activeRequisitionView = requisitionTab === 'hiring-criteria'
     ? hiringCriteriaView
+    : requisitionTab === 'sourcing'
+      ? sourcingView
     : requisitionTab === 'interviews'
       ? interviewsView
       : <RequisitionJobDescription requisitionId={requisitionId} title={title} jobDescription={jobDescription} />;

@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 export type RequisitionView = 'requisition' | 'candidates';
-export type RequisitionTab = 'job-description' | 'hiring-criteria' | 'interviews';
+export type RequisitionTab = 'job-description' | 'hiring-criteria' | 'sourcing' | 'interviews';
 export type PanelTab = 'teamwork' | 'upload';
 
 type RequisitionViewState = {
@@ -20,7 +20,7 @@ const DEFAULT_STATE: RequisitionViewState = {
 };
 
 const VIEW_VALUES: RequisitionView[] = ['requisition', 'candidates'];
-const TAB_VALUES: RequisitionTab[] = ['job-description', 'hiring-criteria', 'interviews'];
+const TAB_VALUES: RequisitionTab[] = ['job-description', 'hiring-criteria', 'sourcing', 'interviews'];
 const PANEL_VALUES: PanelTab[] = ['teamwork', 'upload'];
 
 const PARAM_KEYS = { view: 'view', requisitionTab: 'tab', panelTab: 'panel' } as const;
