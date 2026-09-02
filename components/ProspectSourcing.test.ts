@@ -8,6 +8,7 @@ const directory = dirname(fileURLToPath(import.meta.url));
 const component = readFileSync(join(directory, 'ProspectSourcing.tsx'), 'utf8');
 const searchRoute = readFileSync(join(directory, '..', 'app', 'api', 'requisitions', '[id]', 'prospects', 'route.ts'), 'utf8');
 const evaluationRoute = readFileSync(join(directory, '..', 'app', 'api', 'requisitions', '[id]', 'prospects', '[prospectId]', 'evaluation', 'route.ts'), 'utf8');
+const sourcingEngine = readFileSync(join(directory, '..', 'lib', 'prospectSourcing.ts'), 'utf8');
 
 test('locked shortlist exposes name, location, sourcing fit, score, and explicit QC action', () => {
   assert.match(component, /<strong>\{prospect\.full_name\}<\/strong>/);
@@ -29,6 +30,14 @@ test('a complete criteria draft can be applied directly from the sourcing worksp
   assert.match(component, /Apply Criteria & Enable Sourcing/);
   assert.match(component, /action: 'apply'/);
   assert.match(searchRoute, /criteriaReadyToApply/);
+});
+
+test('free sourcing stays compact while the QC evaluation owns the full criteria matrix', () => {
+  const searchSchema = sourcingEngine.slice(sourcingEngine.indexOf('function searchSchema'), sourcingEngine.indexOf('function evaluationSchema'));
+  assert.match(searchSchema, /preliminaryScore/);
+  assert.doesNotMatch(searchSchema, /criterionSignals/);
+  assert.match(sourcingEngine, /criterionSignals: \[\]/);
+  assert.match(sourcingEngine, /do not emit a criterion-by-criterion matrix during sourcing/);
 });
 
 test('evaluation charges only through the atomic persistence RPC after generation', () => {
