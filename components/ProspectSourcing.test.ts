@@ -37,6 +37,8 @@ test('free sourcing stays compact while the QC evaluation owns the full criteria
   assert.match(searchSchema, /criterionScores/);
   assert.doesNotMatch(searchSchema, /criterionSignals/);
   assert.match(sourcingEngine, /criterionScores\[index\] \* criterion\.appliedWeight/);
+  assert.match(sourcingEngine, /SOURCING_FIT_UPLIFT = 4/);
+  assert.match(sourcingEngine, /Materially overlapping criteria must receive consistent scores/);
   assert.match(sourcingEngine, /Do not emit criterion IDs or criterion evidence during sourcing/);
   assert.match(component, /Preliminary fit/);
   assert.match(component, /Qualified fit/);

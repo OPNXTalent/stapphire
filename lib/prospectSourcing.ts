@@ -5,6 +5,7 @@ import { projectCriterionFindings, type CriterionFinding } from './criterionProj
 
 const SOURCING_MODEL = process.env.AI_GATEWAY_MODEL || 'openai/gpt-5.4';
 const MAX_PROSPECTS = 8;
+const SOURCING_FIT_UPLIFT = 4;
 
 export const SEARCH_SCOPES = ['25_MILES', '50_MILES', '100_MILES', '500_MILES', 'NATIONAL', 'GLOBAL'] as const;
 export type SearchScope = typeof SEARCH_SCOPES[number];
@@ -197,7 +198,7 @@ export async function searchForProspects(input: { title: string; jobDescription:
     model: SOURCING_MODEL,
     instructions: `You are Stapphire's public-web talent sourcing researcher. Translate the non-negotiable sourcing gates and immutable weighted Hiring Criteria into a precise Boolean search strategy, then identify up to ${MAX_PROSPECTS} real people with identity-resolved public evidence.
 
-Gates are occupational identity checks, not weighted preferences. Similar titles and transferable skills never prove the required professional domain. Exclude contradicted gates and known out-of-scope locations. Evaluate every gate. For each person, return criterionScores in the exact same order as WEIGHTED CRITERIA, using only 0, 25, 50, 75, or 100. Do not emit criterion IDs or criterion evidence during sourcing; the paid evaluation performs that evidence audit. Missing public evidence is unknown rather than proof that a criterion is not met. Search public professional pages, employer and government bios, associations, conferences, portfolios, certifications, and publications. Never seek contact details, current salary, protected traits, or merge namesakes.
+Gates are occupational identity checks, not weighted preferences. Similar titles and transferable skills never prove the required professional domain. Exclude contradicted gates and known out-of-scope locations. Evaluate every gate. For each person, return criterionScores in the exact same order as WEIGHTED CRITERIA, using only 0, 25, 50, 75, or 100. Score probable professional alignment for sourcing: use direct public evidence plus reasonable role-based inference, while reserving 0 for contradiction or no credible related signal. Materially overlapping criteria must receive consistent scores when supported by the same experience. Do not emit criterion IDs or criterion evidence during sourcing; the paid evaluation performs that evidence audit. Missing public evidence is unknown rather than proof that a criterion is not met. Search public professional pages, employer and government bios, associations, conferences, portfolios, certifications, and publications. Never seek contact details, current salary, protected traits, or merge namesakes.
 
 Classify the discoverable market as BROAD, COMPETITIVE, SCARCE, or UNICORN from the intersection of domain, seniority, requirements, geography, and gates. Distinguish genuine scarcity from weak public visibility. Missing evidence is unknown, not negative.`,
     input: `POSITION\n${input.title}\n\nTARGET LOCATION\n${input.targetLocation || 'Not specified'}\n\nSEARCH SCOPE\n${input.searchScope}\n\nTARGET COMPENSATION\n${input.targetCompensation || 'Not specified'}\n\nJOB DESCRIPTION\n${input.jobDescription}\n\nNON-NEGOTIABLE GATES\n${JSON.stringify(input.gates)}\n\nWEIGHTED CRITERIA\n${JSON.stringify(input.criteria)}`,
@@ -219,7 +220,8 @@ Classify the discoverable market as BROAD, COMPETITIVE, SCARCE, or UNICORN from 
     const sources = verifiedWebSources(response, prospect.sources);
     if (!prospect.fullName.trim() || !prospect.publicEvidence.trim() || !sources.length || prospect.geographicFit === 'OUTSIDE_SCOPE' || prospect.gateFindings.some((item) => item.status === 'NOT_MET')) return [];
     const criterionSignals = input.criteria.map((criterion, index) => ({ criterionId: criterion.id, score: prospect.criterionScores[index], evidence: '' }));
-    const preliminaryScore = Math.round(input.criteria.reduce((sum, criterion, index) => sum + prospect.criterionScores[index] * criterion.appliedWeight, 0) / 100);
+    const evidenceWeightedScore = Math.round(input.criteria.reduce((sum, criterion, index) => sum + prospect.criterionScores[index] * criterion.appliedWeight, 0) / 100);
+    const preliminaryScore = Math.min(100, evidenceWeightedScore + SOURCING_FIT_UPLIFT);
     const sourcingFit = prospect.gateFindings.some((item) => item.status === 'UNABLE_TO_DETERMINE') ? 'POSSIBLE' as const : 'QUALIFIED' as const;
     const { criterionScores: _criterionScores, ...identity } = prospect;
     return [{ ...identity, sources, preliminaryScore, criterionSignals, sourcingFit, geographicFit: prospect.geographicFit as 'WITHIN_SCOPE' | 'UNABLE_TO_DETERMINE' }];
