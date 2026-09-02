@@ -1,38 +1,55 @@
 import OpenAI from 'openai';
+import { getVercelOidcToken } from '@vercel/oidc';
 import { validateNeutralCriterionFindings, type AppliedCriterion, type CriterionScore, type KnockoutStatus } from './criteriaEvaluation';
 import { projectCriterionFindings, type CriterionFinding } from './criterionProjection';
 
-const SOURCING_MODEL = process.env.OPENAI_SOURCING_MODEL || process.env.OPENAI_EVALUATION_MODEL || 'gpt-5.6';
+const SOURCING_MODEL = process.env.AI_GATEWAY_MODEL || 'openai/gpt-5.4';
 const MAX_PROSPECTS = 8;
+
+export const SEARCH_SCOPES = ['25_MILES', '50_MILES', '100_MILES', '500_MILES', 'NATIONAL', 'GLOBAL'] as const;
+export type SearchScope = typeof SEARCH_SCOPES[number];
+export type SourcingGate = { id: string; label: string };
+export type ProspectLocation = { label: string; confidence: 'CONFIRMED' | 'PROBABLE' | 'UNKNOWN'; evidence: string };
+export type GateFinding = { gateId: string; status: KnockoutStatus; evidence: string; assessment?: string };
+export type MarketAnalysis = { scarcityLevel: 'BROAD' | 'COMPETITIVE' | 'SCARCE' | 'UNICORN'; confidence: 'HIGH' | 'MODERATE' | 'LOW'; summary: string; constraintDrivers: Array<{ constraint: string; impact: 'HIGH' | 'MODERATE' | 'LOW'; explanation: string }>; relaxationLevers: Array<{ change: string; likelyEffect: string; tradeoff: string }>; evidenceCaveat: string; observedProspects: number };
 
 export type ProspectSource = { title: string; url: string };
 export type SourcedProspect = {
   fullName: string;
   preliminaryScore: number;
+  sourcingFit: 'QUALIFIED' | 'POSSIBLE';
   headline: string;
-  location: string;
+  location: ProspectLocation;
+  geographicFit: 'WITHIN_SCOPE' | 'OUTSIDE_SCOPE' | 'UNABLE_TO_DETERMINE';
   publicEvidence: string;
+  gateFindings: GateFinding[];
+  criterionSignals: Array<{ criterionId: string; score: CriterionScore; evidence: string }>;
   sources: ProspectSource[];
 };
 export type ProspectSearchResult = {
   booleanQuery: string;
   strategyRationale: string;
+  marketAnalysis: MarketAnalysis;
   prospects: SourcedProspect[];
   modelIdentifier: string;
 };
 export type ProspectEvaluation = {
   summary: string;
+  location: ProspectLocation;
+  compensation: { estimatedMarketRange: string; targetAlignment: 'LIKELY' | 'STRETCH' | 'UNLIKELY' | 'UNKNOWN'; confidence: 'HIGH' | 'MODERATE' | 'LOW'; rationale: string };
+  receptivity: { level: 'HIGH' | 'MODERATE' | 'LOW' | 'UNKNOWN'; confidence: 'HIGH' | 'MODERATE' | 'LOW'; signals: string[]; rationale: string };
   strongestEvidence: string[];
   gaps: string[];
   unknowns: string[];
+  gateFindings: Array<GateFinding & { assessment: string }>;
   criterionFindings: CriterionFinding[];
   sources: ProspectSource[];
 };
 
-function client() {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured');
-  return new OpenAI({ apiKey });
+async function client() {
+  const apiKey = process.env.AI_GATEWAY_API_KEY || await getVercelOidcToken();
+  if (!apiKey) throw new Error('AI Gateway authentication is unavailable.');
+  return new OpenAI({ apiKey, baseURL: 'https://ai-gateway.vercel.sh/v1' });
 }
 
 const sourceSchema = {
@@ -41,32 +58,44 @@ const sourceSchema = {
   required: ['title', 'url'],
   properties: { title: { type: 'string' as const }, url: { type: 'string' as const } }
 };
+const locationSchema = { type: 'object' as const, additionalProperties: false, required: ['label', 'confidence', 'evidence'], properties: { label: { type: 'string' as const }, confidence: { type: 'string' as const, enum: ['CONFIRMED', 'PROBABLE', 'UNKNOWN'] }, evidence: { type: 'string' as const } } };
+
+function gateSchema(gates: SourcingGate[], includeAssessment = false) {
+  return { type: 'array' as const, minItems: gates.length, maxItems: gates.length, items: { type: 'object' as const, additionalProperties: false, required: includeAssessment ? ['gateId', 'status', 'evidence', 'assessment'] : ['gateId', 'status', 'evidence'], properties: { gateId: { type: 'string' as const, enum: gates.map((gate) => gate.id) }, status: { type: 'string' as const, enum: ['MET', 'NOT_MET', 'UNABLE_TO_DETERMINE'] }, evidence: { type: 'string' as const }, ...(includeAssessment ? { assessment: { type: 'string' as const } } : {}) } } };
+}
 
 function criterionIdSchema(criteria: AppliedCriterion[]) {
   return { type: 'string' as const, enum: criteria.map((criterion) => criterion.id) };
 }
 
-function searchSchema() {
+function searchSchema(criteria: AppliedCriterion[], gates: SourcingGate[]) {
   return {
     type: 'object' as const,
     additionalProperties: false,
-    required: ['booleanQuery', 'strategyRationale', 'prospects'],
+    required: ['booleanQuery', 'strategyRationale', 'marketAnalysis', 'prospects'],
     properties: {
       booleanQuery: { type: 'string' as const },
       strategyRationale: { type: 'string' as const },
+      marketAnalysis: { type: 'object' as const, additionalProperties: false, required: ['scarcityLevel', 'confidence', 'summary', 'constraintDrivers', 'relaxationLevers', 'evidenceCaveat'], properties: {
+        scarcityLevel: { type: 'string' as const, enum: ['BROAD', 'COMPETITIVE', 'SCARCE', 'UNICORN'] }, confidence: { type: 'string' as const, enum: ['HIGH', 'MODERATE', 'LOW'] }, summary: { type: 'string' as const },
+        constraintDrivers: { type: 'array' as const, items: { type: 'object' as const, additionalProperties: false, required: ['constraint', 'impact', 'explanation'], properties: { constraint: { type: 'string' as const }, impact: { type: 'string' as const, enum: ['HIGH', 'MODERATE', 'LOW'] }, explanation: { type: 'string' as const } } } },
+        relaxationLevers: { type: 'array' as const, items: { type: 'object' as const, additionalProperties: false, required: ['change', 'likelyEffect', 'tradeoff'], properties: { change: { type: 'string' as const }, likelyEffect: { type: 'string' as const }, tradeoff: { type: 'string' as const } } } }, evidenceCaveat: { type: 'string' as const }
+      } },
       prospects: {
         type: 'array' as const,
         maxItems: MAX_PROSPECTS,
         items: {
           type: 'object' as const,
           additionalProperties: false,
-          required: ['fullName', 'preliminaryScore', 'headline', 'location', 'publicEvidence', 'sources'],
+          required: ['fullName', 'headline', 'location', 'geographicFit', 'publicEvidence', 'gateFindings', 'criterionSignals', 'sources'],
           properties: {
             fullName: { type: 'string' as const },
-            preliminaryScore: { type: 'integer' as const, minimum: 0, maximum: 100 },
             headline: { type: 'string' as const },
-            location: { type: 'string' as const },
+            location: locationSchema,
+            geographicFit: { type: 'string' as const, enum: ['WITHIN_SCOPE', 'OUTSIDE_SCOPE', 'UNABLE_TO_DETERMINE'] },
             publicEvidence: { type: 'string' as const },
+            gateFindings: gateSchema(gates),
+            criterionSignals: { type: 'array' as const, minItems: criteria.length, maxItems: criteria.length, items: { type: 'object' as const, additionalProperties: false, required: ['criterionId', 'score', 'evidence'], properties: { criterionId: criterionIdSchema(criteria), score: { type: 'integer' as const, enum: [0, 25, 50, 75, 100] }, evidence: { type: 'string' as const } } } },
             sources: { type: 'array' as const, minItems: 1, items: sourceSchema }
           }
         }
@@ -75,16 +104,20 @@ function searchSchema() {
   };
 }
 
-function evaluationSchema(criteria: AppliedCriterion[]) {
+function evaluationSchema(criteria: AppliedCriterion[], gates: SourcingGate[]) {
   return {
     type: 'object' as const,
     additionalProperties: false,
-    required: ['summary', 'strongestEvidence', 'gaps', 'unknowns', 'criterionFindings', 'sources'],
+    required: ['summary', 'location', 'compensation', 'receptivity', 'strongestEvidence', 'gaps', 'unknowns', 'gateFindings', 'criterionFindings', 'sources'],
     properties: {
       summary: { type: 'string' as const },
+      location: locationSchema,
+      compensation: { type: 'object' as const, additionalProperties: false, required: ['estimatedMarketRange', 'targetAlignment', 'confidence', 'rationale'], properties: { estimatedMarketRange: { type: 'string' as const }, targetAlignment: { type: 'string' as const, enum: ['LIKELY', 'STRETCH', 'UNLIKELY', 'UNKNOWN'] }, confidence: { type: 'string' as const, enum: ['HIGH', 'MODERATE', 'LOW'] }, rationale: { type: 'string' as const } } },
+      receptivity: { type: 'object' as const, additionalProperties: false, required: ['level', 'confidence', 'signals', 'rationale'], properties: { level: { type: 'string' as const, enum: ['HIGH', 'MODERATE', 'LOW', 'UNKNOWN'] }, confidence: { type: 'string' as const, enum: ['HIGH', 'MODERATE', 'LOW'] }, signals: { type: 'array' as const, items: { type: 'string' as const } }, rationale: { type: 'string' as const } } },
       strongestEvidence: { type: 'array' as const, items: { type: 'string' as const } },
       gaps: { type: 'array' as const, items: { type: 'string' as const } },
       unknowns: { type: 'array' as const, items: { type: 'string' as const } },
+      gateFindings: gateSchema(gates, true),
       criterionFindings: {
         type: 'array' as const,
         minItems: criteria.length,
@@ -154,50 +187,60 @@ function verifiedWebSources(response: unknown, requested: ProspectSource[]): Pro
   });
 }
 
-export async function searchForProspects(input: { title: string; jobDescription: string; criteria: AppliedCriterion[] }): Promise<ProspectSearchResult> {
-  const response = await client().responses.create({
+function exactCoverage(expected: string[], actual: string[]): boolean { return actual.length === expected.length && new Set(actual).size === expected.length && actual.every((id) => expected.includes(id)); }
+
+export async function searchForProspects(input: { title: string; jobDescription: string; criteria: AppliedCriterion[]; gates: SourcingGate[]; targetLocation: string; searchScope: SearchScope; targetCompensation: string }): Promise<ProspectSearchResult> {
+  const response = await (await client()).responses.create({
     model: SOURCING_MODEL,
-    instructions: `You are Stapphire's public-web talent sourcing researcher. Translate the immutable weighted Hiring Criteria into a precise Boolean search strategy, then use web search to identify up to ${MAX_PROSPECTS} real people with strong, identity-resolved public professional evidence.
+    instructions: `You are Stapphire's public-web talent sourcing researcher. Translate the non-negotiable sourcing gates and immutable weighted Hiring Criteria into a precise Boolean search strategy, then identify up to ${MAX_PROSPECTS} real people with identity-resolved public evidence.
 
-Prioritize the highest-weight criteria and exact occupational context. Treat title synonyms as supporting signals, never substitutes for duties. Exclude false-positive industries and meanings explicitly. Search public professional pages, employer bios, government or association pages, conference biographies, portfolios, certifications, publications, and public profile pages. Never seek or return contact details, protected traits, or inferred sensitive information.
+Gates are occupational identity checks, not weighted preferences. Similar titles and transferable skills never prove the required professional domain. Exclude contradicted gates and known out-of-scope locations. Evaluate every gate and criterion exactly once. Search public professional pages, employer and government bios, associations, conferences, portfolios, certifications, and publications. Never seek contact details, current salary, protected traits, or merge namesakes.
 
-Return a person only when at least one source clearly supports both identity and relevant professional evidence. Do not merge namesakes. Preliminary score is available-evidence alignment to the supplied weights, not a hiring decision. Missing public evidence is unknown, not a negative fact. Every prospect must have at least one working source URL.`,
-    input: `POSITION\n${input.title}\n\nJOB DESCRIPTION SNAPSHOT\n${input.jobDescription}\n\nIMMUTABLE WEIGHTED HIRING CRITERIA\n${JSON.stringify(input.criteria)}`,
+Classify the discoverable market as BROAD, COMPETITIVE, SCARCE, or UNICORN from the intersection of domain, seniority, requirements, geography, and gates. Distinguish genuine scarcity from weak public visibility. Missing evidence is unknown, not negative.`,
+    input: `POSITION\n${input.title}\n\nTARGET LOCATION\n${input.targetLocation || 'Not specified'}\n\nSEARCH SCOPE\n${input.searchScope}\n\nTARGET COMPENSATION\n${input.targetCompensation || 'Not specified'}\n\nJOB DESCRIPTION\n${input.jobDescription}\n\nNON-NEGOTIABLE GATES\n${JSON.stringify(input.gates)}\n\nWEIGHTED CRITERIA\n${JSON.stringify(input.criteria)}`,
     tools: [{ type: 'web_search' }],
     include: ['web_search_call.action.sources'],
     max_output_tokens: 12000,
     store: false,
-    text: { format: { type: 'json_schema', name: 'prospect_search_results', strict: true, schema: searchSchema() } }
+    text: { format: { type: 'json_schema', name: 'prospect_search_results', strict: true, schema: searchSchema(input.criteria, input.gates) } }
   });
   if (response.status !== 'completed' || !response.output_text) throw new Error('Public-web prospect search did not complete.');
   const result = parseJson<Omit<ProspectSearchResult, 'modelIdentifier'>>(response.output_text, 'prospect search result');
-  const prospects = result.prospects
-    .map((prospect) => ({ ...prospect, fullName: prospect.fullName.trim(), publicEvidence: prospect.publicEvidence.trim(), sources: verifiedWebSources(response, prospect.sources) }))
-    .filter((prospect) => prospect.fullName && prospect.publicEvidence && prospect.sources.length > 0)
-    .sort((a, b) => b.preliminaryScore - a.preliminaryScore)
+  const gateIds = input.gates.map((gate) => gate.id); const criterionIds = input.criteria.map((criterion) => criterion.id);
+  const prospects = result.prospects.flatMap((prospect) => {
+    if (!exactCoverage(gateIds, prospect.gateFindings.map((item) => item.gateId)) || !exactCoverage(criterionIds, prospect.criterionSignals.map((item) => item.criterionId))) return [];
+    const sources = verifiedWebSources(response, prospect.sources);
+    if (!prospect.fullName.trim() || !prospect.publicEvidence.trim() || !sources.length || prospect.geographicFit === 'OUTSIDE_SCOPE' || prospect.gateFindings.some((item) => item.status === 'NOT_MET')) return [];
+    const signals = new Map(prospect.criterionSignals.map((item) => [item.criterionId, item]));
+    const preliminaryScore = Math.round(input.criteria.reduce((sum, criterion) => sum + (signals.get(criterion.id)?.score || 0) * criterion.appliedWeight, 0) / 100);
+    const sourcingFit = prospect.gateFindings.some((item) => item.status === 'UNABLE_TO_DETERMINE') ? 'POSSIBLE' as const : 'QUALIFIED' as const;
+    return [{ ...prospect, sources, preliminaryScore, sourcingFit, geographicFit: prospect.geographicFit as 'WITHIN_SCOPE' | 'UNABLE_TO_DETERMINE' }];
+  }).sort((a, b) => a.sourcingFit === b.sourcingFit ? b.preliminaryScore - a.preliminaryScore : a.sourcingFit === 'QUALIFIED' ? -1 : 1)
     .slice(0, MAX_PROSPECTS);
-  return { ...result, prospects, modelIdentifier: response.model };
+  return { ...result, prospects, marketAnalysis: { ...result.marketAnalysis, observedProspects: prospects.length }, modelIdentifier: response.model };
 }
 
-export async function evaluateProspect(input: { title: string; jobDescription: string; criteria: AppliedCriterion[]; prospect: SourcedProspect }): Promise<{ evaluation: ProspectEvaluation; score: number; modelIdentifier: string }> {
-  const response = await client().responses.create({
+export async function evaluateProspect(input: { title: string; jobDescription: string; criteria: AppliedCriterion[]; gates: SourcingGate[]; targetLocation: string; searchScope: SearchScope; targetCompensation: string; prospect: SourcedProspect }): Promise<{ evaluation: ProspectEvaluation; score: number; sourcingFit: 'QUALIFIED' | 'POSSIBLE' | 'EXCLUDED'; modelIdentifier: string }> {
+  const response = await (await client()).responses.create({
     model: SOURCING_MODEL,
-    instructions: `You are Stapphire's evidence-based public-profile evaluator. Research the named person using public professional sources and evaluate only the exact immutable Hiring Criteria supplied.
+    instructions: `Research the named person using public professional sources. Resolve identity carefully and never merge namesakes. Evaluate every non-negotiable gate and weighted criterion exactly once.
 
-Resolve identity carefully and do not merge namesakes. Use public professional evidence only. Do not seek contact details or use protected traits. Do not invent experience. Missing, ambiguous, stale, or inaccessible evidence must be UNABLE_TO_DETERMINE rather than NOT_MET. NOT_MET requires an explicit contradiction. Use the alignment scale 0, 25, 50, 75, or 100. Return every criterion exactly once. This is a sourcing evaluation, not an employment decision. Include direct source URLs supporting the evaluation.`,
-    input: `POSITION\n${input.title}\n\nJOB DESCRIPTION SNAPSHOT\n${input.jobDescription}\n\nIMMUTABLE WEIGHTED HIRING CRITERIA\n${JSON.stringify(input.criteria)}\n\nPROSPECT IDENTITY AND INITIAL PUBLIC EVIDENCE\n${JSON.stringify(input.prospect)}`,
+Similar titles and transferable skills do not satisfy an occupational gate. Missing evidence is UNABLE_TO_DETERMINE; NOT_MET requires contradiction. Estimate a broad market compensation range, never present salary. Treat receptivity as an outreach hypothesis from observable signals. Compensation and receptivity never affect qualification scoring. Never seek contact details or protected traits.`,
+    input: `POSITION\n${input.title}\n\nTARGET LOCATION\n${input.targetLocation || 'Not specified'}\n\nSEARCH SCOPE\n${input.searchScope}\n\nTARGET COMPENSATION\n${input.targetCompensation || 'Not specified'}\n\nJOB DESCRIPTION\n${input.jobDescription}\n\nGATES\n${JSON.stringify(input.gates)}\n\nCRITERIA\n${JSON.stringify(input.criteria)}\n\nPROSPECT\n${JSON.stringify(input.prospect)}`,
     tools: [{ type: 'web_search' }],
     include: ['web_search_call.action.sources'],
     max_output_tokens: 14000,
     store: false,
-    text: { format: { type: 'json_schema', name: 'prospect_evaluation', strict: true, schema: evaluationSchema(input.criteria) } }
+    text: { format: { type: 'json_schema', name: 'prospect_evaluation', strict: true, schema: evaluationSchema(input.criteria, input.gates) } }
   });
   if (response.status !== 'completed' || !response.output_text) throw new Error('Public-web prospect evaluation did not complete.');
   const evaluation = parseJson<ProspectEvaluation>(response.output_text, 'prospect evaluation');
+  if (!exactCoverage(input.gates.map((gate) => gate.id), evaluation.gateFindings.map((item) => item.gateId))) throw new Error('Sourcing-gate coverage was incomplete.');
   validateNeutralCriterionFindings(input.criteria, evaluation.criterionFindings as Array<CriterionFinding & { alignmentScore: CriterionScore; satisfactionStatus: KnockoutStatus }>);
   evaluation.sources = verifiedWebSources(response, evaluation.sources);
   if (evaluation.sources.length === 0) throw new Error('The evaluation did not contain verifiable public sources.');
   const projection = projectCriterionFindings(input.criteria, evaluation.criterionFindings);
   if (!projection.complete || projection.overallMatch === null) throw new Error('The evaluation did not cover every applied criterion.');
-  return { evaluation, score: projection.overallMatch, modelIdentifier: response.model };
+  const sourcingFit = evaluation.gateFindings.some((item) => item.status === 'NOT_MET') ? 'EXCLUDED' : evaluation.gateFindings.some((item) => item.status === 'UNABLE_TO_DETERMINE') ? 'POSSIBLE' : 'QUALIFIED';
+  return { evaluation, score: projection.overallMatch, sourcingFit, modelIdentifier: response.model };
 }

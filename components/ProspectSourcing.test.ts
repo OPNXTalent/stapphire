@@ -9,12 +9,13 @@ const component = readFileSync(join(directory, 'ProspectSourcing.tsx'), 'utf8');
 const searchRoute = readFileSync(join(directory, '..', 'app', 'api', 'requisitions', '[id]', 'prospects', 'route.ts'), 'utf8');
 const evaluationRoute = readFileSync(join(directory, '..', 'app', 'api', 'requisitions', '[id]', 'prospects', '[prospectId]', 'evaluation', 'route.ts'), 'utf8');
 
-test('locked shortlist exposes only the prospect name, preliminary score, and explicit QC action', () => {
+test('locked shortlist exposes name, location, sourcing fit, score, and explicit QC action', () => {
   assert.match(component, /<strong>\{prospect\.full_name\}<\/strong>/);
   assert.match(component, /\{prospect\.preliminary_score\}/);
   assert.match(component, /View evaluation · 1 QC/);
   assert.doesNotMatch(component, /prospect\.headline/);
-  assert.doesNotMatch(component, /prospect\.location/);
+  assert.match(component, /prospect\.location/);
+  assert.match(component, /prospect\.sourcing_fit/);
   assert.match(searchRoute, /prospect\.evaluation \? prospect/);
   assert.match(searchRoute, /sources: \[\]/);
 });

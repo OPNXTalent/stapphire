@@ -16,7 +16,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
   try {
     const [{ data: requisition, error: requisitionError }, { data: prospect, error: prospectError }, organization, basis] = await Promise.all([
       supabaseAdmin.from('phase1_requisitions').select('id,title').eq('id', params.id).is('archived_at', null).maybeSingle(),
-      supabaseAdmin.from('phase1_prospects').select('id,full_name,preliminary_score,headline,location,public_evidence,sources,evaluation,evaluation_score,evaluated_at,evaluation_basis_id').eq('id', params.prospectId).eq('requisition_id', params.id).maybeSingle(),
+      supabaseAdmin.from('phase1_prospects').select('id,search_id,full_name,preliminary_score,sourcing_fit,headline,location,geographic_fit,public_evidence,gate_findings,criterion_signals,sources,evaluation,evaluation_score,evaluated_at,evaluation_basis_id').eq('id', params.prospectId).eq('requisition_id', params.id).maybeSingle(),
       resolveOrganization(),
       resolveCurrentEvaluationBasis(params.id)
     ]);
@@ -40,16 +40,29 @@ export async function POST(_request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: 'Hiring Criteria changed. Run a new prospect search before evaluating this person.' }, { status: 409 });
     }
 
+    const { data: search, error: searchError } = await supabaseAdmin.from('phase1_prospect_searches').select('search_strategy').eq('id', prospect.search_id).single();
+    if (searchError) throw searchError;
+    const config = (search.search_strategy as { config?: { targetLocation?: string; targetCompensation?: string; searchScope?: import('@/lib/prospectSourcing').SearchScope; gates?: import('@/lib/prospectSourcing').SourcingGate[] } })?.config;
+    if (!config?.gates?.length) return NextResponse.json({ error: 'This search is missing its sourcing-gate configuration. Run a new search.' }, { status: 409 });
+
     const initialSources = Array.isArray(prospect.sources) ? prospect.sources as ProspectSource[] : [];
     const result = await evaluateProspect({
       title: requisition.title,
       jobDescription: basis.jobDescriptionSnapshot,
       criteria: basis.criteria,
+      gates: config.gates,
+      targetLocation: config.targetLocation || '',
+      targetCompensation: config.targetCompensation || '',
+      searchScope: config.searchScope || '50_MILES',
       prospect: {
         fullName: prospect.full_name,
         preliminaryScore: prospect.preliminary_score,
         headline: prospect.headline,
         location: prospect.location,
+        sourcingFit: prospect.sourcing_fit,
+        geographicFit: prospect.geographic_fit,
+        gateFindings: prospect.gate_findings,
+        criterionSignals: prospect.criterion_signals,
         publicEvidence: prospect.public_evidence,
         sources: initialSources
       }

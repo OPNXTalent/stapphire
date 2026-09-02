@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { resolveCurrentEvaluationBasis } from '@/lib/evaluationBasis';
-import { searchForProspects } from '@/lib/prospectSourcing';
+import { SEARCH_SCOPES, searchForProspects, type SearchScope, type SourcingGate } from '@/lib/prospectSourcing';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getLatestRequisitionIntelligence } from '@/lib/requisitionIntelligence';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -30,7 +31,7 @@ async function latestSearch(requisitionId: string) {
 
   const { data: prospects, error: prospectsError } = await supabaseAdmin
     .from('phase1_prospects')
-    .select('id,full_name,preliminary_score,headline,location,sources,evaluation_score,evaluation,evaluated_at')
+    .select('id,full_name,preliminary_score,sourcing_fit,headline,location,geographic_fit,gate_findings,criterion_signals,sources,evaluation_score,evaluation,evaluated_at')
     .eq('search_id', search.id)
     .eq('requisition_id', requisitionId)
     .order('preliminary_score', { ascending: false });
@@ -41,6 +42,8 @@ async function latestSearch(requisitionId: string) {
       id: prospect.id,
       full_name: prospect.full_name,
       preliminary_score: prospect.preliminary_score,
+      sourcing_fit: prospect.sourcing_fit,
+      location: prospect.location,
       evaluation_score: null,
       evaluation: null,
       evaluated_at: null,
@@ -51,10 +54,11 @@ async function latestSearch(requisitionId: string) {
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
-    const [requisition, basis, search] = await Promise.all([
+    const [requisition, basis, search, intelligence] = await Promise.all([
       loadRequisition(params.id),
       resolveCurrentEvaluationBasis(params.id),
-      latestSearch(params.id)
+      latestSearch(params.id),
+      getLatestRequisitionIntelligence(params.id)
     ]);
     if (!requisition) return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 });
     return NextResponse.json({
@@ -66,6 +70,15 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         weight: criterion.appliedWeight,
         isKnockout: criterion.isKnockout
       })) : [],
+      defaults: {
+        targetLocation: intelligence?.internalEvidence?.location || '',
+        targetCompensation: intelligence?.internalEvidence?.compensation?.minimum || intelligence?.internalEvidence?.compensation?.maximum ? `${intelligence.internalEvidence.compensation.minimum ?? ''}-${intelligence.internalEvidence.compensation.maximum ?? ''} ${intelligence.internalEvidence.compensation.currency || ''} per ${intelligence.internalEvidence.compensation.unit}` : '',
+        searchScope: '50_MILES',
+        gates: basis?.basisType === 'hiring_criteria' ? [
+          { id: 'occupational-domain', label: `Direct professional experience in the ${requisition.title} occupational domain` },
+          ...basis.criteria.filter((criterion) => criterion.isKnockout).map((criterion) => ({ id: `criterion-${criterion.id}`, label: criterion.label }))
+        ] : []
+      },
       search,
       stale: Boolean(search && search.evaluation_basis_id !== basis?.id)
     });
@@ -75,7 +88,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   }
 }
 
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
     const [requisition, basis] = await Promise.all([loadRequisition(params.id), resolveCurrentEvaluationBasis(params.id)]);
     if (!requisition) return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 });
@@ -83,14 +96,19 @@ export async function POST(_request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: 'Apply weighted Hiring Criteria before sourcing prospects.' }, { status: 409 });
     }
 
+    const body = await request.json().catch(() => ({})) as { targetLocation?: string; targetCompensation?: string; searchScope?: string; gates?: SourcingGate[] };
+    const searchScope = SEARCH_SCOPES.includes(body.searchScope as SearchScope) ? body.searchScope as SearchScope : '50_MILES';
+    const gates = Array.isArray(body.gates) ? body.gates.filter((gate) => typeof gate?.id === 'string' && typeof gate?.label === 'string' && gate.label.trim()).slice(0, 8) : [];
+    if (!gates.length) return NextResponse.json({ error: 'Confirm at least one non-negotiable sourcing gate.' }, { status: 400 });
     const result = await searchForProspects({
       title: requisition.title,
       jobDescription: basis.jobDescriptionSnapshot,
-      criteria: basis.criteria
+      criteria: basis.criteria,
+      gates,
+      targetLocation: body.targetLocation?.trim() || '',
+      targetCompensation: body.targetCompensation?.trim() || '',
+      searchScope
     });
-    if (result.prospects.length === 0) {
-      return NextResponse.json({ error: 'No identity-resolved prospects had enough public evidence. Try refining the Hiring Criteria.' }, { status: 422 });
-    }
 
     const { data: search, error: searchError } = await supabaseAdmin
       .from('phase1_prospect_searches')
@@ -98,7 +116,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
         requisition_id: params.id,
         evaluation_basis_id: basis.id,
         boolean_query: result.booleanQuery,
-        search_strategy: { rationale: result.strategyRationale },
+        search_strategy: { rationale: result.strategyRationale, marketAnalysis: result.marketAnalysis, config: { targetLocation: body.targetLocation?.trim() || '', targetCompensation: body.targetCompensation?.trim() || '', searchScope, gates } },
         model_identifier: result.modelIdentifier
       })
       .select('id,evaluation_basis_id,boolean_query,search_strategy,created_at')
@@ -111,9 +129,13 @@ export async function POST(_request: Request, { params }: { params: { id: string
       evaluation_basis_id: basis.id,
       full_name: prospect.fullName,
       preliminary_score: prospect.preliminaryScore,
+      sourcing_fit: prospect.sourcingFit,
       headline: prospect.headline,
       location: prospect.location,
+      geographic_fit: prospect.geographicFit,
       public_evidence: prospect.publicEvidence,
+      gate_findings: prospect.gateFindings,
+      criterion_signals: prospect.criterionSignals,
       sources: prospect.sources
     })));
     if (prospectsError) {
@@ -126,6 +148,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
       stale: false,
       criteriaApplied: true,
       currentEvaluationBasisId: basis.id,
+      defaults: { targetLocation: body.targetLocation?.trim() || '', targetCompensation: body.targetCompensation?.trim() || '', searchScope, gates },
       criteria: basis.criteria.map((criterion) => ({ id: criterion.id, label: criterion.label, weight: criterion.appliedWeight, isKnockout: criterion.isKnockout }))
     }, { status: 201 });
   } catch (error) {
