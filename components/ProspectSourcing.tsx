@@ -180,7 +180,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
 
       {prospects.length > 0 ? (
         <div className={styles.results}>
-          <div className={styles.resultsHeader}><span>Prospect</span><span>Location</span><span>Sourcing fit</span><span>Score</span><span aria-hidden="true" /></div>
+          <div className={styles.resultsHeader}><span>Prospect</span><span>Location</span><span>Sourcing fit</span><span>Preliminary fit</span><span aria-hidden="true" /></div>
           {prospects.map((prospect) => {
             const open = openId === prospect.id && Boolean(prospect.evaluation);
             return (
@@ -196,7 +196,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
                   <div className={styles.evaluation}>
                     <div className={styles.evaluationHero}>
                       <div><span>Public-evidence evaluation</span><h3>{prospect.full_name}</h3></div>
-                      <strong>{prospect.evaluation_score}% <small>Sourcing fit</small></strong>
+                      <strong>{prospect.evaluation_score}% <small>Qualified fit</small></strong>
                     </div>
                     <p className={styles.summary}>{prospect.evaluation.summary}</p>
                     <div className={styles.intelligence}><section><h4>Estimated market compensation</h4><strong>{prospect.evaluation.compensation.estimatedMarketRange}</strong><p>{prospect.evaluation.compensation.targetAlignment} target alignment · {prospect.evaluation.compensation.confidence} confidence</p><small>{prospect.evaluation.compensation.rationale}</small></section><section><h4>Opportunity receptivity</h4><strong>{prospect.evaluation.receptivity.level}</strong><p>{prospect.evaluation.receptivity.confidence} confidence</p><small>{prospect.evaluation.receptivity.rationale}</small></section></div>

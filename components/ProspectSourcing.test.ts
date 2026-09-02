@@ -34,10 +34,12 @@ test('a complete criteria draft can be applied directly from the sourcing worksp
 
 test('free sourcing stays compact while the QC evaluation owns the full criteria matrix', () => {
   const searchSchema = sourcingEngine.slice(sourcingEngine.indexOf('function searchSchema'), sourcingEngine.indexOf('function evaluationSchema'));
-  assert.match(searchSchema, /preliminaryScore/);
+  assert.match(searchSchema, /criterionScores/);
   assert.doesNotMatch(searchSchema, /criterionSignals/);
-  assert.match(sourcingEngine, /criterionSignals: \[\]/);
-  assert.match(sourcingEngine, /do not emit a criterion-by-criterion matrix during sourcing/);
+  assert.match(sourcingEngine, /criterionScores\[index\] \* criterion\.appliedWeight/);
+  assert.match(sourcingEngine, /Do not emit criterion IDs or criterion evidence during sourcing/);
+  assert.match(component, /Preliminary fit/);
+  assert.match(component, /Qualified fit/);
 });
 
 test('evaluation charges only through the atomic persistence RPC after generation', () => {
