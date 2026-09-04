@@ -51,6 +51,8 @@ test('viewer and contributor access, inviter attribution, roles, timestamps, and
 test('Teamwork routes bypass only the site gate while database tables remain service-role only', () => {
   assert.match(middleware, /'\/teamwork'/);
   assert.match(middleware, /'\/api\/teamwork'/);
+  assert.match(middleware, /pathname\.startsWith\('\/teamwork\/'\)/);
+  assert.match(middleware, /x-stapphire-public-invite/);
   assert.match(migration, /enable row level security/);
   assert.match(migration, /revoke all[\s\S]+from public, anon, authenticated/);
   assert.match(migration, /grant select, insert, update, delete[\s\S]+to service_role/);

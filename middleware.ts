@@ -44,7 +44,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(new URL('/gate-config-error', request.url));
   }
 
-  if (pathname === '/interview/invite' || pathname.startsWith('/interview/invite/')) {
+  if (
+    pathname === '/interview/invite' || pathname.startsWith('/interview/invite/') ||
+    pathname === '/teamwork' || pathname.startsWith('/teamwork/')
+  ) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set('x-stapphire-public-invite', '1');
     return NextResponse.next({ request: { headers: requestHeaders } });
