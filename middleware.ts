@@ -15,7 +15,9 @@ const EXEMPT_PATHS = [
   '/api/gate',
   '/gate-config-error',
   '/interview/invite',
-  '/api/interview-invitations'
+  '/api/interview-invitations',
+  '/teamwork',
+  '/api/teamwork'
 ];
 
 function isStaticAsset(pathname: string): boolean {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
+import { TeamworkShareControl } from '@/components/TeamworkShareControl';
 
 type Note = { id: string; author_name: string; body: string; created_at: string };
 
@@ -62,6 +63,7 @@ export function RequisitionNotes({ requisitionId }: { requisitionId: string }) {
 
   return (
     <div className="requisition-notes">
+      <div className="requisition-notes-share"><TeamworkShareControl requisitionId={requisitionId} /></div>
       <div className="requisition-notes-feed">
         {notes === null && <p className="muted">Loading…</p>}
         {notes !== null && notes.length === 0 && (

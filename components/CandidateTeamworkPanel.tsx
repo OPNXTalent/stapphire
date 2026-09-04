@@ -1,6 +1,7 @@
 'use client';
 
 import { CandidateNoteStream } from '@/components/CandidateNoteStream';
+import { TeamworkShareControl } from '@/components/TeamworkShareControl';
 import type { CandidateFilesSelection } from '@/lib/candidateFilesEvents';
 import styles from './CandidateFilesPanel.module.css';
 
@@ -13,7 +14,7 @@ export function CandidateTeamworkPanel({ candidate }: { candidate: CandidateFile
     // one requisition, so the two can never disagree.
     <div className={styles.panel} data-requisition-id={candidate.requisitionId}>
       <div className={styles.header}>
-        <span className={styles.eyebrow}>Candidate teamwork</span>
+        <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center'}}><span className={styles.eyebrow}>Candidate teamwork</span><TeamworkShareControl requisitionId={candidate.requisitionId} /></div>
         <h2>{candidate.name}</h2>
         <p className={styles.headerCopy}>Shared collaboration for the hiring team.</p>
       </div>
