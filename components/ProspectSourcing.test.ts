@@ -74,3 +74,11 @@ test('sourcing uses the right rail for Search history and the existing requisiti
 test('prior searches allow already-purchased evaluations to reopen but block new evaluation spend against stale criteria', () => {
   assert.match(component, /payload\?\.stale && !prospect\.evaluation/);
 });
+
+test('the unlocked evaluation banner puts candidate location and the best public profile within immediate reach', () => {
+  assert.match(component, /function primaryPublicProfile/);
+  assert.match(component, /linkedin\\\.com\\\/in/);
+  assert.match(component, /prospect\.evaluation\.location\?\.label/);
+  assert.match(component, /Open public profile/);
+  assert.match(component, /className=\{styles\.candidateContact\}/);
+});

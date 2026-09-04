@@ -39,6 +39,13 @@ function List({ items, empty }: { items: string[]; empty: string }) {
   return items.length ? <ul>{items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul> : <p className={styles.muted}>{empty}</p>;
 }
 
+function primaryPublicProfile(sources: Source[]) {
+  return sources.find((source) => /linkedin\.com\/in\//i.test(source.url))
+    || sources.find((source) => /linkedin\.com|github\.com/i.test(source.url))
+    || sources[0]
+    || null;
+}
+
 export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -202,6 +209,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
           <div className={styles.resultsHeader}><span>Prospect</span><span>Location</span><span>Sourcing fit</span><span>Preliminary fit</span><span aria-hidden="true" /></div>
           {prospects.map((prospect) => {
             const open = openId === prospect.id && Boolean(prospect.evaluation);
+            const publicProfile = primaryPublicProfile(prospect.sources);
             return (
               <article className={styles.prospect} key={prospect.id}>
                 <div className={styles.prospectRow}>
@@ -214,7 +222,14 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
                 {open && prospect.evaluation && (
                   <div className={styles.evaluation}>
                     <div className={styles.evaluationHero}>
-                      <div><span>Public-evidence evaluation</span><h3>{prospect.full_name}</h3></div>
+                      <div>
+                        <span>Public-evidence evaluation</span>
+                        <h3>{prospect.full_name}</h3>
+                        <div className={styles.candidateContact}>
+                          <span>{prospect.evaluation.location?.label || prospect.location?.label || 'Location unknown'}</span>
+                          {publicProfile && <a href={publicProfile.url} target="_blank" rel="noreferrer">Open public profile ↗</a>}
+                        </div>
+                      </div>
                       <strong>{prospect.evaluation_score}% <small>Qualified fit</small></strong>
                     </div>
                     <p className={styles.summary}>{prospect.evaluation.summary}</p>
