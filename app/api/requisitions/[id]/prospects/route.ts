@@ -35,14 +35,15 @@ async function criteriaReadyToApply(requisitionId: string) {
   return weighted.length > 0 && weighted.reduce((sum, item) => sum + Number(item.draft_weight || 0), 0) === 100;
 }
 
-async function latestSearch(requisitionId: string) {
-  const { data: search, error: searchError } = await supabaseAdmin
+async function loadSearch(requisitionId: string, searchId?: string | null) {
+  let query = supabaseAdmin
     .from('phase1_prospect_searches')
     .select('id,evaluation_basis_id,boolean_query,search_strategy,created_at')
-    .eq('requisition_id', requisitionId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .eq('requisition_id', requisitionId);
+  query = searchId
+    ? query.eq('id', searchId)
+    : query.order('created_at', { ascending: false }).limit(1);
+  const { data: search, error: searchError } = await query.maybeSingle();
   if (searchError) throw searchError;
   if (!search) return null;
 
@@ -69,16 +70,54 @@ async function latestSearch(requisitionId: string) {
   };
 }
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+async function searchHistory(requisitionId: string, currentEvaluationBasisId?: string | null) {
+  const { data: searches, error: searchesError } = await supabaseAdmin
+    .from('phase1_prospect_searches')
+    .select('id,evaluation_basis_id,search_strategy,created_at')
+    .eq('requisition_id', requisitionId)
+    .order('created_at', { ascending: false })
+    .limit(30);
+  if (searchesError) throw searchesError;
+  if (!searches?.length) return [];
+
+  const { data: prospectRows, error: prospectsError } = await supabaseAdmin
+    .from('phase1_prospects')
+    .select('search_id')
+    .eq('requisition_id', requisitionId)
+    .in('search_id', searches.map((search) => search.id));
+  if (prospectsError) throw prospectsError;
+  const counts = new Map<string, number>();
+  for (const prospect of prospectRows || []) counts.set(prospect.search_id, (counts.get(prospect.search_id) || 0) + 1);
+
+  return searches.map((search) => ({
+    ...search,
+    prospectCount: counts.get(search.id) || 0,
+    isCurrentCriteria: search.evaluation_basis_id === currentEvaluationBasisId
+  }));
+}
+
+export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
+    const searchParams = new URL(request.url).searchParams;
+    const requestedSearchId = searchParams.get('searchId');
+    if (searchParams.get('view') === 'history') {
+      const [requisition, basis] = await Promise.all([
+        loadRequisition(params.id),
+        resolveCurrentEvaluationBasis(params.id)
+      ]);
+      if (!requisition) return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 });
+      const history = await searchHistory(params.id, basis?.id);
+      return NextResponse.json({ search: history[0] ? { id: history[0].id } : null, history });
+    }
     const [requisition, basis, search, intelligence, readyToApply] = await Promise.all([
       loadRequisition(params.id),
       resolveCurrentEvaluationBasis(params.id),
-      latestSearch(params.id),
+      loadSearch(params.id, requestedSearchId),
       getLatestRequisitionIntelligence(params.id),
       criteriaReadyToApply(params.id)
     ]);
     if (!requisition) return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 });
+    if (requestedSearchId && !search) return NextResponse.json({ error: 'Saved search not found.' }, { status: 404 });
     return NextResponse.json({
       criteriaApplied: basis?.basisType === 'hiring_criteria',
       criteriaReadyToApply: basis?.basisType !== 'hiring_criteria' && readyToApply,
@@ -163,9 +202,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 
     return NextResponse.json({
-      search: await latestSearch(params.id),
+      search: await loadSearch(params.id, search.id),
       stale: false,
       criteriaApplied: true,
+      criteriaReadyToApply: false,
       currentEvaluationBasisId: basis.id,
       defaults: { targetLocation: body.targetLocation?.trim() || '', targetCompensation: body.targetCompensation?.trim() || '', searchScope, gates },
       criteria: basis.criteria.map((criterion) => ({ id: criterion.id, label: criterion.label, weight: criterion.appliedWeight, isKnockout: criterion.isKnockout }))

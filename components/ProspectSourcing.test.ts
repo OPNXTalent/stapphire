@@ -9,6 +9,8 @@ const component = readFileSync(join(directory, 'ProspectSourcing.tsx'), 'utf8');
 const searchRoute = readFileSync(join(directory, '..', 'app', 'api', 'requisitions', '[id]', 'prospects', 'route.ts'), 'utf8');
 const evaluationRoute = readFileSync(join(directory, '..', 'app', 'api', 'requisitions', '[id]', 'prospects', '[prospectId]', 'evaluation', 'route.ts'), 'utf8');
 const sourcingEngine = readFileSync(join(directory, '..', 'lib', 'prospectSourcing.ts'), 'utf8');
+const historyPanel = readFileSync(join(directory, 'ProspectSearchHistory.tsx'), 'utf8');
+const workspacePanel = readFileSync(join(directory, 'WorkspacePanel.tsx'), 'utf8');
 
 test('locked shortlist exposes name, location, sourcing fit, score, and explicit QC action', () => {
   assert.match(component, /<strong>\{prospect\.full_name\}<\/strong>/);
@@ -49,4 +51,26 @@ test('evaluation charges only through the atomic persistence RPC after generatio
   const billing = evaluationRoute.indexOf("rpc('consume_qc_and_unlock_prospect_evaluation_v1'");
   assert.ok(generation >= 0 && billing > generation);
   assert.match(evaluationRoute, /No QC was used/);
+});
+
+test('saved sourcing runs can be reopened without creating a new search or consuming QC', () => {
+  assert.match(searchRoute, /searchParams\.get\('searchId'\)/);
+  assert.match(searchRoute, /async function searchHistory/);
+  assert.match(searchRoute, /prospectCount/);
+  assert.match(historyPanel, /Reviewing saved results never uses QC/);
+  assert.match(historyPanel, /PROSPECT_SEARCH_FOCUS_EVENT/);
+  assert.match(component, /loadSavedSearch\(detail\.searchId\)/);
+});
+
+test('sourcing uses the right rail for Search history and the existing requisition Teamwork', () => {
+  assert.match(workspacePanel, /showSourcingWorkspace/);
+  assert.match(workspacePanel, />\s*Searches\s*</);
+  assert.match(workspacePanel, /<ProspectSearchHistory requisitionId=\{requisitionId\}/);
+  assert.match(workspacePanel, /<RequisitionNotes requisitionId=\{requisitionId\}/);
+  assert.match(historyPanel, /Current criteria/);
+  assert.match(historyPanel, /Prior criteria/);
+});
+
+test('prior searches allow already-purchased evaluations to reopen but block new evaluation spend against stale criteria', () => {
+  assert.match(component, /payload\?\.stale && !prospect\.evaluation/);
 });

@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { CandidateFilesPanel } from '@/components/CandidateFilesPanel';
 import { CandidateTeamworkPanel } from '@/components/CandidateTeamworkPanel';
 import { InterviewQuestionBankPanel } from '@/components/InterviewQuestionBankPanel';
+import { ProspectSearchHistory } from '@/components/ProspectSearchHistory';
 import { ResumeUpload } from '@/components/ResumeUpload';
 import { RequisitionNotes } from '@/components/RequisitionNotes';
 import { useRequisitionViewState } from '@/components/RequisitionViewStateProvider';
@@ -52,6 +53,7 @@ export function WorkspacePanel({
   const [candidate, setCandidate] = useState<CandidateFilesSelection | null>(null);
   const [candidatePanelTab, setCandidatePanelTab] = useState<'files' | 'teamwork'>('files');
   const [interviewContext, setInterviewContext] = useState<InterviewWorkspaceFocusDetail | null>(null);
+  const [sourcingPanelTab, setSourcingPanelTab] = useState<'searches' | 'teamwork'>('searches');
 
   useEffect(() => {
     function focusCandidate(event: Event) {
@@ -92,6 +94,7 @@ export function WorkspacePanel({
     setCandidate(null);
     setCandidatePanelTab('files');
     setInterviewContext(null);
+    setSourcingPanelTab('searches');
   }, [pathname]);
 
   const showCandidateFiles = Boolean(candidate && (isCompletedInterviewRoute || (requisitionId && state.view === 'candidates')));
@@ -100,10 +103,14 @@ export function WorkspacePanel({
     (requisitionId && state.view === 'requisition' && state.requisitionTab === 'interviews')
   );
   const showCandidateWorkspace = Boolean(requisitionId && state.view === 'candidates');
+  const showSourcingWorkspace = Boolean(
+    requisitionId && state.view === 'requisition' && state.requisitionTab === 'sourcing'
+  );
   const showRequisitionNotes = Boolean(
     requisitionId &&
     state.view === 'requisition' &&
-    state.requisitionTab !== 'interviews'
+    state.requisitionTab !== 'interviews' &&
+    state.requisitionTab !== 'sourcing'
   );
 
   if (collapsed) {
@@ -113,6 +120,8 @@ export function WorkspacePanel({
         ? (candidatePanelTab === 'teamwork' ? 'Teamwork' : 'Candidate Files')
         : showCandidateWorkspace
           ? (tab === 'teamwork' ? 'Teamwork' : 'Resume Upload')
+          : showSourcingWorkspace
+            ? (sourcingPanelTab === 'searches' ? 'Searches' : 'Teamwork')
           : showRequisitionNotes
             ? 'Teamwork'
             : 'Hiring Workspace';
@@ -165,6 +174,25 @@ export function WorkspacePanel({
               <ResumeUpload requisitionId={requisitionId} />
             </div>
             <div hidden={tab !== 'teamwork'}>
+              <RequisitionNotes requisitionId={requisitionId} />
+            </div>
+          </div>
+        </>
+      ) : showSourcingWorkspace && requisitionId ? (
+        <>
+          <div className="side-tabs">
+            <button type="button" className={`side-tab ${sourcingPanelTab === 'searches' ? 'active' : ''}`} onClick={() => setSourcingPanelTab('searches')}>
+              Searches
+            </button>
+            <button type="button" className={`side-tab ${sourcingPanelTab === 'teamwork' ? 'active' : ''}`} onClick={() => setSourcingPanelTab('teamwork')}>
+              Teamwork
+            </button>
+          </div>
+          <div className="side-content">
+            <div hidden={sourcingPanelTab !== 'searches'}>
+              <ProspectSearchHistory requisitionId={requisitionId} />
+            </div>
+            <div hidden={sourcingPanelTab !== 'teamwork'}>
               <RequisitionNotes requisitionId={requisitionId} />
             </div>
           </div>

@@ -1,6 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  PROSPECT_SEARCH_FOCUS_EVENT,
+  PROSPECT_SEARCHES_CHANGED_EVENT,
+  type ProspectSearchFocusDetail
+} from '@/lib/prospectSearchEvents';
 import styles from './ProspectSourcing.module.css';
 
 type Criterion = { id: string; label: string; weight: number; isKnockout: boolean };
@@ -47,25 +52,45 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
   const [searchScope, setSearchScope] = useState('50_MILES');
   const [gateText, setGateText] = useState('');
 
+  const applyLoadedPayload = useCallback((body: Payload) => {
+    setPayload(body);
+    const config = body.search?.search_strategy?.config || body.defaults;
+    setTargetLocation(config?.targetLocation || '');
+    setTargetCompensation(config?.targetCompensation || '');
+    setSearchScope(config?.searchScope || '50_MILES');
+    setGateText((config?.gates || []).map((gate: Gate) => gate.label).join('\n'));
+  }, []);
+
+  const loadSavedSearch = useCallback(async (searchId?: string) => {
+    const suffix = searchId ? `?searchId=${encodeURIComponent(searchId)}` : '';
+    const response = await fetch(`/api/requisitions/${requisitionId}/prospects${suffix}`, { cache: 'no-store' });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || 'Unable to load sourced prospects.');
+    applyLoadedPayload(body);
+  }, [applyLoadedPayload, requisitionId]);
+
   useEffect(() => {
     let active = true;
-    fetch(`/api/requisitions/${requisitionId}/prospects`, { cache: 'no-store' })
-      .then(async (response) => {
-        const body = await response.json();
-        if (!response.ok) throw new Error(body.error || 'Unable to load sourced prospects.');
-        if (active) {
-          setPayload(body);
-          const config = body.search?.search_strategy?.config || body.defaults;
-          setTargetLocation(config?.targetLocation || '');
-          setTargetCompensation(config?.targetCompensation || '');
-          setSearchScope(config?.searchScope || '50_MILES');
-          setGateText((config?.gates || []).map((gate: Gate) => gate.label).join('\n'));
-        }
-      })
+    loadSavedSearch()
       .catch((caught: Error) => { if (active) setError(caught.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [requisitionId]);
+  }, [loadSavedSearch]);
+
+  useEffect(() => {
+    function focusSavedSearch(event: Event) {
+      const detail = (event as CustomEvent<ProspectSearchFocusDetail>).detail;
+      if (detail?.requisitionId !== requisitionId || !detail.searchId) return;
+      setLoading(true);
+      setError('');
+      setOpenId(null);
+      loadSavedSearch(detail.searchId)
+        .catch((caught: Error) => setError(caught.message))
+        .finally(() => setLoading(false));
+    }
+    window.addEventListener(PROSPECT_SEARCH_FOCUS_EVENT, focusSavedSearch);
+    return () => window.removeEventListener(PROSPECT_SEARCH_FOCUS_EVENT, focusSavedSearch);
+  }, [loadSavedSearch, requisitionId]);
 
   async function runSearch() {
     setSearching(true);
@@ -76,7 +101,8 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
       const response = await fetch(`/api/requisitions/${requisitionId}/prospects`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ targetLocation, targetCompensation, searchScope, gates }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || 'Unable to source prospects.');
-      setPayload(body);
+      applyLoadedPayload(body);
+      if (body.search?.id) window.dispatchEvent(new CustomEvent(PROSPECT_SEARCHES_CHANGED_EVENT, { detail: { requisitionId, searchId: body.search.id } }));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to source prospects.');
     } finally {
@@ -91,14 +117,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
       const response = await fetch(`/api/requisitions/${requisitionId}/hiring-criteria`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'apply' }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || 'Unable to apply Hiring Criteria.');
-      const refreshed = await fetch(`/api/requisitions/${requisitionId}/prospects`, { cache: 'no-store' });
-      const payloadBody = await refreshed.json();
-      if (!refreshed.ok) throw new Error(payloadBody.error || 'Unable to refresh sourcing.');
-      setPayload(payloadBody);
-      setTargetLocation(payloadBody.defaults?.targetLocation || '');
-      setTargetCompensation(payloadBody.defaults?.targetCompensation || '');
-      setSearchScope(payloadBody.defaults?.searchScope || '50_MILES');
-      setGateText((payloadBody.defaults?.gates || []).map((gate: Gate) => gate.label).join('\n'));
+      await loadSavedSearch();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to apply Hiring Criteria.');
     } finally {
@@ -188,7 +207,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
                 <div className={styles.prospectRow}>
                   <strong>{prospect.full_name}</strong><span className={styles.location}>{prospect.location?.label || 'Location unknown'}</span><span className={styles.fit}>{prospect.sourcing_fit}</span>
                   <span className={styles.score}>{prospect.preliminary_score}</span>
-                  <button type="button" className={styles.unlock} disabled={Boolean(evaluatingId) || payload?.stale} onClick={() => unlockEvaluation(prospect)} aria-expanded={open}>
+                  <button type="button" className={styles.unlock} disabled={Boolean(evaluatingId) || Boolean(payload?.stale && !prospect.evaluation)} onClick={() => unlockEvaluation(prospect)} aria-expanded={open}>
                     {evaluatingId === prospect.id ? 'Evaluating…' : prospect.evaluation ? (open ? 'Hide evaluation' : 'View evaluation') : 'View evaluation · 1 QC'}
                   </button>
                 </div>
