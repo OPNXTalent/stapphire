@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { TeamworkShareControl } from '@/components/TeamworkShareControl';
 
 type Note = { id: string; author_name: string; body: string; created_at: string };
@@ -39,6 +39,7 @@ export function RequisitionNotes({ requisitionId }: { requisitionId: string }) {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (posting) return;
     const trimmedBody = body.trim();
     if (!trimmedBody) return;
 
@@ -80,19 +81,22 @@ export function RequisitionNotes({ requisitionId }: { requisitionId: string }) {
         ))}
       </div>
 
-      <form className="requisition-notes-form" onSubmit={submit}>
+      <form className="requisition-notes-form" onSubmit={submit} noValidate>
         <textarea
           placeholder="Leave a note for the hiring team…"
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
+            if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            if (body.trim() && !posting) event.currentTarget.form?.requestSubmit();
+          }}
           maxLength={4000}
           rows={3}
-          required
+          aria-label="Hiring team note. Press Enter to post; Shift Enter for a new line."
         />
         {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={posting}>
-          {posting ? 'Posting…' : 'Post note'}
-        </button>
+        {posting && <span className="muted" role="status">Posting…</span>}
       </form>
     </div>
   );
