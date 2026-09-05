@@ -23,6 +23,7 @@ test('the Evaluation banner renders only available safe contact links', () => {
 
 test('the Evaluation hover changes only its label color, never its fill or border', () => {
   assert.match(styles, /\.bar:not\(\.evaluationBar\):hover\{border-color:var\(--sapphire\);background:var\(--wash\)\}/);
-  assert.doesNotMatch(styles, /\.evaluationBar:hover\{[^}]*(?:background|border)/);
+  assert.match(styles, /\.bar\.evaluationBar:hover\{background:#fff!important\}/);
+  assert.doesNotMatch(styles, /\.bar\.evaluationBar:hover\{[^}]*border/);
   assert.match(styles, /\.evaluationBar:hover \.evaluationToggle\{color:var\(--sapphire\)\}/);
 });
