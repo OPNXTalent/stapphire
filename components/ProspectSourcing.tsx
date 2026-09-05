@@ -31,6 +31,10 @@ type Search = {
   boolean_query: string;
   search_strategy: { rationale?: string; config?: { targetLocation?: string; targetCompensation?: string; searchScope?: string; gates?: Gate[]; screeningVersion?: string }; marketAnalysis?: { scarcityLevel: string; confidence: string; summary: string; constraintDrivers: Array<{ constraint: string; explanation: string }>; relaxationLevers: Array<{ change: string; likelyEffect: string }> } };
   created_at: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  stage: string;
+  progress: { totalTracks?: number; completedTracks?: number; discovered?: number; reviewed?: number; qualified?: number; rejected?: number; target?: number; coverageConfidence?: string };
+  error_summary: string | null;
   prospects: Prospect[];
 };
 type Payload = { criteriaApplied: boolean; criteriaReadyToApply: boolean; currentEvaluationBasisId: string | null; criteria: Criterion[]; defaults: { targetLocation: string; targetCompensation: string; searchScope: string; gates: Gate[] }; search: Search | null; stale: boolean };
@@ -119,21 +123,49 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
     return () => window.removeEventListener(PROSPECT_SEARCH_FOCUS_EVENT, focusSavedSearch);
   }, [loadSavedSearch, requisitionId]);
 
+  useEffect(() => {
+    const search = payload?.search;
+    if (!search || !['queued', 'processing'].includes(search.status)) return;
+    let active = true;
+    setSearching(true);
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/requisitions/${requisitionId}/prospects?searchId=${encodeURIComponent(search.id)}`, { cache: 'no-store' });
+        const body = await response.json() as Payload & { error?: string };
+        if (!response.ok) throw new Error(body.error || 'Unable to refresh the sourcing run.');
+        if (!active) return;
+        setPayload(body);
+        if (body.search && !['queued', 'processing'].includes(body.search.status)) {
+          setSearching(false);
+          if (body.search.status === 'failed') setError(body.search.error_summary || 'The sourcing run could not be completed.');
+          window.dispatchEvent(new CustomEvent(PROSPECT_SEARCHES_CHANGED_EVENT, { detail: { requisitionId, searchId: body.search.id } }));
+        }
+      } catch (caught) {
+        if (active) setError(caught instanceof Error ? caught.message : 'Unable to refresh the sourcing run.');
+      }
+    };
+    const timer = window.setInterval(() => void poll(), 2500);
+    void poll();
+    return () => { active = false; window.clearInterval(timer); };
+  }, [payload?.search?.id, payload?.search?.status, requisitionId]);
+
   async function runSearch() {
     setSearching(true);
     setError('');
     setOpenId(null);
+    let accepted = false;
     try {
       const gates = nonNegotiables.map((label, index) => ({ id: `gate-${index + 1}`, label }));
       const response = await fetch(`/api/requisitions/${requisitionId}/prospects`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ targetLocation, targetCompensation, searchScope, gates }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || 'Unable to source prospects.');
       applyLoadedPayload(body);
+      accepted = Boolean(body.search?.id && ['queued', 'processing'].includes(body.search.status));
       if (body.search?.id) window.dispatchEvent(new CustomEvent(PROSPECT_SEARCHES_CHANGED_EVENT, { detail: { requisitionId, searchId: body.search.id } }));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to source prospects.');
     } finally {
-      setSearching(false);
+      if (!accepted) setSearching(false);
     }
   }
 
@@ -219,6 +251,16 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
       {payload?.stale && <div className={styles.notice}>The Hiring Criteria changed after this search. Run a new search before unlocking evaluations.</div>}
       {legacyScreening && <div className={styles.notice}>This shortlist predates the stricter evidence screen. Run a new search before relying on it.</div>}
       {error && <div className={styles.error} role="alert">{error}</div>}
+
+      {payload?.search && ['queued', 'processing'].includes(payload.search.status) && <section className={styles.pipeline} aria-live="polite">
+        <div><strong>{payload.search.stage === 'queued' || payload.search.stage === 'planning' ? 'Building search paths' : payload.search.stage === 'discovering' ? 'Finding relevant professionals' : 'Reviewing public evidence'}</strong><span>Qualified prospects will appear below as they clear the screen.</span></div>
+        <dl>
+          <div><dt>Search paths</dt><dd>{payload.search.progress?.completedTracks || 0}/{payload.search.progress?.totalTracks || '—'}</dd></div>
+          <div><dt>Found</dt><dd>{payload.search.progress?.discovered || 0}</dd></div>
+          <div><dt>Reviewed</dt><dd>{payload.search.progress?.reviewed || 0}</dd></div>
+          <div><dt>Cleared</dt><dd>{payload.search.progress?.qualified || 0}</dd></div>
+        </dl>
+      </section>}
 
       {payload?.search && (
         <details className={styles.strategy}>

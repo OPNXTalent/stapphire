@@ -24,6 +24,10 @@ export type ResumeEvaluationOperationMessage = {
   operationItemId: string;
 };
 
+export type ProspectSearchOperationMessage = {
+  searchId: string;
+};
+
 export type ResumeOperationItemSummary = {
   id: string;
   status: 'uploading' | 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
@@ -49,6 +53,12 @@ export function isResumeEvaluationOperationMessage(value: unknown): value is Res
   return typeof value === 'object' && value !== null
     && typeof (value as { operationItemId?: unknown }).operationItemId === 'string'
     && (value as { operationItemId: string }).operationItemId.length > 0;
+}
+
+export function isProspectSearchOperationMessage(value: unknown): value is ProspectSearchOperationMessage {
+  return typeof value === 'object' && value !== null
+    && typeof (value as { searchId?: unknown }).searchId === 'string'
+    && (value as { searchId: string }).searchId.length > 0;
 }
 
 export function isActiveOperation(status: OperationStatus): boolean {

@@ -14,6 +14,9 @@ const workspacePanel = readFileSync(join(directory, 'WorkspacePanel.tsx'), 'utf8
 const sourcingStyles = readFileSync(join(directory, 'ProspectSourcing.module.css'), 'utf8');
 const teamworkWorkspace = readFileSync(join(directory, '..', 'lib', 'teamworkWorkspace.ts'), 'utf8');
 const sharedTeamwork = readFileSync(join(directory, 'SharedTeamworkWorkspace.tsx'), 'utf8');
+const sourcingOperation = readFileSync(join(directory, '..', 'lib', 'prospectSearchOperation.ts'), 'utf8');
+const queueRoute = readFileSync(join(directory, '..', 'app', 'api', 'queues', 'prospect-search', 'route.ts'), 'utf8');
+const queue = readFileSync(join(directory, '..', 'lib', 'operationQueue.ts'), 'utf8');
 
 test('locked shortlist exposes name, location, sourcing fit, score, and explicit QC action', () => {
   assert.match(component, /<strong>\{prospect\.full_name\}<\/strong>/);
@@ -125,4 +128,35 @@ test('the unlocked evaluation banner puts candidate location and the best public
   assert.match(component, /prospect\.evaluation\.location\?\.label/);
   assert.match(component, /Open public profile/);
   assert.match(component, /className=\{styles\.candidateContact\}/);
+});
+
+test('sourcing is a persisted multi-pass queue instead of one blocking web request', () => {
+  assert.match(searchRoute, /status: 'queued'/);
+  assert.match(searchRoute, /enqueueProspectSearch/);
+  assert.match(searchRoute, /status: 202/);
+  assert.doesNotMatch(searchRoute, /await searchForProspects/);
+  assert.match(queue, /stapphire-prospect-search/);
+  assert.match(queueRoute, /processProspectSearch/);
+  assert.match(sourcingOperation, /planProspectSearch/);
+  assert.match(sourcingOperation, /discoverProspects/);
+  assert.match(sourcingOperation, /screenDiscoveredProspects/);
+  assert.match(sourcingOperation, /TARGET_SHORTLIST = 8/);
+});
+
+test('cleared prospects appear progressively while the run is still active', () => {
+  assert.match(component, /window\.setInterval\(\(\) => void poll\(\), 2500\)/);
+  assert.match(component, /Qualified prospects will appear below as they clear the screen/);
+  assert.match(component, /payload\.search\.progress\?\.qualified/);
+  assert.match(sourcingOperation, /from\('phase1_prospects'\)\.upsert/);
+  assert.match(sourcingOperation, /status: outcome\.prospect \? 'qualified' : 'rejected'/);
+});
+
+test('the funnel deduplicates identities and reports honest coverage', () => {
+  assert.match(sourcingEngine, /identityKey = canonicalUrl/);
+  assert.match(sourcingOperation, /onConflict: 'search_id,identity_key'/);
+  assert.match(sourcingOperation, /coverageConfidence/);
+  assert.match(sourcingOperation, /identities discovered across/);
+  assert.match(component, />Found<\/dt>/);
+  assert.match(component, />Reviewed<\/dt>/);
+  assert.match(component, />Cleared<\/dt>/);
 });

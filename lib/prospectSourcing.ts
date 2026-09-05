@@ -3,7 +3,7 @@ import { getVercelOidcToken } from '@vercel/oidc';
 import { validateNeutralCriterionFindings, type AppliedCriterion, type CriterionScore, type KnockoutStatus } from './criteriaEvaluation';
 import { projectCriterionFindings, type CriterionFinding } from './criterionProjection';
 
-const SOURCING_MODEL = process.env.AI_GATEWAY_MODEL || 'openai/gpt-5.4';
+export const SOURCING_MODEL = process.env.AI_GATEWAY_MODEL || 'openai/gpt-5.4';
 const MAX_PROSPECTS = 8;
 const SOURCING_FIT_UPLIFT = 4;
 const MIN_SHORTLIST_SCORE = 70;
@@ -37,6 +37,27 @@ export type ProspectSearchResult = {
   marketAnalysis: MarketAnalysis;
   prospects: SourcedProspect[];
   modelIdentifier: string;
+};
+export type ProspectSearchTrack = { id: string; label: string; query: string; rationale: string };
+export type ProspectSearchPlan = {
+  booleanQuery: string;
+  strategyRationale: string;
+  tracks: ProspectSearchTrack[];
+  marketAnalysis: Omit<MarketAnalysis, 'observedProspects'>;
+  modelIdentifier: string;
+};
+export type DiscoveredProspect = {
+  identityKey: string;
+  fullName: string;
+  headline: string;
+  locationLabel: string;
+  discoveryEvidence: string;
+  sources: ProspectSource[];
+};
+export type ProspectScreenOutcome = {
+  identityKey: string;
+  prospect: SourcedProspect | null;
+  rejectionReason: string | null;
 };
 type ProspectSearchResponse = Omit<ProspectSearchResult, 'prospects' | 'modelIdentifier'> & {
   prospects: Array<Omit<SourcedProspect, 'preliminaryScore' | 'sourcingFit'>>;
@@ -201,6 +222,105 @@ function verifiedWebSources(response: unknown, requested: ProspectSource[]): Pro
 }
 
 function exactCoverage(expected: string[], actual: string[]): boolean { return actual.length === expected.length && new Set(actual).size === expected.length && actual.every((id) => expected.includes(id)); }
+
+const marketAnalysisSchema = {
+  type: 'object' as const,
+  additionalProperties: false,
+  required: ['scarcityLevel', 'confidence', 'summary', 'constraintDrivers', 'relaxationLevers', 'evidenceCaveat'],
+  properties: {
+    scarcityLevel: { type: 'string' as const, enum: ['BROAD', 'COMPETITIVE', 'SCARCE', 'UNICORN'] },
+    confidence: { type: 'string' as const, enum: ['HIGH', 'MODERATE', 'LOW'] },
+    summary: { type: 'string' as const },
+    constraintDrivers: { type: 'array' as const, items: { type: 'object' as const, additionalProperties: false, required: ['constraint', 'impact', 'explanation'], properties: { constraint: { type: 'string' as const }, impact: { type: 'string' as const, enum: ['HIGH', 'MODERATE', 'LOW'] }, explanation: { type: 'string' as const } } } },
+    relaxationLevers: { type: 'array' as const, items: { type: 'object' as const, additionalProperties: false, required: ['change', 'likelyEffect', 'tradeoff'], properties: { change: { type: 'string' as const }, likelyEffect: { type: 'string' as const }, tradeoff: { type: 'string' as const } } } },
+    evidenceCaveat: { type: 'string' as const }
+  }
+};
+
+function sourcingInput(input: { title: string; jobDescription: string; criteria: AppliedCriterion[]; gates: SourcingGate[]; targetLocation: string; searchScope: SearchScope; targetCompensation: string }) {
+  return `POSITION\n${input.title}\n\nTARGET LOCATION\n${input.targetLocation || 'Not specified'}\n\nSEARCH SCOPE\n${input.searchScope}\n\nTARGET COMPENSATION\n${input.targetCompensation || 'Not specified'}\n\nJOB DESCRIPTION\n${input.jobDescription}\n\nNON-NEGOTIABLES\n${JSON.stringify(input.gates)}\n\nWEIGHTED CRITERIA\n${JSON.stringify(input.criteria)}`;
+}
+
+export async function planProspectSearch(input: { title: string; jobDescription: string; criteria: AppliedCriterion[]; gates: SourcingGate[]; targetLocation: string; searchScope: SearchScope; targetCompensation: string }): Promise<ProspectSearchPlan> {
+  const response = await (await client()).responses.create({
+    model: SOURCING_MODEL,
+    instructions: `Design a broad but disciplined public-web sourcing plan. Create 5 materially different discovery tracks: exact occupational titles, adjacent credible titles, employer/industry targets, associations/conferences, and credential/publication evidence. Queries must preserve the occupational domain and geography but should not require every weighted criterion in the discovery query. Discovery is recall-oriented; a later evidence screen will determine qualification. Do not seek contact data or protected traits. Estimate market scarcity provisionally and be explicit that final confidence depends on the observed funnel.`,
+    input: sourcingInput(input),
+    max_output_tokens: 5000,
+    store: false,
+    text: { format: { type: 'json_schema', name: 'prospect_search_plan', strict: true, schema: {
+      type: 'object', additionalProperties: false,
+      required: ['booleanQuery', 'strategyRationale', 'tracks', 'marketAnalysis'],
+      properties: {
+        booleanQuery: { type: 'string' }, strategyRationale: { type: 'string' },
+        tracks: { type: 'array', minItems: 5, maxItems: 5, items: { type: 'object', additionalProperties: false, required: ['id', 'label', 'query', 'rationale'], properties: { id: { type: 'string' }, label: { type: 'string' }, query: { type: 'string' }, rationale: { type: 'string' } } } },
+        marketAnalysis: marketAnalysisSchema
+      }
+    } } }
+  });
+  if (response.status !== 'completed' || !response.output_text) throw new Error('Prospect search planning did not complete.');
+  const result = parseJson<Omit<ProspectSearchPlan, 'modelIdentifier'>>(response.output_text, 'prospect search plan');
+  return { ...result, tracks: result.tracks.map((track, index) => ({ ...track, id: track.id.trim() || `track-${index + 1}` })), modelIdentifier: response.model };
+}
+
+export async function discoverProspects(input: { title: string; targetLocation: string; searchScope: SearchScope; track: ProspectSearchTrack }): Promise<{ prospects: DiscoveredProspect[]; modelIdentifier: string }> {
+  const response = await (await client()).responses.create({
+    model: SOURCING_MODEL,
+    instructions: `Find up to 8 real, named professionals for this sourcing track. This pass is intentionally recall-oriented: require credible occupational relevance, but do not attempt the final weighted evaluation. Resolve identities carefully, avoid namesakes, and cite public professional pages actually found with web search. Prefer a LinkedIn public profile, employer bio, association bio, conference page, portfolio, certification, or publication. Never seek contact data or protected traits. Return fewer people if identity cannot be resolved.`,
+    input: `POSITION\n${input.title}\n\nTARGET LOCATION\n${input.targetLocation || 'Not specified'}\n\nSEARCH SCOPE\n${input.searchScope}\n\nDISCOVERY TRACK\n${JSON.stringify(input.track)}`,
+    tools: [{ type: 'web_search' }], include: ['web_search_call.action.sources'], max_output_tokens: 6500, store: false,
+    text: { format: { type: 'json_schema', name: 'prospect_discovery', strict: true, schema: { type: 'object', additionalProperties: false, required: ['prospects'], properties: { prospects: { type: 'array', maxItems: 8, items: { type: 'object', additionalProperties: false, required: ['fullName', 'headline', 'locationLabel', 'discoveryEvidence', 'sources'], properties: { fullName: { type: 'string' }, headline: { type: 'string' }, locationLabel: { type: 'string' }, discoveryEvidence: { type: 'string' }, sources: { type: 'array', minItems: 1, items: sourceSchema } } } } } } } }
+  });
+  if (response.status !== 'completed' || !response.output_text) throw new Error('Prospect discovery did not complete.');
+  const parsed = parseJson<{ prospects: Array<Omit<DiscoveredProspect, 'identityKey'>> }>(response.output_text, 'prospect discovery');
+  const prospects = parsed.prospects.flatMap((prospect) => {
+    const sources = verifiedWebSources(response, prospect.sources);
+    if (!prospect.fullName.trim() || !prospect.discoveryEvidence.trim() || sources.length === 0) return [];
+    const profile = sources.find((source) => /linkedin\.com\/in\//i.test(source.url));
+    const identityKey = canonicalUrl(profile?.url || '') || `${prospect.fullName.trim().toLowerCase()}|${prospect.locationLabel.trim().toLowerCase()}`;
+    return [{ ...prospect, fullName: prospect.fullName.trim(), sources, identityKey }];
+  });
+  return { prospects, modelIdentifier: response.model };
+}
+
+export async function screenDiscoveredProspects(input: { title: string; jobDescription: string; criteria: AppliedCriterion[]; gates: SourcingGate[]; targetLocation: string; searchScope: SearchScope; targetCompensation: string; candidates: DiscoveredProspect[] }): Promise<{ outcomes: ProspectScreenOutcome[]; modelIdentifier: string }> {
+  if (!input.candidates.length) return { outcomes: [], modelIdentifier: SOURCING_MODEL };
+  const candidateKeys = input.candidates.map((candidate) => candidate.identityKey);
+  const response = await (await client()).responses.create({
+    model: SOURCING_MODEL,
+    instructions: `Independently research and screen every supplied identity against the position. Return exactly one result per identityKey. This is a qualification screen, not lead generation. Similar titles and transferable skills do not prove occupational fit. Every explicit non-negotiable and geography must be MET. DIRECT evidence explicitly demonstrates the work; INFERRED may never score above 50; UNKNOWN scores 0. Use 100 only for unusually strong direct evidence, 75 for clear direct evidence, 50 for partial or inferred alignment, 25 for weak adjacent evidence, and 0 when credible evidence is absent. Find at least two independent public professional sources. Never merge namesakes or seek contact details, salary, or protected traits.`,
+    input: `${sourcingInput(input)}\n\nDISCOVERED IDENTITIES\n${JSON.stringify(input.candidates)}`,
+    tools: [{ type: 'web_search' }], include: ['web_search_call.action.sources'], max_output_tokens: 10000, store: false,
+    text: { format: { type: 'json_schema', name: 'prospect_screen_batch', strict: true, schema: { type: 'object', additionalProperties: false, required: ['prospects'], properties: { prospects: { type: 'array', minItems: input.candidates.length, maxItems: input.candidates.length, items: { type: 'object', additionalProperties: false, required: ['identityKey', 'fullName', 'headline', 'location', 'geographicFit', 'publicEvidence', 'gateFindings', 'criterionSignals', 'sources'], properties: { identityKey: { type: 'string', enum: candidateKeys }, fullName: { type: 'string' }, headline: { type: 'string' }, location: locationSchema, geographicFit: { type: 'string', enum: ['WITHIN_SCOPE', 'OUTSIDE_SCOPE', 'UNABLE_TO_DETERMINE'] }, publicEvidence: { type: 'string' }, gateFindings: gateSchema(input.gates), criterionSignals: { type: 'array', minItems: input.criteria.length, maxItems: input.criteria.length, items: { type: 'object', additionalProperties: false, required: ['criterionId', 'score', 'evidence', 'evidenceStrength'], properties: { criterionId: criterionIdSchema(input.criteria), score: { type: 'integer', enum: [0, 25, 50, 75, 100] }, evidence: { type: 'string' }, evidenceStrength: { type: 'string', enum: ['DIRECT', 'INFERRED', 'UNKNOWN'] } } } }, sources: { type: 'array', minItems: 2, items: sourceSchema } } } } } } } }
+  });
+  if (response.status !== 'completed' || !response.output_text) throw new Error('Prospect screening did not complete.');
+  const parsed = parseJson<{ prospects: Array<{ identityKey: string } & Omit<SourcedProspect, 'preliminaryScore' | 'sourcingFit'>> }>(response.output_text, 'prospect screen');
+  const returned = new Map(parsed.prospects.map((prospect) => [prospect.identityKey, prospect]));
+  const outcomes = input.candidates.map((candidate): ProspectScreenOutcome => {
+    const prospect = returned.get(candidate.identityKey);
+    if (!prospect) return { identityKey: candidate.identityKey, prospect: null, rejectionReason: 'The evidence screen returned no resolved identity.' };
+    if (!exactCoverage(input.gates.map((gate) => gate.id), prospect.gateFindings.map((item) => item.gateId))) return { identityKey: candidate.identityKey, prospect: null, rejectionReason: 'Non-negotiable evidence was incomplete.' };
+    if (!exactCoverage(input.criteria.map((criterion) => criterion.id), prospect.criterionSignals.map((item) => item.criterionId))) return { identityKey: candidate.identityKey, prospect: null, rejectionReason: 'Weighted-criteria evidence was incomplete.' };
+    const sources = verifiedWebSources(response, prospect.sources);
+    if (sources.length < 2) return { identityKey: candidate.identityKey, prospect: null, rejectionReason: 'Fewer than two independent public sources were verified.' };
+    if (prospect.geographicFit !== 'WITHIN_SCOPE') return { identityKey: candidate.identityKey, prospect: null, rejectionReason: 'Location was outside or could not be confirmed within the search scope.' };
+    if (prospect.gateFindings.some((item) => item.status !== 'MET')) return { identityKey: candidate.identityKey, prospect: null, rejectionReason: 'A non-negotiable was not positively established.' };
+    const byCriterion = new Map(prospect.criterionSignals.map((signal) => [signal.criterionId, signal]));
+    const criterionSignals = input.criteria.map((criterion) => {
+      const signal = byCriterion.get(criterion.id)!;
+      const score = signal.evidenceStrength === 'UNKNOWN' ? 0 : signal.evidenceStrength === 'INFERRED' ? Math.min(signal.score, 50) as CriterionScore : signal.score;
+      return { ...signal, score };
+    });
+    const evidenceWeightedScore = Math.round(input.criteria.reduce((sum, criterion, index) => sum + criterionSignals[index].score * criterion.appliedWeight, 0) / 100);
+    const preliminaryScore = Math.min(100, evidenceWeightedScore + SOURCING_FIT_UPLIFT);
+    const directEvidenceWeight = input.criteria.reduce((sum, criterion, index) => sum + (!criterion.isKnockout && criterionSignals[index].evidenceStrength === 'DIRECT' && criterionSignals[index].score >= 75 ? criterion.appliedWeight : 0), 0);
+    if (preliminaryScore < MIN_SHORTLIST_SCORE) return { identityKey: candidate.identityKey, prospect: null, rejectionReason: `Evidence fit ${preliminaryScore}% was below the 70% shortlist threshold.` };
+    if (directEvidenceWeight < MIN_DIRECT_EVIDENCE_WEIGHT) return { identityKey: candidate.identityKey, prospect: null, rejectionReason: 'Too much of the apparent fit depended on inference rather than direct evidence.' };
+    const sourcingFit = preliminaryScore >= 80 && directEvidenceWeight >= 60 ? 'QUALIFIED' as const : 'POSSIBLE' as const;
+    return { identityKey: candidate.identityKey, prospect: { ...prospect, sources, preliminaryScore, criterionSignals, sourcingFit, geographicFit: 'WITHIN_SCOPE' }, rejectionReason: null };
+  });
+  return { outcomes, modelIdentifier: response.model };
+}
 
 export async function searchForProspects(input: { title: string; jobDescription: string; criteria: AppliedCriterion[]; gates: SourcingGate[]; targetLocation: string; searchScope: SearchScope; targetCompensation: string }): Promise<ProspectSearchResult> {
   const response = await (await client()).responses.create({

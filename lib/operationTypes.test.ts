@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   isActiveOperation,
   isHiringCriteriaOperationMessage,
+  isProspectSearchOperationMessage,
   isResumeEvaluationOperationMessage,
   isRetryableHiringCriteriaError,
   isTerminalOperation
@@ -14,6 +15,12 @@ test('Hiring Criteria operation messages require a non-empty operation ID', () =
   assert.equal(isHiringCriteriaOperationMessage({ operationId: '' }), false);
   assert.equal(isHiringCriteriaOperationMessage({}), false);
   assert.equal(isHiringCriteriaOperationMessage(null), false);
+});
+
+test('prospect search messages require one persisted search ID', () => {
+  assert.equal(isProspectSearchOperationMessage({ searchId: 'search-1' }), true);
+  assert.equal(isProspectSearchOperationMessage({ searchId: '' }), false);
+  assert.equal(isProspectSearchOperationMessage({ operationId: 'operation-1' }), false);
 });
 
 test('resume evaluation messages require one durable operation item ID', () => {

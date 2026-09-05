@@ -21,6 +21,17 @@
           "initialDelaySeconds": 0
         }
       ]
+    },
+    "app/api/queues/prospect-search/route.ts": {
+      "maxDuration": 300,
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "stapphire-prospect-search",
+          "retryAfterSeconds": 15,
+          "initialDelaySeconds": 0
+        }
+      ]
     }
   }
 }

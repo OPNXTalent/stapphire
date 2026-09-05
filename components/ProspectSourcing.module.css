@@ -69,6 +69,14 @@
   color: var(--amber);
   font-size: 13px;
 }
+.pipeline { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-top:14px; padding:13px 16px; border:1px solid #b8c8ef; border-radius:6px; background:#f3f6ff; }
+.pipeline > div:first-child { display:grid; gap:3px; }
+.pipeline > div:first-child strong { color:var(--deep); font-size:13px; }
+.pipeline > div:first-child span { color:var(--muted); font-size:11px; }
+.pipeline dl { display:flex; gap:22px; margin:0; }
+.pipeline dl div { display:grid; gap:2px; min-width:54px; text-align:center; }
+.pipeline dt { color:var(--muted); font:700 9px var(--mono); letter-spacing:.05em; text-transform:uppercase; }
+.pipeline dd { margin:0; color:var(--deep); font:800 18px var(--display); }
 .notice {
   display: flex;
   align-items: center;
@@ -317,6 +325,8 @@
   .header {
     display: grid;
   }
+  .pipeline { display:grid; }
+  .pipeline dl { justify-content:space-between; gap:10px; }
   .resultsHeader {
     display: none;
   }

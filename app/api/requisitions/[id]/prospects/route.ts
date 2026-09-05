@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { resolveCurrentEvaluationBasis, resolveEvaluationBasisById, type HiringCriteriaEvaluationBasis } from '@/lib/evaluationBasis';
-import { PROSPECT_SCREENING_VERSION, SEARCH_SCOPES, searchForProspects, type SearchScope, type SourcingGate } from '@/lib/prospectSourcing';
+import { PROSPECT_SCREENING_VERSION, SEARCH_SCOPES, SOURCING_MODEL, type SearchScope, type SourcingGate } from '@/lib/prospectSourcing';
+import { operationQueue } from '@/lib/operationQueue';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getLatestRequisitionIntelligence } from '@/lib/requisitionIntelligence';
 
@@ -63,7 +64,7 @@ async function resolveOrApplySourcingBasis(requisitionId: string): Promise<Hirin
 async function loadSearch(requisitionId: string, searchId?: string | null) {
   let query = supabaseAdmin
     .from('phase1_prospect_searches')
-    .select('id,evaluation_basis_id,boolean_query,search_strategy,created_at')
+    .select('id,evaluation_basis_id,boolean_query,search_strategy,status,stage,progress,error_summary,created_at,started_at,completed_at')
     .eq('requisition_id', requisitionId);
   query = searchId
     ? query.eq('id', searchId)
@@ -98,7 +99,7 @@ async function loadSearch(requisitionId: string, searchId?: string | null) {
 async function searchHistory(requisitionId: string, currentEvaluationBasisId?: string | null) {
   const { data: searches, error: searchesError } = await supabaseAdmin
     .from('phase1_prospect_searches')
-    .select('id,evaluation_basis_id,search_strategy,created_at')
+    .select('id,evaluation_basis_id,search_strategy,status,stage,progress,error_summary,created_at,started_at,completed_at')
     .eq('requisition_id', requisitionId)
     .order('created_at', { ascending: false })
     .limit(30);
@@ -181,47 +182,27 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const body = await request.json().catch(() => ({})) as { targetLocation?: string; targetCompensation?: string; searchScope?: string; gates?: SourcingGate[] };
     const searchScope = SEARCH_SCOPES.includes(body.searchScope as SearchScope) ? body.searchScope as SearchScope : '50_MILES';
     const gates = Array.isArray(body.gates) ? body.gates.filter((gate) => typeof gate?.id === 'string' && typeof gate?.label === 'string' && gate.label.trim()).slice(0, 8) : [];
-    const result = await searchForProspects({
-      title: requisition.title,
-      jobDescription: basis.jobDescriptionSnapshot,
-      criteria: basis.criteria,
-      gates,
-      targetLocation: body.targetLocation?.trim() || '',
-      targetCompensation: body.targetCompensation?.trim() || '',
-      searchScope
-    });
-
     const { data: search, error: searchError } = await supabaseAdmin
       .from('phase1_prospect_searches')
       .insert({
         requisition_id: params.id,
         evaluation_basis_id: basis.id,
-        boolean_query: result.booleanQuery,
-        search_strategy: { rationale: result.strategyRationale, marketAnalysis: result.marketAnalysis, config: { targetLocation: body.targetLocation?.trim() || '', targetCompensation: body.targetCompensation?.trim() || '', searchScope, gates, screeningVersion: PROSPECT_SCREENING_VERSION } },
-        model_identifier: result.modelIdentifier
+        boolean_query: 'Building a multi-pass search strategy…',
+        search_strategy: { config: { targetLocation: body.targetLocation?.trim() || '', targetCompensation: body.targetCompensation?.trim() || '', searchScope, gates, screeningVersion: PROSPECT_SCREENING_VERSION } },
+        model_identifier: SOURCING_MODEL,
+        status: 'queued',
+        stage: 'queued',
+        progress: { totalTracks: 0, completedTracks: 0, discovered: 0, reviewed: 0, qualified: 0, rejected: 0, target: 8, coverageConfidence: 'LOW' }
       })
-      .select('id,evaluation_basis_id,boolean_query,search_strategy,created_at')
+      .select('id')
       .single();
     if (searchError) throw searchError;
 
-    const { error: prospectsError } = await supabaseAdmin.from('phase1_prospects').insert(result.prospects.map((prospect) => ({
-      search_id: search.id,
-      requisition_id: params.id,
-      evaluation_basis_id: basis.id,
-      full_name: prospect.fullName,
-      preliminary_score: prospect.preliminaryScore,
-      sourcing_fit: prospect.sourcingFit,
-      headline: prospect.headline,
-      location: prospect.location,
-      geographic_fit: prospect.geographicFit,
-      public_evidence: prospect.publicEvidence,
-      gate_findings: prospect.gateFindings,
-      criterion_signals: prospect.criterionSignals,
-      sources: prospect.sources
-    })));
-    if (prospectsError) {
-      await supabaseAdmin.from('phase1_prospect_searches').delete().eq('id', search.id).eq('requisition_id', params.id);
-      throw prospectsError;
+    try {
+      await operationQueue.enqueueProspectSearch({ searchId: search.id });
+    } catch (dispatchError) {
+      await supabaseAdmin.from('phase1_prospect_searches').update({ status: 'failed', stage: 'failed', error_summary: 'The sourcing run could not be started.' }).eq('id', search.id);
+      throw dispatchError;
     }
 
     return NextResponse.json({
@@ -232,7 +213,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       currentEvaluationBasisId: basis.id,
       defaults: { targetLocation: body.targetLocation?.trim() || '', targetCompensation: body.targetCompensation?.trim() || '', searchScope, gates },
       criteria: basis.criteria.map((criterion) => ({ id: criterion.id, label: criterion.label, weight: criterion.appliedWeight, isKnockout: criterion.isKnockout }))
-    }, { status: 201 });
+    }, { status: 202 });
   } catch (error) {
     console.error('Prospect search failed', { requisitionId: params.id, error });
     return NextResponse.json({ error: 'Unable to complete the public-web prospect search. No QC was used.' }, { status: 500 });
