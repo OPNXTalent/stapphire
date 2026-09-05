@@ -11,6 +11,7 @@ const evaluationRoute = readFileSync(join(directory, '..', 'app', 'api', 'requis
 const sourcingEngine = readFileSync(join(directory, '..', 'lib', 'prospectSourcing.ts'), 'utf8');
 const historyPanel = readFileSync(join(directory, 'ProspectSearchHistory.tsx'), 'utf8');
 const workspacePanel = readFileSync(join(directory, 'WorkspacePanel.tsx'), 'utf8');
+const sourcingStyles = readFileSync(join(directory, 'ProspectSourcing.module.css'), 'utf8');
 
 test('locked shortlist exposes name, location, sourcing fit, score, and explicit QC action', () => {
   assert.match(component, /<strong>\{prospect\.full_name\}<\/strong>/);
@@ -73,6 +74,11 @@ test('sourcing uses the right rail for Search history and the existing requisiti
   assert.match(workspacePanel, /<RequisitionNotes requisitionId=\{requisitionId\}/);
   assert.match(historyPanel, /Current criteria/);
   assert.match(historyPanel, /Prior criteria/);
+});
+
+test('sourcing gates begin compact and grow with their content', () => {
+  assert.match(component, /className=\{styles\.gates\}[\s\S]*rows=\{1\}/);
+  assert.match(sourcingStyles, /\.controls \.gates textarea \{ field-sizing:content; min-height:38px; max-height:160px;/);
 });
 
 test('prior searches allow already-purchased evaluations to reopen but block new evaluation spend against stale criteria', () => {
