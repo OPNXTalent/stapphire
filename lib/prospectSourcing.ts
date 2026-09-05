@@ -390,7 +390,9 @@ Similar titles and transferable skills do not satisfy an occupational gate. Miss
   const evaluation = parseJson<ProspectEvaluation>(response.output_text, 'prospect evaluation');
   if (!exactCoverage(input.gates.map((gate) => gate.id), evaluation.gateFindings.map((item) => item.gateId))) throw new Error('Sourcing-gate coverage was incomplete.');
   validateNeutralCriterionFindings(input.criteria, evaluation.criterionFindings as Array<CriterionFinding & { alignmentScore: CriterionScore; satisfactionStatus: KnockoutStatus }>);
-  evaluation.sources = verifiedWebSources(response, evaluation.sources);
+  const initialSources = cleanSources(input.prospect.sources);
+  const newlyVerifiedSources = verifiedWebSources(response, evaluation.sources);
+  evaluation.sources = cleanSources([...initialSources, ...newlyVerifiedSources]);
   if (evaluation.sources.length === 0) throw new Error('The evaluation did not contain verifiable public sources.');
   const projection = projectCriterionFindings(input.criteria, evaluation.criterionFindings);
   if (!projection.complete || projection.overallMatch === null) throw new Error('The evaluation did not cover every applied criterion.');

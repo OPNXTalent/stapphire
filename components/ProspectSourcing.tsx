@@ -252,8 +252,8 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
       {legacyScreening && <div className={styles.notice}>This shortlist predates the stricter evidence screen. Run a new search before relying on it.</div>}
       {error && <div className={styles.error} role="alert">{error}</div>}
 
-      {payload?.search && ['queued', 'processing'].includes(payload.search.status) && <section className={styles.pipeline} aria-live="polite">
-        <div><strong>{payload.search.stage === 'queued' || payload.search.stage === 'planning' ? 'Building search paths' : payload.search.stage === 'discovering' ? 'Finding relevant professionals' : 'Reviewing public evidence'}</strong><span>Qualified prospects will appear below as they clear the screen.</span></div>
+      {payload?.search && payload.search.search_strategy?.config?.screeningVersion === 'evidence_v2' && <section className={styles.pipeline} aria-live="polite">
+        <div><strong>{payload.search.status === 'completed' ? 'Search coverage' : payload.search.status === 'failed' ? 'Search interrupted' : payload.search.stage === 'queued' || payload.search.stage === 'planning' ? 'Building search paths' : payload.search.stage === 'discovering' ? 'Finding relevant professionals' : 'Reviewing public evidence'}</strong><span>{payload.search.status === 'completed' ? `${payload.search.progress?.coverageConfidence || 'LOW'} confidence based on the completed evidence funnel.` : payload.search.status === 'failed' ? 'The completed work remains available below.' : 'Qualified prospects will appear below as they clear the screen.'}</span></div>
         <dl>
           <div><dt>Search paths</dt><dd>{payload.search.progress?.completedTracks || 0}/{payload.search.progress?.totalTracks || '—'}</dd></div>
           <div><dt>Found</dt><dd>{payload.search.progress?.discovered || 0}</dd></div>

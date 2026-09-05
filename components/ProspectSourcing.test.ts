@@ -160,3 +160,15 @@ test('the funnel deduplicates identities and reports honest coverage', () => {
   assert.match(component, />Reviewed<\/dt>/);
   assert.match(component, />Cleared<\/dt>/);
 });
+
+test('search coverage remains visible after a sourcing run completes', () => {
+  assert.match(component, /payload\.search\.status === 'completed' \? 'Search coverage'/);
+  assert.doesNotMatch(component, /\['queued', 'processing'\]\.includes\(payload\.search\.status\) && <section className=\{styles\.pipeline\}/);
+  assert.match(component, /confidence based on the completed evidence funnel/);
+});
+
+test('evaluation trusts the already-verified shortlist sources as well as newly verified research', () => {
+  assert.match(sourcingEngine, /const initialSources = cleanSources\(input\.prospect\.sources\)/);
+  assert.match(sourcingEngine, /const newlyVerifiedSources = verifiedWebSources\(response, evaluation\.sources\)/);
+  assert.match(sourcingEngine, /cleanSources\(\[\.\.\.initialSources, \.\.\.newlyVerifiedSources\]\)/);
+});
