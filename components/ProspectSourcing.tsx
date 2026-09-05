@@ -50,7 +50,6 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
-  const [applying, setApplying] = useState(false);
   const [evaluatingId, setEvaluatingId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -117,21 +116,6 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
     }
   }
 
-  async function applyCriteria() {
-    setApplying(true);
-    setError('');
-    try {
-      const response = await fetch(`/api/requisitions/${requisitionId}/hiring-criteria`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'apply' }) });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || 'Unable to apply Hiring Criteria.');
-      await loadSavedSearch();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to apply Hiring Criteria.');
-    } finally {
-      setApplying(false);
-    }
-  }
-
   async function unlockEvaluation(prospect: Prospect) {
     if (prospect.evaluation) { setOpenId(openId === prospect.id ? null : prospect.id); return; }
     setEvaluatingId(prospect.id);
@@ -165,28 +149,29 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
   if (loading) return <section className={styles.shell}><p className={styles.muted}>Loading sourcing workspace…</p></section>;
   const criteriaById = new Map((payload?.criteria || []).map((criterion) => [criterion.id, criterion]));
   const prospects = payload?.search?.prospects || [];
+  const canSource = Boolean(payload?.criteriaApplied || payload?.criteriaReadyToApply);
 
   return (
     <section className={styles.shell} aria-labelledby="prospect-sourcing-title">
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Public-web sourcing prototype</p>
+          <p className={styles.eyebrow}>Public-web sourcing</p>
           <h2 id="prospect-sourcing-title">Find the evidence before the contact data</h2>
-          <p className={styles.intro}>Stapphire turns the applied weights into a search strategy, resolves likely people, and withholds the complete evaluation until you choose to spend 1 QC.</p>
+          <p className={styles.intro}>Stapphire turns the weighted criteria into a search strategy, resolves likely people, and withholds the complete evaluation until you choose to spend 1 QC.</p>
         </div>
-        <button type="button" onClick={runSearch} disabled={searching || !payload?.criteriaApplied}>
+        <button type="button" onClick={runSearch} disabled={searching || !canSource}>
           {searching ? 'Searching the public web…' : prospects.length ? 'Run a new search' : 'Find prospects'}
         </button>
       </header>
 
-      {payload?.criteriaApplied && <div className={styles.controls}>
+      {canSource && <div className={styles.controls}>
         <label>Target work location<input value={targetLocation} onChange={(event) => setTargetLocation(event.target.value)} placeholder="City, state, or country" /></label>
         <label>Search radius<select value={searchScope} onChange={(event) => setSearchScope(event.target.value)}><option value="25_MILES">25 miles</option><option value="50_MILES">50 miles</option><option value="100_MILES">100 miles</option><option value="500_MILES">500 miles</option><option value="NATIONAL">National</option><option value="GLOBAL">Global</option></select></label>
         <label>Target compensation <span>(optional)</span><input value={targetCompensation} onChange={(event) => setTargetCompensation(event.target.value)} placeholder="$140,000–$175,000" /></label>
         <label className={styles.gates}>Non-negotiable sourcing gates <span>one per line</span><textarea value={gateText} onChange={(event) => setGateText(event.target.value)} rows={3} /></label>
       </div>}
 
-      {!payload?.criteriaApplied && <div className={styles.notice}>{payload?.criteriaReadyToApply ? <><span>Your Hiring Criteria are complete and total 100%. Apply them to create the immutable sourcing basis.</span><button type="button" onClick={applyCriteria} disabled={applying}>{applying ? 'Applying…' : 'Apply Criteria & Enable Sourcing'}</button></> : 'Complete and apply Hiring Criteria with a total weight of 100% before sourcing.'}</div>}
+      {!canSource && <div className={styles.notice}>Complete Hiring Criteria with a total weight of 100% before sourcing.</div>}
       {payload?.stale && <div className={styles.notice}>The Hiring Criteria changed after this search. Run a new search before unlocking evaluations.</div>}
       {error && <div className={styles.error} role="alert">{error}</div>}
 
@@ -258,7 +243,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
             );
           })}
         </div>
-      ) : payload?.criteriaApplied && !searching ? <div className={styles.empty}><strong>{payload?.search ? 'No prospects cleared the evidence gates.' : 'No prospect search yet.'}</strong><span>{payload?.search ? 'The Talent Market Read above still explains the constraint.' : 'Confirm the sourcing gates and search scope, then find prospects.'}</span></div> : null}
+      ) : canSource && !searching ? <div className={styles.empty}><strong>{payload?.search ? 'No prospects cleared the evidence gates.' : 'No prospect search yet.'}</strong><span>{payload?.search ? 'The Talent Market Read above still explains the constraint.' : 'Confirm the sourcing gates and search scope, then find prospects.'}</span></div> : null}
     </section>
   );
 }

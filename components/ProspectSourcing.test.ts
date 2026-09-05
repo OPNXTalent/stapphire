@@ -23,15 +23,19 @@ test('locked shortlist exposes name, location, sourcing fit, score, and explicit
   assert.match(searchRoute, /sources: \[\]/);
 });
 
-test('search requires an applied Hiring Criteria basis and does not perform QC billing', () => {
-  assert.match(searchRoute, /basis\.basisType !== 'hiring_criteria'/);
+test('search automatically snapshots ready Hiring Criteria and does not perform QC billing', () => {
+  assert.match(searchRoute, /resolveOrApplySourcingBasis/);
+  assert.match(searchRoute, /rpc\('apply_phase1_hiring_criteria'/);
+  assert.match(searchRoute, /resolveEvaluationBasisById/);
   assert.doesNotMatch(searchRoute, /credits_remaining|consume_qc/);
 });
 
-test('a complete criteria draft can be applied directly from the sourcing workspace', () => {
-  assert.match(component, /Apply Criteria & Enable Sourcing/);
-  assert.match(component, /action: 'apply'/);
+test('a complete criteria draft enables sourcing without a manual apply step', () => {
+  assert.match(component, /const canSource = Boolean\(payload\?\.criteriaApplied \|\| payload\?\.criteriaReadyToApply\)/);
+  assert.doesNotMatch(component, /Apply Criteria & Enable Sourcing/);
+  assert.doesNotMatch(component, /action: 'apply'/);
   assert.match(searchRoute, /criteriaReadyToApply/);
+  assert.match(searchRoute, /loadReadyCriteriaDraft/);
 });
 
 test('free sourcing stays compact while the QC evaluation owns the full criteria matrix', () => {
