@@ -77,6 +77,8 @@ test('sourcing uses the right rail for Search history and the existing requisiti
 });
 
 test('sourcing gates begin compact and grow with their content', () => {
+  assert.match(component, />Non-negotiables <span>one per line<\/span>/);
+  assert.doesNotMatch(component, /Non-negotiable sourcing gates/);
   assert.match(component, /className=\{styles\.gates\}[\s\S]*rows=\{1\}/);
   assert.match(sourcingStyles, /\.controls \.gates textarea \{ field-sizing:content; min-height:38px; max-height:160px;/);
 });

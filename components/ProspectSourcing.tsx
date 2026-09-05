@@ -168,7 +168,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
         <label>Target work location<input value={targetLocation} onChange={(event) => setTargetLocation(event.target.value)} placeholder="City, state, or country" /></label>
         <label>Search radius<select value={searchScope} onChange={(event) => setSearchScope(event.target.value)}><option value="25_MILES">25 miles</option><option value="50_MILES">50 miles</option><option value="100_MILES">100 miles</option><option value="500_MILES">500 miles</option><option value="NATIONAL">National</option><option value="GLOBAL">Global</option></select></label>
         <label>Target compensation <span>(optional)</span><input value={targetCompensation} onChange={(event) => setTargetCompensation(event.target.value)} placeholder="$140,000–$175,000" /></label>
-        <label className={styles.gates}>Non-negotiable sourcing gates <span>one per line</span><textarea value={gateText} onChange={(event) => setGateText(event.target.value)} rows={1} /></label>
+        <label className={styles.gates}>Non-negotiables <span>one per line</span><textarea value={gateText} onChange={(event) => setGateText(event.target.value)} rows={1} /></label>
       </div>}
 
       {!canSource && <div className={styles.notice}>Complete Hiring Criteria with a total weight of 100% before sourcing.</div>}
