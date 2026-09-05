@@ -23,11 +23,17 @@ import {
 export function WorkspacePanel({
   collapsed,
   onExpand,
-  onCollapse
+  onCollapse,
+  onNarrow,
+  onWiden,
+  onResizeStart
 }: {
   collapsed: boolean;
   onExpand: () => void;
   onCollapse: () => void;
+  onNarrow: () => void;
+  onWiden: () => void;
+  onResizeStart: (clientX: number) => void;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -135,9 +141,23 @@ export function WorkspacePanel({
 
   return (
     <div className="side-panel">
-      <button className="panel-collapse-btn" onClick={onCollapse} aria-label="Collapse panel">
-        ›
-      </button>
+      <div
+        className="panel-resize-handle"
+        role="separator"
+        aria-label="Resize workspace panel"
+        aria-orientation="vertical"
+        tabIndex={0}
+        onPointerDown={(event) => { event.preventDefault(); onResizeStart(event.clientX); }}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowLeft') { event.preventDefault(); onWiden(); }
+          if (event.key === 'ArrowRight') { event.preventDefault(); onNarrow(); }
+        }}
+      />
+      <div className="panel-size-controls" aria-label="Workspace panel size">
+        <button type="button" onClick={onNarrow} aria-label="Narrow panel" title="Narrow panel">−</button>
+        <button type="button" onClick={onWiden} aria-label="Widen panel" title="Widen panel">+</button>
+        <button type="button" onClick={onCollapse} aria-label="Collapse panel" title="Collapse panel">›</button>
+      </div>
 
       {showQuestionBank && requisitionId ? (
         <InterviewQuestionBankPanel

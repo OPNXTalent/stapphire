@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { WorkspacePanel } from '@/components/WorkspacePanel';
@@ -10,10 +10,74 @@ import { ResumeUploadManagerProvider } from '@/components/ResumeUploadManager';
 import { RequisitionViewStateProvider } from '@/components/RequisitionViewStateProvider';
 
 type RequisitionLink = { id: string; title: string };
+const DEFAULT_RIGHT_PANEL_WIDTH = 360;
+const MIN_RIGHT_PANEL_WIDTH = 320;
+const MAX_RIGHT_PANEL_WIDTH = 680;
+const RIGHT_PANEL_WIDTH_KEY = 'stapphire_right_panel_width';
+
+function clampPanelWidth(width: number) {
+  const viewportMaximum = typeof window === 'undefined'
+    ? MAX_RIGHT_PANEL_WIDTH
+    : Math.max(MIN_RIGHT_PANEL_WIDTH, window.innerWidth - 560);
+  return Math.min(Math.max(width, MIN_RIGHT_PANEL_WIDTH), Math.min(MAX_RIGHT_PANEL_WIDTH, viewportMaximum));
+}
 
 export function AppShell({ requisitions, children }: { requisitions: RequisitionLink[]; children: React.ReactNode }) {
   const pathname = usePathname();
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [rightPanelWidth, setRightPanelWidth] = useState(DEFAULT_RIGHT_PANEL_WIDTH);
+  const [resizeOrigin, setResizeOrigin] = useState<{ clientX: number; width: number } | null>(null);
+  const rightPanelWidthRef = useRef(rightPanelWidth);
+
+  const updateRightPanelWidth = useCallback((width: number) => {
+    const nextWidth = clampPanelWidth(width);
+    rightPanelWidthRef.current = nextWidth;
+    setRightPanelWidth(nextWidth);
+    return nextWidth;
+  }, []);
+
+  useEffect(() => {
+    try {
+      const savedWidth = Number(localStorage.getItem(RIGHT_PANEL_WIDTH_KEY));
+      if (Number.isFinite(savedWidth) && savedWidth > 0) updateRightPanelWidth(savedWidth);
+    } catch {}
+  }, [updateRightPanelWidth]);
+
+  useEffect(() => {
+    if (!resizeOrigin) return;
+    const origin = resizeOrigin;
+    const previousCursor = document.body.style.cursor;
+    const previousSelection = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    function move(event: PointerEvent) {
+      updateRightPanelWidth(origin.width + origin.clientX - event.clientX);
+    }
+
+    function finish() {
+      try { localStorage.setItem(RIGHT_PANEL_WIDTH_KEY, String(rightPanelWidthRef.current)); } catch {}
+      setResizeOrigin(null);
+    }
+
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', finish, { once: true });
+    window.addEventListener('pointercancel', finish, { once: true });
+    window.addEventListener('blur', finish, { once: true });
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
+      window.removeEventListener('blur', finish);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousSelection;
+    };
+  }, [resizeOrigin, updateRightPanelWidth]);
+
+  function resizeRightPanel(delta: number) {
+    const nextWidth = updateRightPanelWidth(rightPanelWidthRef.current + delta);
+    try { localStorage.setItem(RIGHT_PANEL_WIDTH_KEY, String(nextWidth)); } catch {}
+  }
 
   if (pathname.startsWith('/interview/preview/')) {
     return <>{children}</>;
@@ -33,7 +97,10 @@ export function AppShell({ requisitions, children }: { requisitions: Requisition
         <span className="brand-tagline">Hiring Quality Control</span>
         <GlobalBannerControls/>
       </header>
-      <div className={`app-shell ${effectiveRightCollapsed ? 'right-collapsed' : ''}`}>
+      <div
+        className={`app-shell ${effectiveRightCollapsed ? 'right-collapsed' : ''}`}
+        style={{ '--right-panel-width': `${rightPanelWidth}px` } as CSSProperties}
+      >
         <aside className="req-nav">
           <div className="req-nav-head">
             <span className="eyebrow">Workspace</span>
@@ -64,7 +131,14 @@ export function AppShell({ requisitions, children }: { requisitions: Requisition
             {children}
           </div>
         </main>
-        {!formDesigner && <WorkspacePanel collapsed={rightCollapsed} onExpand={() => setRightCollapsed(false)} onCollapse={() => setRightCollapsed(true)}/>} 
+        {!formDesigner && <WorkspacePanel
+          collapsed={rightCollapsed}
+          onExpand={() => setRightCollapsed(false)}
+          onCollapse={() => setRightCollapsed(true)}
+          onNarrow={() => resizeRightPanel(-80)}
+          onWiden={() => resizeRightPanel(80)}
+          onResizeStart={(clientX) => setResizeOrigin({ clientX, width: rightPanelWidthRef.current })}
+        />}
       </div>
     </RequisitionViewStateProvider>
     </ResumeUploadManagerProvider>

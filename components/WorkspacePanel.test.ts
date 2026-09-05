@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'WorkspacePanel.tsx'), 'utf8');
+const appShell = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'AppShell.tsx'), 'utf8');
+const globals = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'app', 'globals.css'), 'utf8');
 
 test('selected-candidate workspace is isolated from matrix-level resume upload', () => {
   const candidateBranch = source.match(/showCandidateFiles && candidate \? \(([\s\S]*?)\) : showCandidateWorkspace/);
@@ -82,4 +84,15 @@ test('the completed-interview route does not gain access to the general requisit
   assert.match(source, /const showQuestionBank = Boolean\(\s*\n\s*isInterviewBuilder \|\|\s*\n\s*\(requisitionId && state\.view === 'requisition' && state\.requisitionTab === 'interviews'\)\s*\n\s*\);/, 'showQuestionBank must remain requisitionId-gated, unaffected by isCompletedInterviewRoute');
   assert.match(source, /const showCandidateWorkspace = Boolean\(requisitionId && state\.view === 'candidates'\);/, 'showCandidateWorkspace must remain requisitionId-gated, unaffected by isCompletedInterviewRoute');
   assert.match(source, /const showRequisitionNotes = Boolean\(\s*\n\s*requisitionId &&/, 'showRequisitionNotes must remain requisitionId-gated, unaffected by isCompletedInterviewRoute');
+});
+
+test('the right workspace panel can be narrowed, widened, dragged, collapsed, and remembers its width', () => {
+  assert.match(source, /panel-resize-handle/);
+  assert.match(source, /onResizeStart\(event\.clientX\)/);
+  assert.match(source, /aria-label="Narrow panel"/);
+  assert.match(source, /aria-label="Widen panel"/);
+  assert.match(source, /aria-label="Collapse panel"/);
+  assert.match(appShell, /stapphire_right_panel_width/);
+  assert.match(appShell, /window\.addEventListener\('pointermove'/);
+  assert.match(globals, /var\(--right-panel-width,360px\)/);
 });

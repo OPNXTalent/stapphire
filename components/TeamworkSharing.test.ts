@@ -11,6 +11,8 @@ const joinRoute = read('app/api/teamwork/[token]/join/route.ts');
 const publicPage = read('components/SharedTeamworkWorkspace.tsx');
 const middleware = read('middleware.ts');
 const migration = read('supabase/migrations/20260904082908_lightweight_teamwork_sharing.sql');
+const shareControl = read('components/TeamworkShareControl.tsx');
+const shareStyles = read('components/TeamworkShareControl.module.css');
 
 test('shared workspace is a separate route and projects no candidate files, resume text, dispositions, or private notes', () => {
   assert.match(read('app/teamwork/[token]/page.tsx'), /SharedTeamworkWorkspace/);
@@ -61,4 +63,12 @@ test('Teamwork routes bypass only the site gate while database tables remain ser
 test('lightweight sharing contains no Supabase magic-link or OTP authentication flow', () => {
   const combined = [shareHelper, joinRoute, publicPage].join('\n');
   assert.doesNotMatch(combined, /signInWithOtp|magiclink|magic-link|supabase\.auth/);
+});
+
+test('Share access stays compact and contained inside the resizable Teamwork rail', () => {
+  assert.match(shareControl, /<span>Invited by<\/span>/);
+  assert.match(shareControl, /<span>Access<\/span>/);
+  assert.doesNotMatch(shareStyles, /position:\s*(absolute|fixed)|width:\s*min\(430px/);
+  assert.match(shareStyles, /\.panel \{[\s\S]*width: 100%;[\s\S]*margin-top: 9px/);
+  assert.match(shareStyles, /grid-template-columns: 66px minmax\(0, 1fr\)/);
 });
