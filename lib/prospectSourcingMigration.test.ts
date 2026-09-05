@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const migration = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'supabase', 'migrations', '20260831143000_prospect_sourcing_prototype.sql'), 'utf8');
-const durableMigration = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'supabase', 'migrations', '20260905103000_durable_multi_pass_prospect_sourcing.sql'), 'utf8');
+const durableMigration = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'supabase', 'migrations', '20260905113854_durable_multi_pass_prospect_sourcing.sql'), 'utf8');
 
 test('prospect tables are RLS protected and restricted to the server role', () => {
   assert.match(migration, /alter table phase1_prospect_searches enable row level security/);
