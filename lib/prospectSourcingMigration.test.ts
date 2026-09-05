@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const migration = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'supabase', 'migrations', '20260831143000_prospect_sourcing_prototype.sql'), 'utf8');
 const durableMigration = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'supabase', 'migrations', '20260905113854_durable_multi_pass_prospect_sourcing.sql'), 'utf8');
+const reviewedMigration = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'supabase', 'migrations', '20260905144643_preserve_reviewed_prospect_diagnostics.sql'), 'utf8');
 
 test('prospect tables are RLS protected and restricted to the server role', () => {
   assert.match(migration, /alter table phase1_prospect_searches enable row level security/);
@@ -40,4 +41,13 @@ test('prospect queue ownership is protected by an expiring database lease', () =
   assert.match(durableMigration, /lease_expires_at < now\(\)/);
   assert.match(durableMigration, /release_phase1_prospect_search_v1/);
   assert.match(durableMigration, /grant execute on function claim_phase1_prospect_search_v1[\s\S]+to service_role/);
+});
+
+test('reviewed prospect diagnostics are persisted and evaluation unlock costs two QC atomically', () => {
+  assert.match(reviewedMigration, /screening_status text not null default 'CLEARED'/);
+  assert.match(reviewedMigration, /screening_disposition text/);
+  assert.match(reviewedMigration, /if v_remaining < 2 then raise exception 'INSUFFICIENT_QC'/);
+  assert.match(reviewedMigration, /credits_remaining = credits_remaining - 2/);
+  assert.match(reviewedMigration, /values \(p_org_id, -2, 'prospect_evaluation_unlock'\)/);
+  assert.match(reviewedMigration, /revoke all on function consume_qc_and_unlock_prospect_evaluation_v1[\s\S]+from public, anon, authenticated/);
 });

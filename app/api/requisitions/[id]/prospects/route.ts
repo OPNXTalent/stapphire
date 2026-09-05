@@ -75,7 +75,7 @@ async function loadSearch(requisitionId: string, searchId?: string | null) {
 
   const { data: prospects, error: prospectsError } = await supabaseAdmin
     .from('phase1_prospects')
-    .select('id,full_name,preliminary_score,sourcing_fit,headline,location,geographic_fit,gate_findings,criterion_signals,sources,evaluation_score,evaluation,evaluated_at')
+    .select('id,full_name,preliminary_score,sourcing_fit,screening_status,screening_disposition,headline,location,geographic_fit,gate_findings,criterion_signals,sources,evaluation_score,evaluation,evaluated_at')
     .eq('search_id', search.id)
     .eq('requisition_id', requisitionId)
     .order('preliminary_score', { ascending: false });
@@ -87,6 +87,8 @@ async function loadSearch(requisitionId: string, searchId?: string | null) {
       full_name: prospect.full_name,
       preliminary_score: prospect.preliminary_score,
       sourcing_fit: prospect.sourcing_fit,
+      screening_status: prospect.screening_status,
+      screening_disposition: prospect.screening_disposition,
       location: prospect.location,
       evaluation_score: null,
       evaluation: null,

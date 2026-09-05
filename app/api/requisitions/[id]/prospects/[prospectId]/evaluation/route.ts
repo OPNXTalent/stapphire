@@ -35,7 +35,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
         evaluatedAt: prospect.evaluated_at
       });
     }
-    if ((organization.credits_remaining as number) < 1) return NextResponse.json({ error: 'No QC credits remain.' }, { status: 402 });
+    if ((organization.credits_remaining as number) < 2) return NextResponse.json({ error: 'At least 2 QC credits are required.' }, { status: 402 });
     if (!basis || basis.basisType !== 'hiring_criteria' || basis.id !== prospect.evaluation_basis_id) {
       return NextResponse.json({ error: 'Hiring Criteria changed. Run a new prospect search before evaluating this person.' }, { status: 409 });
     }

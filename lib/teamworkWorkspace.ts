@@ -39,7 +39,7 @@ export async function loadSharedTeamworkWorkspace(requisitionId: string) {
   const candidateIds = candidateRows.map((candidate) => candidate.id);
   const [prospectResult, roundsResult, candidateNotesResult] = await Promise.all([
     search
-      ? supabaseAdmin.from('phase1_prospects').select('id,full_name,preliminary_score,sourcing_fit,headline,location,geographic_fit,gate_findings,criterion_signals,sources,evaluation_score,evaluation,evaluated_at').eq('search_id', search.id).eq('requisition_id', requisitionId).order('preliminary_score', { ascending: false })
+      ? supabaseAdmin.from('phase1_prospects').select('id,full_name,preliminary_score,sourcing_fit,screening_status,headline,location,geographic_fit,gate_findings,criterion_signals,sources,evaluation_score,evaluation,evaluated_at').eq('search_id', search.id).eq('requisition_id', requisitionId).order('preliminary_score', { ascending: false })
       : Promise.resolve({ data: [], error: null }),
     plan
       ? supabaseAdmin.from('phase1_interview_rounds').select('id,stage,title,sort_order').eq('plan_id', plan.id).order('sort_order', { ascending: true })
@@ -74,7 +74,7 @@ export async function loadSharedTeamworkWorkspace(requisitionId: string) {
     created_at: (note as T & { created_at: string }).created_at,
     context_role: note.teamwork_participant_id ? participantContext.get(note.teamwork_participant_id) || null : null
   });
-  const shareableProspects = (prospectResult.data || []).filter((prospect) => Number(prospect.evaluation_score ?? prospect.preliminary_score) >= 70).map((prospect) => prospect.evaluation ? prospect : {
+  const shareableProspects = (prospectResult.data || []).filter((prospect) => prospect.screening_status !== 'NOT_CLEARED' && Number(prospect.evaluation_score ?? prospect.preliminary_score) >= 70).map((prospect) => prospect.evaluation ? prospect : {
     id: prospect.id,
     full_name: prospect.full_name,
     preliminary_score: prospect.preliminary_score,

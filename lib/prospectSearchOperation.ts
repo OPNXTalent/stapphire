@@ -184,12 +184,14 @@ async function screen(search: SearchRow, leaseToken: string, title: string, jobD
         full_name: prospect.fullName, preliminary_score: prospect.preliminaryScore, sourcing_fit: prospect.sourcingFit,
         headline: prospect.headline, location: prospect.location, geographic_fit: prospect.geographicFit,
         public_evidence: prospect.publicEvidence, gate_findings: prospect.gateFindings,
-        criterion_signals: prospect.criterionSignals, sources: prospect.sources
+        criterion_signals: prospect.criterionSignals, sources: prospect.sources,
+        screening_status: outcome.rejectionReason ? 'NOT_CLEARED' : 'CLEARED',
+        screening_disposition: outcome.rejectionReason
       }, { onConflict: 'search_id,full_name', ignoreDuplicates: true });
       if (insertError) throw insertError;
     }
     const { error: reviewError } = await supabaseAdmin.from('phase1_prospect_discoveries').update({
-      status: outcome.prospect ? 'qualified' : 'rejected', rejection_reason: outcome.rejectionReason,
+      status: outcome.rejectionReason ? 'rejected' : 'qualified', rejection_reason: outcome.rejectionReason,
       screen_attempts: 1, reviewed_at: new Date().toISOString(), updated_at: new Date().toISOString()
     }).eq('id', row.id);
     if (reviewError) throw reviewError;

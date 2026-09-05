@@ -20,6 +20,8 @@ type Prospect = {
   full_name: string;
   preliminary_score: number;
   sourcing_fit: string;
+  screening_status: 'CLEARED' | 'NOT_CLEARED';
+  screening_disposition: string | null;
   location: Location;
   evaluation_score: number | null;
   evaluation: Evaluation | null;
@@ -59,6 +61,17 @@ function displayedEvidenceFit(prospect: Prospect) {
   const score = displayedEvidenceScore(prospect);
   if (prospect.evaluation_score !== null) return score >= 80 ? 'STRONG' : score >= 70 ? 'POTENTIAL' : 'WEAK';
   return prospect.sourcing_fit === 'QUALIFIED' ? 'STRONG' : 'POTENTIAL';
+}
+
+function screeningLabel(prospect: Prospect) {
+  if (prospect.screening_status !== 'NOT_CLEARED') return 'CLEARED';
+  const reason = prospect.screening_disposition || '';
+  if (/below the 70%/i.test(reason)) return 'BELOW THRESHOLD';
+  if (/independent public sources|depended on inference/i.test(reason)) return 'EVIDENCE LIMITED';
+  if (/location/i.test(reason)) return 'LOCATION';
+  if (/non-negotiable/i.test(reason)) return 'REQUIREMENT GAP';
+  if (/incomplete|no resolved identity/i.test(reason)) return 'INCOMPLETE';
+  return 'NOT CLEARED';
 }
 
 export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
@@ -202,7 +215,20 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
 
   if (loading) return <section className={styles.shell}><p className={styles.muted}>Loading sourcing workspace…</p></section>;
   const criteriaById = new Map((payload?.criteria || []).map((criterion) => [criterion.id, criterion]));
-  const prospects = (payload?.search?.prospects || []).filter((prospect) => Boolean(prospect.evaluation) || prospect.preliminary_score >= 70);
+  const prospects = payload?.search?.prospects || [];
+  const clearedProspects = prospects.filter((prospect) => prospect.screening_status !== 'NOT_CLEARED');
+  const reviewedOutProspects = prospects.filter((prospect) => prospect.screening_status === 'NOT_CLEARED');
+  const prospectGroups = [
+    { label: 'Cleared prospects', prospects: clearedProspects },
+    { label: 'Reviewed — not cleared', prospects: reviewedOutProspects }
+  ].filter((group) => group.prospects.length > 0);
+  const screeningDiagnostics = prospects
+    .filter((prospect) => prospect.screening_status === 'NOT_CLEARED')
+    .reduce((counts, prospect) => {
+      const label = screeningLabel(prospect);
+      counts.set(label, (counts.get(label) || 0) + 1);
+      return counts;
+    }, new Map<string, number>());
   const canSource = Boolean(payload?.criteriaApplied || payload?.criteriaReadyToApply);
   const legacyScreening = Boolean(payload?.search && payload.search.search_strategy?.config?.screeningVersion !== 'evidence_v2');
   const storedMarket = payload?.search?.search_strategy?.marketAnalysis;
@@ -220,7 +246,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
         <div>
           <p className={styles.eyebrow}>Public-web sourcing</p>
           <h2 id="prospect-sourcing-title">Find the evidence before the contact data</h2>
-          <p className={styles.intro}>Stapphire turns the weighted criteria into a search strategy, resolves likely people, and withholds the complete evaluation until you choose to spend 1 QC.</p>
+          <p className={styles.intro}>Stapphire turns the weighted criteria into a search strategy, resolves likely people, and withholds the complete evaluation until you choose to spend 2 QC.</p>
         </div>
         <button type="button" onClick={runSearch} disabled={searching || !canSource}>
           {searching ? 'Searching the public web…' : prospects.length ? 'Run a new search' : 'Find prospects'}
@@ -262,7 +288,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
       {error && <div className={styles.error} role="alert">{error}</div>}
 
       {payload?.search && payload.search.search_strategy?.config?.screeningVersion === 'evidence_v2' && <section className={styles.pipeline} aria-live="polite">
-        <div><strong>{payload.search.status === 'completed' ? 'Search coverage' : payload.search.status === 'failed' ? 'Search interrupted' : payload.search.stage === 'queued' || payload.search.stage === 'planning' ? 'Building search paths' : payload.search.stage === 'discovering' ? 'Finding relevant professionals' : 'Reviewing public evidence'}</strong><span>{payload.search.status === 'completed' ? `${payload.search.progress?.coverageConfidence || 'LOW'} confidence based on the completed evidence funnel.` : payload.search.status === 'failed' ? 'The completed work remains available below.' : 'Qualified prospects will appear below as they clear the screen.'}</span></div>
+        <div><strong>{payload.search.status === 'completed' ? 'Search coverage' : payload.search.status === 'failed' ? 'Search interrupted' : payload.search.stage === 'queued' || payload.search.stage === 'planning' ? 'Building search paths' : payload.search.stage === 'discovering' ? 'Finding relevant professionals' : 'Reviewing public evidence'}</strong><span>{payload.search.status === 'completed' ? `${payload.search.progress?.coverageConfidence || 'LOW'} confidence based on the completed evidence funnel.` : payload.search.status === 'failed' ? 'The completed work remains available below.' : 'Reviewed prospects will appear below as each evidence decision completes.'}</span></div>
         <dl>
           <div><dt>Search paths</dt><dd>{payload.search.progress?.completedTracks || 0}/{payload.search.progress?.totalTracks || '—'}</dd></div>
           <div><dt>Found</dt><dd>{payload.search.progress?.discovered || 0}</dd></div>
@@ -285,21 +311,30 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
         <details><summary>Why—and what could widen the pool</summary><div className={styles.marketGrid}><section><h4>Constraint drivers</h4><ul>{storedMarket.constraintDrivers.map((item: { constraint: string; explanation: string }) => <li key={item.constraint}><strong>{item.constraint}</strong> — {item.explanation}</li>)}</ul></section><section><h4>Relaxation levers</h4><ul>{storedMarket.relaxationLevers.map((item: { change: string; likelyEffect: string }) => <li key={item.change}><strong>{item.change}</strong> — {item.likelyEffect}</li>)}</ul></section></div></details>
       </section>}
 
+      {screeningDiagnostics.size > 0 && <details className={styles.diagnostics}>
+        <summary>Screening diagnostics <span>{reviewedOutProspects.length} not cleared</span></summary>
+        <div>{[...screeningDiagnostics.entries()].map(([label, count]) => <span key={label}><strong>{count}</strong>{label}</span>)}</div>
+        <p>These prospects remain available below so the recruiter can inspect the strongest near matches and challenge the screen.</p>
+      </details>}
+
       {prospects.length > 0 ? (
         <div className={styles.results}>
-          <div className={styles.resultsHeader}><span>Prospect</span><span>Location</span><span>Evidence</span><span>Fit</span><span aria-hidden="true" /></div>
-          {prospects.map((prospect) => {
-            const open = openId === prospect.id && Boolean(prospect.evaluation);
-            const publicProfile = primaryPublicProfile(prospect.sources);
-            return (
-              <article className={styles.prospect} key={prospect.id}>
-                <div className={styles.prospectRow}>
-                  <strong>{prospect.full_name}</strong><span className={styles.location}>{prospect.location?.label || 'Location unknown'}</span><span className={styles.fit}>{displayedEvidenceFit(prospect)}</span>
-                  <span className={styles.score}>{displayedEvidenceScore(prospect)}</span>
-                  <button type="button" className={styles.unlock} disabled={Boolean(evaluatingId) || Boolean(payload?.stale && !prospect.evaluation)} onClick={() => unlockEvaluation(prospect)} aria-expanded={open}>
-                    {evaluatingId === prospect.id ? 'Evaluating…' : prospect.evaluation ? (open ? 'Hide evaluation' : 'View evaluation') : 'View evaluation · 1 QC'}
-                  </button>
-                </div>
+          <div className={styles.resultsHeader}><span>Prospect</span><span>Location</span><span>Screening</span><span>Fit</span><span aria-hidden="true" /></div>
+          {prospectGroups.map((group) => <details className={styles.resultGroup} key={group.label} open>
+            <summary>{group.label}<span>{group.prospects.length}</span></summary>
+            {group.prospects.map((prospect) => {
+              const open = openId === prospect.id && Boolean(prospect.evaluation);
+              const publicProfile = primaryPublicProfile(prospect.sources);
+              const purchased = Boolean(prospect.evaluation);
+              return (
+                <article className={styles.prospect} key={prospect.id}>
+                  <div className={`${styles.prospectRow} ${purchased ? styles.purchased : styles.unviewed}`}>
+                    <strong>{prospect.full_name}</strong><span className={styles.location}>{prospect.location?.label || 'Location unknown'}</span><span className={styles.fit} title={prospect.screening_disposition || undefined}>{screeningLabel(prospect)}</span>
+                    <span className={styles.score}>{displayedEvidenceScore(prospect)}</span>
+                    <button type="button" className={styles.unlock} disabled={Boolean(evaluatingId) || Boolean(payload?.stale && !prospect.evaluation)} onClick={() => unlockEvaluation(prospect)} aria-expanded={open}>
+                      {evaluatingId === prospect.id ? 'Evaluating…' : prospect.evaluation ? (open ? 'Hide evaluation' : 'View evaluation') : 'View Evaluation - 2 QC'}
+                    </button>
+                  </div>
                 {open && prospect.evaluation && (
                   <div className={styles.evaluation}>
                     <div className={styles.evaluationHero}>
@@ -335,9 +370,10 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
                     <p className={styles.disclaimer}>Public-source evidence may be incomplete or outdated. Use this evaluation to decide whether further research or outreach is worth the effort—not as an employment decision.</p>
                   </div>
                 )}
-              </article>
-            );
-          })}
+                </article>
+              );
+            })}
+          </details>)}
         </div>
       ) : canSource && !searching ? <div className={styles.empty}><strong>{payload?.search ? 'No prospects cleared the evidence threshold.' : 'No prospect search yet.'}</strong><span>{payload?.search ? 'That is a valid result. The Talent Market Read above explains the constraint.' : 'Set the search scope, add any true non-negotiables, and find prospects.'}</span></div> : null}
     </section>

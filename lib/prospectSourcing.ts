@@ -299,25 +299,26 @@ export async function screenDiscoveredProspects(input: { title: string; jobDescr
   const outcomes = input.candidates.map((candidate): ProspectScreenOutcome => {
     const prospect = returned.get(candidate.identityKey);
     if (!prospect) return { identityKey: candidate.identityKey, prospect: null, rejectionReason: 'The evidence screen returned no resolved identity.' };
-    if (!exactCoverage(input.gates.map((gate) => gate.id), prospect.gateFindings.map((item) => item.gateId))) return { identityKey: candidate.identityKey, prospect: null, rejectionReason: 'Non-negotiable evidence was incomplete.' };
-    if (!exactCoverage(input.criteria.map((criterion) => criterion.id), prospect.criterionSignals.map((item) => item.criterionId))) return { identityKey: candidate.identityKey, prospect: null, rejectionReason: 'Weighted-criteria evidence was incomplete.' };
     const sources = verifiedWebSources(response, prospect.sources);
-    if (sources.length < 2) return { identityKey: candidate.identityKey, prospect: null, rejectionReason: 'Fewer than two independent public sources were verified.' };
-    if (prospect.geographicFit !== 'WITHIN_SCOPE') return { identityKey: candidate.identityKey, prospect: null, rejectionReason: 'Location was outside or could not be confirmed within the search scope.' };
-    if (prospect.gateFindings.some((item) => item.status !== 'MET')) return { identityKey: candidate.identityKey, prospect: null, rejectionReason: 'A non-negotiable was not positively established.' };
     const byCriterion = new Map(prospect.criterionSignals.map((signal) => [signal.criterionId, signal]));
     const criterionSignals = input.criteria.map((criterion) => {
-      const signal = byCriterion.get(criterion.id)!;
+      const signal = byCriterion.get(criterion.id) || { criterionId: criterion.id, score: 0 as CriterionScore, evidence: 'No public evidence was returned.', evidenceStrength: 'UNKNOWN' as const };
       const score = signal.evidenceStrength === 'UNKNOWN' ? 0 : signal.evidenceStrength === 'INFERRED' ? Math.min(signal.score, 50) as CriterionScore : signal.score;
       return { ...signal, score };
     });
     const evidenceWeightedScore = Math.round(input.criteria.reduce((sum, criterion, index) => sum + criterionSignals[index].score * criterion.appliedWeight, 0) / 100);
     const preliminaryScore = Math.min(100, evidenceWeightedScore + SOURCING_FIT_UPLIFT);
     const directEvidenceWeight = input.criteria.reduce((sum, criterion, index) => sum + (!criterion.isKnockout && criterionSignals[index].evidenceStrength === 'DIRECT' && criterionSignals[index].score >= 75 ? criterion.appliedWeight : 0), 0);
-    if (preliminaryScore < MIN_SHORTLIST_SCORE) return { identityKey: candidate.identityKey, prospect: null, rejectionReason: `Evidence fit ${preliminaryScore}% was below the 70% shortlist threshold.` };
-    if (directEvidenceWeight < MIN_DIRECT_EVIDENCE_WEIGHT) return { identityKey: candidate.identityKey, prospect: null, rejectionReason: 'Too much of the apparent fit depended on inference rather than direct evidence.' };
     const sourcingFit = preliminaryScore >= 80 && directEvidenceWeight >= 60 ? 'QUALIFIED' as const : 'POSSIBLE' as const;
-    return { identityKey: candidate.identityKey, prospect: { ...prospect, sources, preliminaryScore, criterionSignals, sourcingFit, geographicFit: 'WITHIN_SCOPE' }, rejectionReason: null };
+    const screenedProspect: SourcedProspect = { ...prospect, sources, preliminaryScore, criterionSignals, sourcingFit };
+    if (!exactCoverage(input.gates.map((gate) => gate.id), prospect.gateFindings.map((item) => item.gateId))) return { identityKey: candidate.identityKey, prospect: screenedProspect, rejectionReason: 'Non-negotiable evidence was incomplete.' };
+    if (!exactCoverage(input.criteria.map((criterion) => criterion.id), prospect.criterionSignals.map((item) => item.criterionId))) return { identityKey: candidate.identityKey, prospect: screenedProspect, rejectionReason: 'Weighted-criteria evidence was incomplete.' };
+    if (sources.length < 2) return { identityKey: candidate.identityKey, prospect: screenedProspect, rejectionReason: 'Fewer than two independent public sources were verified.' };
+    if (prospect.geographicFit !== 'WITHIN_SCOPE') return { identityKey: candidate.identityKey, prospect: screenedProspect, rejectionReason: 'Location was outside or could not be confirmed within the search scope.' };
+    if (prospect.gateFindings.some((item) => item.status !== 'MET')) return { identityKey: candidate.identityKey, prospect: screenedProspect, rejectionReason: 'A non-negotiable was not positively established.' };
+    if (preliminaryScore < MIN_SHORTLIST_SCORE) return { identityKey: candidate.identityKey, prospect: screenedProspect, rejectionReason: `Evidence fit ${preliminaryScore}% was below the 70% shortlist threshold.` };
+    if (directEvidenceWeight < MIN_DIRECT_EVIDENCE_WEIGHT) return { identityKey: candidate.identityKey, prospect: screenedProspect, rejectionReason: 'Too much of the apparent fit depended on inference rather than direct evidence.' };
+    return { identityKey: candidate.identityKey, prospect: { ...screenedProspect, geographicFit: 'WITHIN_SCOPE' }, rejectionReason: null };
   });
   return { outcomes, modelIdentifier: response.model };
 }

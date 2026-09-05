@@ -19,11 +19,13 @@ export function observedScarcityLevel(
   const allPathsComplete = totalTracks > 0 && completedTracks >= totalTracks;
   const clearanceRate = reviewed > 0 ? qualified / reviewed : 0;
 
-  // While final screening is still underway, 0 cleared from a meaningful
-  // sample across every planned search path is already useful recruiter
-  // intelligence. It is provisional, but it is no longer merely a
-  // theoretical "competitive" market.
-  if (qualified === 0 && ((allPathsComplete && reviewed >= 16) || (terminal && reviewed >= 8))) return 'UNICORN';
+  // Zero clearance proves that the current screen is difficult; it does not,
+  // by itself, prove that the underlying labor market is a unicorn market.
+  // Preserve an independently established UNICORN read, otherwise classify
+  // the observed funnel as SCARCE and let rejection diagnostics explain why.
+  if (qualified === 0 && ((allPathsComplete && reviewed >= 16) || (terminal && reviewed >= 8))) {
+    return fallback === 'UNICORN' ? 'UNICORN' : 'SCARCE';
+  }
   if (!terminal) return fallback;
   if (reviewed >= 12 && (qualified <= 2 || clearanceRate < 0.15)) return 'SCARCE';
   if (qualified >= 8 && completedTracks <= 2) return 'BROAD';

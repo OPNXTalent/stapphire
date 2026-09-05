@@ -19,13 +19,13 @@ const queueRoute = readFileSync(join(directory, '..', 'app', 'api', 'queues', 'p
 const queue = readFileSync(join(directory, '..', 'lib', 'operationQueue.ts'), 'utf8');
 const marketRead = readFileSync(join(directory, '..', 'lib', 'prospectMarketRead.ts'), 'utf8');
 
-test('locked shortlist exposes name, location, sourcing fit, score, and explicit QC action', () => {
+test('reviewed prospects expose name, location, screening disposition, score, and explicit QC action', () => {
   assert.match(component, /<strong>\{prospect\.full_name\}<\/strong>/);
   assert.match(component, /displayedEvidenceScore\(prospect\)/);
-  assert.match(component, /View evaluation · 1 QC/);
+  assert.match(component, /View Evaluation - 2 QC/);
   assert.doesNotMatch(component, /prospect\.headline/);
   assert.match(component, /prospect\.location/);
-  assert.match(component, /displayedEvidenceFit\(prospect\)/);
+  assert.match(component, /screeningLabel\(prospect\)/);
   assert.match(searchRoute, /prospect\.evaluation \? prospect/);
   assert.match(searchRoute, /sources: \[\]/);
 });
@@ -57,7 +57,7 @@ test('free sourcing performs an evidence audit while the QC evaluation owns the 
   assert.match(sourcingEngine, /gateFindings\.some\(\(item\) => item\.status !== 'MET'\)/);
   assert.match(sourcingEngine, /SOURCING_FIT_UPLIFT = 4/);
   assert.match(sourcingEngine, /Materially overlapping criteria must receive consistent scores/);
-  assert.match(component, />Evidence<\/span><span>Fit<\/span>/);
+  assert.match(component, />Screening<\/span><span>Fit<\/span>/);
   assert.match(component, /Evaluated fit/);
 });
 
@@ -70,10 +70,11 @@ test('non-negotiables are optional and only explicit Knockout criteria prepopula
   assert.match(component, /filter\(\(gate: Gate\) => gate\.id !== 'occupational-domain'\)/);
 });
 
-test('older loose searches are identified and low unevaluated leads are removed from the working shortlist', () => {
+test('older loose searches are identified while reviewed-out prospects remain visible', () => {
   assert.match(searchRoute, /screeningVersion: PROSPECT_SCREENING_VERSION/);
   assert.match(component, /screeningVersion !== 'evidence_v2'/);
-  assert.match(component, /Boolean\(prospect\.evaluation\) \|\| prospect\.preliminary_score >= 70/);
+  assert.match(component, /Reviewed — not cleared/);
+  assert.match(component, /screening_status === 'NOT_CLEARED'/);
   assert.match(component, /predates the stricter evidence screen/);
 });
 
@@ -89,6 +90,18 @@ test('evaluation charges only through the atomic persistence RPC after generatio
   const billing = evaluationRoute.indexOf("rpc('consume_qc_and_unlock_prospect_evaluation_v1'");
   assert.ok(generation >= 0 && billing > generation);
   assert.match(evaluationRoute, /No QC was used/);
+});
+
+test('locked prospect rows use a quiet two-QC text action instead of a filled button', () => {
+  assert.match(sourcingStyles, /\.unviewed \{ background:#edf1f8; \}/);
+  assert.match(sourcingStyles, /\.purchased \{ background:white; \}/);
+  assert.match(sourcingStyles, /\.unlock \{[\s\S]*border: 0;[\s\S]*background: transparent/);
+});
+
+test('reviewed-out screening diagnostics remain visible and grouped by disposition', () => {
+  assert.match(component, /Screening diagnostics/);
+  assert.match(component, /screeningDiagnostics\.entries\(\)/);
+  assert.match(component, /strongest near matches and challenge the screen/);
 });
 
 test('saved sourcing runs can be reopened without creating a new search or consuming QC', () => {
@@ -146,10 +159,15 @@ test('sourcing is a persisted multi-pass queue instead of one blocking web reque
 
 test('cleared prospects appear progressively while the run is still active', () => {
   assert.match(component, /window\.setInterval\(\(\) => void poll\(\), 2500\)/);
-  assert.match(component, /Qualified prospects will appear below as they clear the screen/);
+  assert.match(component, /Reviewed prospects will appear below as each evidence decision completes/);
   assert.match(component, /payload\.search\.progress\?\.qualified/);
   assert.match(sourcingOperation, /from\('phase1_prospects'\)\.upsert/);
-  assert.match(sourcingOperation, /status: outcome\.prospect \? 'qualified' : 'rejected'/);
+  assert.match(sourcingOperation, /status: outcome\.rejectionReason \? 'rejected' : 'qualified'/);
+});
+
+test('cleared and reviewed-out rows both remain visible while polling streams new decisions', () => {
+  assert.match(component, /prospectGroups\.map\(\(group\) => <details className=\{styles\.resultGroup\} key=\{group\.label\} open>/);
+  assert.match(component, /Reviewed — not cleared/);
 });
 
 test('the funnel deduplicates identities and reports honest coverage', () => {
@@ -168,9 +186,9 @@ test('search coverage remains visible after a sourcing run completes', () => {
   assert.match(component, /confidence based on the completed evidence funnel/);
 });
 
-test('UNICORN sits above Competitive and is driven by observed funnel evidence before final screening ends', () => {
-  assert.match(marketRead, /return 'UNICORN'/);
+test('UNICORN sits above Competitive without treating zero clearance as proof by itself', () => {
   assert.match(marketRead, /allPathsComplete && reviewed >= 16/);
+  assert.match(marketRead, /fallback === 'UNICORN' \? 'UNICORN' : 'SCARCE'/);
   assert.match(component, /observedScarcityLevel\(payload\.search\.progress/);
   assert.match(component, /displayedScarcity === 'UNICORN'/);
   assert.match(component, /provisionalUnicornSummary/);
