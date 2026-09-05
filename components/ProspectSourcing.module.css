@@ -4,8 +4,16 @@
 .controls { display:grid; grid-template-columns:2fr 1fr 2fr; gap:12px; margin-top:14px; padding:16px; border:1px solid var(--line); border-radius:6px; background:var(--paper); }
 .controls label { display:grid; gap:6px; color:var(--deep); font-size:11px; font-weight:700; }
 .controls input,.controls select,.controls textarea { width:100%; padding:9px 10px; border:1px solid var(--line-strong); border-radius:4px; background:white; color:var(--ink); font:inherit; }
-.controls .gates { grid-column:1/-1; }
-.controls .gates textarea { field-sizing:content; min-height:38px; max-height:160px; overflow-y:auto; resize:none; }
+.controls .gates { display:grid; grid-column:1/-1; gap:8px; }
+.gateHeading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.gateHeading strong { font-size:11px; }
+.gateHeading button { padding:6px 9px; border:1px solid var(--line-strong); border-radius:4px; background:white; color:var(--sapphire); font-size:11px; font-weight:700; }
+.gateIntake { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; padding:10px; border:1px solid var(--line); border-radius:5px; background:var(--wash); }
+.gateIntake button { padding:7px 12px; }
+.gateList { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.gateList li { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:7px 9px; border:1px solid var(--line); border-radius:4px; background:white; color:var(--ink); font-size:11px; font-weight:500; }
+.gateList li button { flex:none; width:22px; height:22px; padding:0; border:0; background:transparent; color:var(--faint); font-size:16px; line-height:1; }
+.gateList li button:hover { color:var(--red); }
 .market { display:grid; grid-template-columns:180px 1fr; gap:20px; margin-top:14px; padding:18px; border:1px solid #b8c8ef; border-radius:6px; background:#f3f6ff; }
 .market > div { display:grid; align-content:start; gap:3px; }
 .market > div strong { font:800 23px var(--display); color:var(--deep); }

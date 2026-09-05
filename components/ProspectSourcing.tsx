@@ -56,7 +56,9 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
   const [targetLocation, setTargetLocation] = useState('');
   const [targetCompensation, setTargetCompensation] = useState('');
   const [searchScope, setSearchScope] = useState('50_MILES');
-  const [gateText, setGateText] = useState('');
+  const [nonNegotiables, setNonNegotiables] = useState<string[]>([]);
+  const [nonNegotiableDraft, setNonNegotiableDraft] = useState('');
+  const [nonNegotiableIntakeOpen, setNonNegotiableIntakeOpen] = useState(false);
 
   const applyLoadedPayload = useCallback((body: Payload) => {
     setPayload(body);
@@ -64,8 +66,17 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
     setTargetLocation(config?.targetLocation || '');
     setTargetCompensation(config?.targetCompensation || '');
     setSearchScope(config?.searchScope || '50_MILES');
-    setGateText((config?.gates || []).map((gate: Gate) => gate.label).join('\n'));
+    setNonNegotiables((config?.gates || []).map((gate: Gate) => gate.label));
+    setNonNegotiableDraft('');
+    setNonNegotiableIntakeOpen(false);
   }, []);
+
+  function addNonNegotiable() {
+    const label = nonNegotiableDraft.trim();
+    if (!label) return;
+    setNonNegotiables((current) => current.some((item) => item.toLowerCase() === label.toLowerCase()) ? current : [...current, label]);
+    setNonNegotiableDraft('');
+  }
 
   const loadSavedSearch = useCallback(async (searchId?: string) => {
     const suffix = searchId ? `?searchId=${encodeURIComponent(searchId)}` : '';
@@ -103,7 +114,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
     setError('');
     setOpenId(null);
     try {
-      const gates = gateText.split('\n').map((label, index) => ({ id: `gate-${index + 1}`, label: label.trim() })).filter((gate) => gate.label);
+      const gates = nonNegotiables.map((label, index) => ({ id: `gate-${index + 1}`, label }));
       const response = await fetch(`/api/requisitions/${requisitionId}/prospects`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ targetLocation, targetCompensation, searchScope, gates }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || 'Unable to source prospects.');
@@ -168,7 +179,29 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
         <label>Target work location<input value={targetLocation} onChange={(event) => setTargetLocation(event.target.value)} placeholder="City, state, or country" /></label>
         <label>Search radius<select value={searchScope} onChange={(event) => setSearchScope(event.target.value)}><option value="25_MILES">25 miles</option><option value="50_MILES">50 miles</option><option value="100_MILES">100 miles</option><option value="500_MILES">500 miles</option><option value="NATIONAL">National</option><option value="GLOBAL">Global</option></select></label>
         <label>Target compensation <span>(optional)</span><input value={targetCompensation} onChange={(event) => setTargetCompensation(event.target.value)} placeholder="$140,000–$175,000" /></label>
-        <label className={styles.gates}>Non-negotiables <span>one per line</span><textarea value={gateText} onChange={(event) => setGateText(event.target.value)} rows={1} /></label>
+        <section className={styles.gates} aria-labelledby="non-negotiables-label">
+          <div className={styles.gateHeading}>
+            <strong id="non-negotiables-label">Non-negotiables</strong>
+            <button type="button" onClick={() => setNonNegotiableIntakeOpen((open) => !open)} aria-expanded={nonNegotiableIntakeOpen}>
+              {nonNegotiableIntakeOpen ? 'Close' : 'Add non-negotiable'}
+            </button>
+          </div>
+          {nonNegotiableIntakeOpen && <div className={styles.gateIntake}>
+            <input
+              value={nonNegotiableDraft}
+              onChange={(event) => setNonNegotiableDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+                event.preventDefault();
+                addNonNegotiable();
+              }}
+              placeholder="Enter a must-have requirement"
+              autoFocus
+            />
+            <button type="button" onClick={addNonNegotiable} disabled={!nonNegotiableDraft.trim()}>Add</button>
+          </div>}
+          {nonNegotiables.length > 0 && <ul className={styles.gateList}>{nonNegotiables.map((label, index) => <li key={`${label}-${index}`}><span>{label}</span><button type="button" onClick={() => setNonNegotiables((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${label}`}>×</button></li>)}</ul>}
+        </section>
       </div>}
 
       {!canSource && <div className={styles.notice}>Complete Hiring Criteria with a total weight of 100% before sourcing.</div>}

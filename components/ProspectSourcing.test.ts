@@ -76,11 +76,14 @@ test('sourcing uses the right rail for Search history and the existing requisiti
   assert.match(historyPanel, /Prior criteria/);
 });
 
-test('sourcing gates begin compact and grow with their content', () => {
-  assert.match(component, />Non-negotiables <span>one per line<\/span>/);
+test('Non-negotiables use a compact progressive intake instead of a free-text box', () => {
+  assert.match(component, /Add non-negotiable/);
   assert.doesNotMatch(component, /Non-negotiable sourcing gates/);
-  assert.match(component, /className=\{styles\.gates\}[\s\S]*rows=\{1\}/);
-  assert.match(sourcingStyles, /\.controls \.gates textarea \{ field-sizing:content; min-height:38px; max-height:160px;/);
+  assert.doesNotMatch(component, /one per line|className=\{styles\.gates\}[\s\S]*<textarea/);
+  assert.match(component, /nonNegotiableIntakeOpen/);
+  assert.match(component, /event\.key !== 'Enter'/);
+  assert.match(component, /Remove \$\{label\}/);
+  assert.match(sourcingStyles, /\.gateIntake \{ display:grid; grid-template-columns:minmax\(0,1fr\) auto/);
 });
 
 test('prior searches allow already-purchased evaluations to reopen but block new evaluation spend against stale criteria', () => {
