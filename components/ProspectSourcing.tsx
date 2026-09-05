@@ -78,7 +78,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
-  const [evaluatingId, setEvaluatingId] = useState<string | null>(null);
+  const [evaluatingIds, setEvaluatingIds] = useState<Set<string>>(() => new Set());
   const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [targetLocation, setTargetLocation] = useState('');
@@ -185,7 +185,8 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
 
   async function unlockEvaluation(prospect: Prospect) {
     if (prospect.evaluation) { setOpenId(openId === prospect.id ? null : prospect.id); return; }
-    setEvaluatingId(prospect.id);
+    if (evaluatingIds.has(prospect.id)) return;
+    setEvaluatingIds((current) => new Set(current).add(prospect.id));
     setError('');
     try {
       const response = await fetch(`/api/requisitions/${requisitionId}/prospects/${prospect.id}/evaluation`, { method: 'POST' });
@@ -209,7 +210,11 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to evaluate prospect.');
     } finally {
-      setEvaluatingId(null);
+      setEvaluatingIds((current) => {
+        const next = new Set(current);
+        next.delete(prospect.id);
+        return next;
+      });
     }
   }
 
@@ -331,8 +336,8 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
                   <div className={`${styles.prospectRow} ${purchased ? styles.purchased : styles.unviewed}`}>
                     <strong>{prospect.full_name}</strong><span className={styles.location}>{prospect.location?.label || 'Location unknown'}</span><span className={styles.fit} title={prospect.screening_disposition || undefined}>{screeningLabel(prospect)}</span>
                     <span className={styles.score}>{displayedEvidenceScore(prospect)}</span>
-                    <button type="button" className={styles.unlock} disabled={Boolean(evaluatingId) || Boolean(payload?.stale && !prospect.evaluation)} onClick={() => unlockEvaluation(prospect)} aria-expanded={open}>
-                      {evaluatingId === prospect.id ? 'Evaluating…' : prospect.evaluation ? (open ? 'Hide evaluation' : 'View evaluation') : 'View Evaluation - 2 QC'}
+                    <button type="button" className={styles.unlock} disabled={evaluatingIds.has(prospect.id) || Boolean(payload?.stale && !prospect.evaluation)} onClick={() => unlockEvaluation(prospect)} aria-expanded={open}>
+                      {evaluatingIds.has(prospect.id) ? 'Evaluating…' : prospect.evaluation ? (open ? 'Hide evaluation' : 'View evaluation') : 'View Evaluation - 2 QC'}
                     </button>
                   </div>
                 {open && prospect.evaluation && (

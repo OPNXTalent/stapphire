@@ -98,6 +98,12 @@ test('locked prospect rows use a quiet two-QC text action instead of a filled bu
   assert.match(sourcingStyles, /\.unlock \{[\s\S]*border: 0;[\s\S]*background: transparent/);
 });
 
+test('prospect evaluations can run concurrently without disabling unrelated rows', () => {
+  assert.match(component, /useState<Set<string>>\(\(\) => new Set\(\)\)/);
+  assert.match(component, /disabled=\{evaluatingIds\.has\(prospect\.id\)/);
+  assert.doesNotMatch(component, /disabled=\{Boolean\(evaluatingId\)/);
+});
+
 test('reviewed-out screening diagnostics remain visible and grouped by disposition', () => {
   assert.match(component, /Screening diagnostics/);
   assert.match(component, /screeningDiagnostics\.entries\(\)/);
