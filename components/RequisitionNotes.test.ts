@@ -19,3 +19,7 @@ test('the composer has no submit button or native required-field prompt', () => 
   assert.doesNotMatch(form, /<button/);
   assert.match(form, /Shift Enter for a new line/);
 });
+
+test('an empty Teamwork thread does not explain the obvious or consume panel space', () => {
+  assert.doesNotMatch(source, /No notes yet|Leave one for the hiring team below/);
+});
