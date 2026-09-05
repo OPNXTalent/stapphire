@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { resolveCurrentEvaluationBasis, resolveEvaluationBasisById, type HiringCriteriaEvaluationBasis } from '@/lib/evaluationBasis';
-import { SEARCH_SCOPES, searchForProspects, type SearchScope, type SourcingGate } from '@/lib/prospectSourcing';
+import { PROSPECT_SCREENING_VERSION, SEARCH_SCOPES, searchForProspects, type SearchScope, type SourcingGate } from '@/lib/prospectSourcing';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getLatestRequisitionIntelligence } from '@/lib/requisitionIntelligence';
 
@@ -159,10 +159,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
         targetLocation: intelligence?.internalEvidence?.location || '',
         targetCompensation: intelligence?.internalEvidence?.compensation?.minimum || intelligence?.internalEvidence?.compensation?.maximum ? `${intelligence.internalEvidence.compensation.minimum ?? ''}-${intelligence.internalEvidence.compensation.maximum ?? ''} ${intelligence.internalEvidence.compensation.currency || ''} per ${intelligence.internalEvidence.compensation.unit}` : '',
         searchScope: '50_MILES',
-        gates: sourcingCriteria.length ? [
-          { id: 'occupational-domain', label: `Direct professional experience in the ${requisition.title} occupational domain` },
-          ...sourcingCriteria.filter((criterion) => criterion.isKnockout).map((criterion) => ({ id: `criterion-${criterion.id}`, label: criterion.label }))
-        ] : []
+        gates: sourcingCriteria.filter((criterion) => criterion.isKnockout).map((criterion) => ({ id: `criterion-${criterion.id}`, label: criterion.label }))
       },
       search,
       stale: Boolean(search && search.evaluation_basis_id !== basis?.id)
@@ -184,7 +181,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const body = await request.json().catch(() => ({})) as { targetLocation?: string; targetCompensation?: string; searchScope?: string; gates?: SourcingGate[] };
     const searchScope = SEARCH_SCOPES.includes(body.searchScope as SearchScope) ? body.searchScope as SearchScope : '50_MILES';
     const gates = Array.isArray(body.gates) ? body.gates.filter((gate) => typeof gate?.id === 'string' && typeof gate?.label === 'string' && gate.label.trim()).slice(0, 8) : [];
-    if (!gates.length) return NextResponse.json({ error: 'Confirm at least one non-negotiable sourcing gate.' }, { status: 400 });
     const result = await searchForProspects({
       title: requisition.title,
       jobDescription: basis.jobDescriptionSnapshot,
@@ -201,7 +197,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         requisition_id: params.id,
         evaluation_basis_id: basis.id,
         boolean_query: result.booleanQuery,
-        search_strategy: { rationale: result.strategyRationale, marketAnalysis: result.marketAnalysis, config: { targetLocation: body.targetLocation?.trim() || '', targetCompensation: body.targetCompensation?.trim() || '', searchScope, gates } },
+        search_strategy: { rationale: result.strategyRationale, marketAnalysis: result.marketAnalysis, config: { targetLocation: body.targetLocation?.trim() || '', targetCompensation: body.targetCompensation?.trim() || '', searchScope, gates, screeningVersion: PROSPECT_SCREENING_VERSION } },
         model_identifier: result.modelIdentifier
       })
       .select('id,evaluation_basis_id,boolean_query,search_strategy,created_at')

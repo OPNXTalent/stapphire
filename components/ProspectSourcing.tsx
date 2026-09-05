@@ -29,7 +29,7 @@ type Search = {
   id: string;
   evaluation_basis_id: string;
   boolean_query: string;
-  search_strategy: { rationale?: string; config?: { targetLocation?: string; targetCompensation?: string; searchScope?: string; gates?: Gate[] }; marketAnalysis?: { scarcityLevel: string; confidence: string; summary: string; constraintDrivers: Array<{ constraint: string; explanation: string }>; relaxationLevers: Array<{ change: string; likelyEffect: string }> } };
+  search_strategy: { rationale?: string; config?: { targetLocation?: string; targetCompensation?: string; searchScope?: string; gates?: Gate[]; screeningVersion?: string }; marketAnalysis?: { scarcityLevel: string; confidence: string; summary: string; constraintDrivers: Array<{ constraint: string; explanation: string }>; relaxationLevers: Array<{ change: string; likelyEffect: string }> } };
   created_at: string;
   prospects: Prospect[];
 };
@@ -44,6 +44,16 @@ function primaryPublicProfile(sources: Source[]) {
     || sources.find((source) => /linkedin\.com|github\.com/i.test(source.url))
     || sources[0]
     || null;
+}
+
+function displayedEvidenceScore(prospect: Prospect) {
+  return prospect.evaluation_score ?? prospect.preliminary_score;
+}
+
+function displayedEvidenceFit(prospect: Prospect) {
+  const score = displayedEvidenceScore(prospect);
+  if (prospect.evaluation_score !== null) return score >= 80 ? 'STRONG' : score >= 70 ? 'POTENTIAL' : 'WEAK';
+  return prospect.sourcing_fit === 'QUALIFIED' ? 'STRONG' : 'POTENTIAL';
 }
 
 export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
@@ -66,7 +76,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
     setTargetLocation(config?.targetLocation || '');
     setTargetCompensation(config?.targetCompensation || '');
     setSearchScope(config?.searchScope || '50_MILES');
-    setNonNegotiables((config?.gates || []).map((gate: Gate) => gate.label));
+    setNonNegotiables((config?.gates || []).filter((gate: Gate) => gate.id !== 'occupational-domain').map((gate: Gate) => gate.label));
     setNonNegotiableDraft('');
     setNonNegotiableIntakeOpen(false);
   }, []);
@@ -159,8 +169,9 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
 
   if (loading) return <section className={styles.shell}><p className={styles.muted}>Loading sourcing workspace…</p></section>;
   const criteriaById = new Map((payload?.criteria || []).map((criterion) => [criterion.id, criterion]));
-  const prospects = payload?.search?.prospects || [];
+  const prospects = (payload?.search?.prospects || []).filter((prospect) => Boolean(prospect.evaluation) || prospect.preliminary_score >= 70);
   const canSource = Boolean(payload?.criteriaApplied || payload?.criteriaReadyToApply);
+  const legacyScreening = Boolean(payload?.search && payload.search.search_strategy?.config?.screeningVersion !== 'evidence_v2');
 
   return (
     <section className={styles.shell} aria-labelledby="prospect-sourcing-title">
@@ -206,6 +217,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
 
       {!canSource && <div className={styles.notice}>Complete Hiring Criteria with a total weight of 100% before sourcing.</div>}
       {payload?.stale && <div className={styles.notice}>The Hiring Criteria changed after this search. Run a new search before unlocking evaluations.</div>}
+      {legacyScreening && <div className={styles.notice}>This shortlist predates the stricter evidence screen. Run a new search before relying on it.</div>}
       {error && <div className={styles.error} role="alert">{error}</div>}
 
       {payload?.search && (
@@ -224,15 +236,15 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
 
       {prospects.length > 0 ? (
         <div className={styles.results}>
-          <div className={styles.resultsHeader}><span>Prospect</span><span>Location</span><span>Sourcing fit</span><span>Preliminary fit</span><span aria-hidden="true" /></div>
+          <div className={styles.resultsHeader}><span>Prospect</span><span>Location</span><span>Evidence</span><span>Fit</span><span aria-hidden="true" /></div>
           {prospects.map((prospect) => {
             const open = openId === prospect.id && Boolean(prospect.evaluation);
             const publicProfile = primaryPublicProfile(prospect.sources);
             return (
               <article className={styles.prospect} key={prospect.id}>
                 <div className={styles.prospectRow}>
-                  <strong>{prospect.full_name}</strong><span className={styles.location}>{prospect.location?.label || 'Location unknown'}</span><span className={styles.fit}>{prospect.sourcing_fit}</span>
-                  <span className={styles.score}>{prospect.preliminary_score}</span>
+                  <strong>{prospect.full_name}</strong><span className={styles.location}>{prospect.location?.label || 'Location unknown'}</span><span className={styles.fit}>{displayedEvidenceFit(prospect)}</span>
+                  <span className={styles.score}>{displayedEvidenceScore(prospect)}</span>
                   <button type="button" className={styles.unlock} disabled={Boolean(evaluatingId) || Boolean(payload?.stale && !prospect.evaluation)} onClick={() => unlockEvaluation(prospect)} aria-expanded={open}>
                     {evaluatingId === prospect.id ? 'Evaluating…' : prospect.evaluation ? (open ? 'Hide evaluation' : 'View evaluation') : 'View evaluation · 1 QC'}
                   </button>
@@ -248,7 +260,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
                           {publicProfile && <a href={publicProfile.url} target="_blank" rel="noreferrer">Open public profile ↗</a>}
                         </div>
                       </div>
-                      <strong>{prospect.evaluation_score}% <small>Qualified fit</small></strong>
+                      <strong>{prospect.evaluation_score}% <small>Evaluated fit</small></strong>
                     </div>
                     <p className={styles.summary}>{prospect.evaluation.summary}</p>
                     <div className={styles.intelligence}><section><h4>Estimated market compensation</h4><strong>{prospect.evaluation.compensation.estimatedMarketRange}</strong><p>{prospect.evaluation.compensation.targetAlignment} target alignment · {prospect.evaluation.compensation.confidence} confidence</p><small>{prospect.evaluation.compensation.rationale}</small></section><section><h4>Opportunity receptivity</h4><strong>{prospect.evaluation.receptivity.level}</strong><p>{prospect.evaluation.receptivity.confidence} confidence</p><small>{prospect.evaluation.receptivity.rationale}</small></section></div>
@@ -276,7 +288,7 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
             );
           })}
         </div>
-      ) : canSource && !searching ? <div className={styles.empty}><strong>{payload?.search ? 'No prospects cleared the evidence gates.' : 'No prospect search yet.'}</strong><span>{payload?.search ? 'The Talent Market Read above still explains the constraint.' : 'Confirm the sourcing gates and search scope, then find prospects.'}</span></div> : null}
+      ) : canSource && !searching ? <div className={styles.empty}><strong>{payload?.search ? 'No prospects cleared the evidence threshold.' : 'No prospect search yet.'}</strong><span>{payload?.search ? 'That is a valid result. The Talent Market Read above explains the constraint.' : 'Set the search scope, add any true non-negotiables, and find prospects.'}</span></div> : null}
     </section>
   );
 }

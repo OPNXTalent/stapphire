@@ -74,11 +74,22 @@ export async function loadSharedTeamworkWorkspace(requisitionId: string) {
     created_at: (note as T & { created_at: string }).created_at,
     context_role: note.teamwork_participant_id ? participantContext.get(note.teamwork_participant_id) || null : null
   });
+  const shareableProspects = (prospectResult.data || []).filter((prospect) => Number(prospect.evaluation_score ?? prospect.preliminary_score) >= 70).map((prospect) => prospect.evaluation ? prospect : {
+    id: prospect.id,
+    full_name: prospect.full_name,
+    preliminary_score: prospect.preliminary_score,
+    sourcing_fit: prospect.sourcing_fit,
+    location: prospect.location,
+    evaluation_score: null,
+    evaluation: null,
+    evaluated_at: null,
+    sources: []
+  });
 
   return {
     requisition,
     hiringCriteria,
-    sourcing: search ? { ...search, prospects: prospectResult.data || [] } : null,
+    sourcing: search ? { ...search, prospects: shareableProspects } : null,
     interviewPlan: plan ? {
       id: plan.id,
       revision: plan.revision,

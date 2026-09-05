@@ -43,7 +43,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
     const { data: search, error: searchError } = await supabaseAdmin.from('phase1_prospect_searches').select('search_strategy').eq('id', prospect.search_id).single();
     if (searchError) throw searchError;
     const config = (search.search_strategy as { config?: { targetLocation?: string; targetCompensation?: string; searchScope?: import('@/lib/prospectSourcing').SearchScope; gates?: import('@/lib/prospectSourcing').SourcingGate[] } })?.config;
-    if (!config?.gates?.length) return NextResponse.json({ error: 'This search is missing its sourcing-gate configuration. Run a new search.' }, { status: 409 });
+    if (!config || !Array.isArray(config.gates)) return NextResponse.json({ error: 'This search is missing its non-negotiables configuration. Run a new search.' }, { status: 409 });
 
     const initialSources = Array.isArray(prospect.sources) ? prospect.sources as ProspectSource[] : [];
     const result = await evaluateProspect({

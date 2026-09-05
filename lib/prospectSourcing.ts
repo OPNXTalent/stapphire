@@ -6,12 +6,16 @@ import { projectCriterionFindings, type CriterionFinding } from './criterionProj
 const SOURCING_MODEL = process.env.AI_GATEWAY_MODEL || 'openai/gpt-5.4';
 const MAX_PROSPECTS = 8;
 const SOURCING_FIT_UPLIFT = 4;
+const MIN_SHORTLIST_SCORE = 70;
+const MIN_DIRECT_EVIDENCE_WEIGHT = 40;
+export const PROSPECT_SCREENING_VERSION = 'evidence_v2';
 
 export const SEARCH_SCOPES = ['25_MILES', '50_MILES', '100_MILES', '500_MILES', 'NATIONAL', 'GLOBAL'] as const;
 export type SearchScope = typeof SEARCH_SCOPES[number];
 export type SourcingGate = { id: string; label: string };
 export type ProspectLocation = { label: string; confidence: 'CONFIRMED' | 'PROBABLE' | 'UNKNOWN'; evidence: string };
 export type GateFinding = { gateId: string; status: KnockoutStatus; evidence: string; assessment?: string };
+export type CriterionSignal = { criterionId: string; score: CriterionScore; evidence: string; evidenceStrength: 'DIRECT' | 'INFERRED' | 'UNKNOWN' };
 export type MarketAnalysis = { scarcityLevel: 'BROAD' | 'COMPETITIVE' | 'SCARCE' | 'UNICORN'; confidence: 'HIGH' | 'MODERATE' | 'LOW'; summary: string; constraintDrivers: Array<{ constraint: string; impact: 'HIGH' | 'MODERATE' | 'LOW'; explanation: string }>; relaxationLevers: Array<{ change: string; likelyEffect: string; tradeoff: string }>; evidenceCaveat: string; observedProspects: number };
 
 export type ProspectSource = { title: string; url: string };
@@ -24,7 +28,7 @@ export type SourcedProspect = {
   geographicFit: 'WITHIN_SCOPE' | 'OUTSIDE_SCOPE' | 'UNABLE_TO_DETERMINE';
   publicEvidence: string;
   gateFindings: GateFinding[];
-  criterionSignals: Array<{ criterionId: string; score: CriterionScore; evidence: string }>;
+  criterionSignals: CriterionSignal[];
   sources: ProspectSource[];
 };
 export type ProspectSearchResult = {
@@ -35,7 +39,7 @@ export type ProspectSearchResult = {
   modelIdentifier: string;
 };
 type ProspectSearchResponse = Omit<ProspectSearchResult, 'prospects' | 'modelIdentifier'> & {
-  prospects: Array<Omit<SourcedProspect, 'preliminaryScore' | 'criterionSignals'> & { criterionScores: CriterionScore[] }>;
+  prospects: Array<Omit<SourcedProspect, 'preliminaryScore' | 'sourcingFit'>>;
 };
 export type ProspectEvaluation = {
   summary: string;
@@ -65,7 +69,7 @@ const sourceSchema = {
 const locationSchema = { type: 'object' as const, additionalProperties: false, required: ['label', 'confidence', 'evidence'], properties: { label: { type: 'string' as const }, confidence: { type: 'string' as const, enum: ['CONFIRMED', 'PROBABLE', 'UNKNOWN'] }, evidence: { type: 'string' as const } } };
 
 function gateSchema(gates: SourcingGate[], includeAssessment = false) {
-  return { type: 'array' as const, minItems: gates.length, maxItems: gates.length, items: { type: 'object' as const, additionalProperties: false, required: includeAssessment ? ['gateId', 'status', 'evidence', 'assessment'] : ['gateId', 'status', 'evidence'], properties: { gateId: { type: 'string' as const, enum: gates.map((gate) => gate.id) }, status: { type: 'string' as const, enum: ['MET', 'NOT_MET', 'UNABLE_TO_DETERMINE'] }, evidence: { type: 'string' as const }, ...(includeAssessment ? { assessment: { type: 'string' as const } } : {}) } } };
+  return { type: 'array' as const, minItems: gates.length, maxItems: gates.length, items: { type: 'object' as const, additionalProperties: false, required: includeAssessment ? ['gateId', 'status', 'evidence', 'assessment'] : ['gateId', 'status', 'evidence'], properties: { gateId: gates.length ? { type: 'string' as const, enum: gates.map((gate) => gate.id) } : { type: 'string' as const }, status: { type: 'string' as const, enum: ['MET', 'NOT_MET', 'UNABLE_TO_DETERMINE'] }, evidence: { type: 'string' as const }, ...(includeAssessment ? { assessment: { type: 'string' as const } } : {}) } } };
 }
 
 function criterionIdSchema(criteria: AppliedCriterion[]) {
@@ -91,7 +95,7 @@ function searchSchema(criteria: AppliedCriterion[], gates: SourcingGate[]) {
         items: {
           type: 'object' as const,
           additionalProperties: false,
-          required: ['fullName', 'headline', 'location', 'geographicFit', 'publicEvidence', 'gateFindings', 'criterionScores', 'sources'],
+          required: ['fullName', 'headline', 'location', 'geographicFit', 'publicEvidence', 'gateFindings', 'criterionSignals', 'sources'],
           properties: {
             fullName: { type: 'string' as const },
             headline: { type: 'string' as const },
@@ -99,8 +103,13 @@ function searchSchema(criteria: AppliedCriterion[], gates: SourcingGate[]) {
             geographicFit: { type: 'string' as const, enum: ['WITHIN_SCOPE', 'OUTSIDE_SCOPE', 'UNABLE_TO_DETERMINE'] },
             publicEvidence: { type: 'string' as const },
             gateFindings: gateSchema(gates),
-            criterionScores: { type: 'array' as const, minItems: criteria.length, maxItems: criteria.length, items: { type: 'integer' as const, enum: [0, 25, 50, 75, 100] } },
-            sources: { type: 'array' as const, minItems: 1, items: sourceSchema }
+            criterionSignals: { type: 'array' as const, minItems: criteria.length, maxItems: criteria.length, items: { type: 'object' as const, additionalProperties: false, required: ['criterionId', 'score', 'evidence', 'evidenceStrength'], properties: {
+              criterionId: criterionIdSchema(criteria),
+              score: { type: 'integer' as const, enum: [0, 25, 50, 75, 100] },
+              evidence: { type: 'string' as const },
+              evidenceStrength: { type: 'string' as const, enum: ['DIRECT', 'INFERRED', 'UNKNOWN'] }
+            } } },
+            sources: { type: 'array' as const, minItems: 2, items: sourceSchema }
           }
         }
       }
@@ -196,9 +205,9 @@ function exactCoverage(expected: string[], actual: string[]): boolean { return a
 export async function searchForProspects(input: { title: string; jobDescription: string; criteria: AppliedCriterion[]; gates: SourcingGate[]; targetLocation: string; searchScope: SearchScope; targetCompensation: string }): Promise<ProspectSearchResult> {
   const response = await (await client()).responses.create({
     model: SOURCING_MODEL,
-    instructions: `You are Stapphire's public-web talent sourcing researcher. Translate the non-negotiable sourcing gates and immutable weighted Hiring Criteria into a precise Boolean search strategy, then identify up to ${MAX_PROSPECTS} real people with identity-resolved public evidence.
+    instructions: `You are Stapphire's public-web talent sourcing researcher. Translate the non-negotiables and immutable weighted Hiring Criteria into a precise Boolean search strategy, then identify up to ${MAX_PROSPECTS} real people with identity-resolved public evidence. This is a qualification screen, not a lead-generation exercise. Return fewer people—or none—rather than adjacent candidates.
 
-Gates are occupational identity checks, not weighted preferences. Similar titles and transferable skills never prove the required professional domain. Exclude contradicted gates and known out-of-scope locations. Evaluate every gate. For each person, return criterionScores in the exact same order as WEIGHTED CRITERIA, using only 0, 25, 50, 75, or 100. Score probable professional alignment for sourcing: use direct public evidence plus reasonable role-based inference, while reserving 0 for contradiction or no credible related signal. Materially overlapping criteria must receive consistent scores when supported by the same experience. Do not emit criterion IDs or criterion evidence during sourcing; the paid evaluation performs that evidence audit. Missing public evidence is unknown rather than proof that a criterion is not met. Search public professional pages, employer and government bios, associations, conferences, portfolios, certifications, and publications. Never seek contact details, current salary, protected traits, or merge namesakes.
+Non-negotiables are admission checks, not weighted preferences. Every non-negotiable and the stated geography must be positively established before returning a person. Similar titles, transferable skills, broad HR leadership, or proximity to the occupation never prove the required professional domain. Evaluate every weighted criterion with a criterionSignal. DIRECT means a public source explicitly demonstrates the work; INFERRED means only a reasonable role-based implication and may never score above 50; UNKNOWN must score 0. Use 100 only for unusually strong direct evidence, 75 for clear direct evidence, 50 for partial or inferred alignment, 25 for weak adjacent evidence, and 0 when credible evidence is absent. Keep the calibration consistent with a full candidate evaluation. Materially overlapping criteria must receive consistent scores when supported by the same experience. Find at least two independent public professional sources per person. Search employer and government bios, associations, conferences, portfolios, certifications, publications, and professional profiles. Never seek contact details, current salary, protected traits, or merge namesakes.
 
 Classify the discoverable market as BROAD, COMPETITIVE, SCARCE, or UNICORN from the intersection of domain, seniority, requirements, geography, and gates. Distinguish genuine scarcity from weak public visibility. Missing evidence is unknown, not negative.`,
     input: `POSITION\n${input.title}\n\nTARGET LOCATION\n${input.targetLocation || 'Not specified'}\n\nSEARCH SCOPE\n${input.searchScope}\n\nTARGET COMPENSATION\n${input.targetCompensation || 'Not specified'}\n\nJOB DESCRIPTION\n${input.jobDescription}\n\nNON-NEGOTIABLE GATES\n${JSON.stringify(input.gates)}\n\nWEIGHTED CRITERIA\n${JSON.stringify(input.criteria)}`,
@@ -214,19 +223,33 @@ Classify the discoverable market as BROAD, COMPETITIVE, SCARCE, or UNICORN from 
   }
   const result = parseJson<ProspectSearchResponse>(response.output_text, 'prospect search result');
   const gateIds = input.gates.map((gate) => gate.id);
-  const prospects = result.prospects.flatMap((prospect) => {
+  const screenedProspects = result.prospects.flatMap((prospect) => {
     if (!exactCoverage(gateIds, prospect.gateFindings.map((item) => item.gateId))) return [];
-    if (prospect.criterionScores.length !== input.criteria.length) return [];
+    if (!exactCoverage(input.criteria.map((criterion) => criterion.id), prospect.criterionSignals.map((item) => item.criterionId))) return [];
     const sources = verifiedWebSources(response, prospect.sources);
-    if (!prospect.fullName.trim() || !prospect.publicEvidence.trim() || !sources.length || prospect.geographicFit === 'OUTSIDE_SCOPE' || prospect.gateFindings.some((item) => item.status === 'NOT_MET')) return [];
-    const criterionSignals = input.criteria.map((criterion, index) => ({ criterionId: criterion.id, score: prospect.criterionScores[index], evidence: '' }));
-    const evidenceWeightedScore = Math.round(input.criteria.reduce((sum, criterion, index) => sum + prospect.criterionScores[index] * criterion.appliedWeight, 0) / 100);
+    if (!prospect.fullName.trim() || !prospect.publicEvidence.trim() || sources.length < 2 || prospect.geographicFit !== 'WITHIN_SCOPE' || prospect.gateFindings.some((item) => item.status !== 'MET')) return [];
+    const byCriterion = new Map(prospect.criterionSignals.map((signal) => [signal.criterionId, signal]));
+    const criterionSignals = input.criteria.map((criterion) => {
+      const signal = byCriterion.get(criterion.id)!;
+      const score = signal.evidenceStrength === 'UNKNOWN' ? 0 : signal.evidenceStrength === 'INFERRED' ? Math.min(signal.score, 50) as CriterionScore : signal.score;
+      return { ...signal, score };
+    });
+    if (criterionSignals.some((signal) => !signal.evidence.trim())) return [];
+    const evidenceWeightedScore = Math.round(input.criteria.reduce((sum, criterion, index) => sum + criterionSignals[index].score * criterion.appliedWeight, 0) / 100);
     const preliminaryScore = Math.min(100, evidenceWeightedScore + SOURCING_FIT_UPLIFT);
-    const sourcingFit = prospect.gateFindings.some((item) => item.status === 'UNABLE_TO_DETERMINE') ? 'POSSIBLE' as const : 'QUALIFIED' as const;
-    const { criterionScores: _criterionScores, ...identity } = prospect;
-    return [{ ...identity, sources, preliminaryScore, criterionSignals, sourcingFit, geographicFit: prospect.geographicFit as 'WITHIN_SCOPE' | 'UNABLE_TO_DETERMINE' }];
-  }).sort((a, b) => a.sourcingFit === b.sourcingFit ? b.preliminaryScore - a.preliminaryScore : a.sourcingFit === 'QUALIFIED' ? -1 : 1)
-    .slice(0, MAX_PROSPECTS);
+    const directEvidenceWeight = input.criteria.reduce((sum, criterion, index) => sum + (!criterion.isKnockout && criterionSignals[index].evidenceStrength === 'DIRECT' && criterionSignals[index].score >= 75 ? criterion.appliedWeight : 0), 0);
+    if (preliminaryScore < MIN_SHORTLIST_SCORE || directEvidenceWeight < MIN_DIRECT_EVIDENCE_WEIGHT) return [];
+    const sourcingFit = preliminaryScore >= 80 && directEvidenceWeight >= 60 ? 'QUALIFIED' as const : 'POSSIBLE' as const;
+    return [{ ...prospect, sources, preliminaryScore, criterionSignals, sourcingFit, geographicFit: 'WITHIN_SCOPE' as const }];
+  });
+  const deduplicated = new Map<string, SourcedProspect>();
+  for (const prospect of screenedProspects) {
+    const profile = prospect.sources.find((source) => /linkedin\.com\/in\//i.test(source.url));
+    const key = canonicalUrl(profile?.url || '') || `${prospect.fullName.trim().toLowerCase()}|${prospect.location.label.trim().toLowerCase()}`;
+    const existing = deduplicated.get(key);
+    if (!existing || prospect.preliminaryScore > existing.preliminaryScore) deduplicated.set(key, prospect);
+  }
+  const prospects = [...deduplicated.values()].sort((a, b) => a.sourcingFit === b.sourcingFit ? b.preliminaryScore - a.preliminaryScore : a.sourcingFit === 'QUALIFIED' ? -1 : 1).slice(0, MAX_PROSPECTS);
   return { ...result, prospects, marketAnalysis: { ...result.marketAnalysis, observedProspects: prospects.length }, modelIdentifier: response.model };
 }
 
