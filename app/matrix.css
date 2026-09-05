@@ -138,7 +138,7 @@
 .upload-queue-item-attention .upload-queue-msg{white-space:normal;overflow-wrap:break-word;flex-shrink:1}
 .upload-operation-progress{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
 .upload-remove-btn{background:none;border:none;color:var(--faint);font-size:14px;line-height:1;padding:0 2px;cursor:pointer;flex-shrink:0}
-.upload-remove-btn:hover{color:var(--red)}
+.upload-remove-btn:hover{background:none;color:var(--red)}
 @media(max-width:1000px){.matrix-row-head{grid-template-columns:72px minmax(140px,1.5fr) 60px repeat(4,minmax(60px,1fr)) 100px;gap:8px;padding-left:12px;padding-right:12px}}
 @media(max-width:860px){.workspace-content:has(.requisition-workspace.candidates-active),.workspace-content:has(.requisition-workspace.requisition-active){height:auto;overflow:visible}.requisition-workspace.candidates-active,.requisition-workspace.requisition-active{height:auto;min-height:0;overflow:visible}.requisition-detail-view:not([hidden]),.requisition-tab-panel,.requisition-tab-panel .job-description-scroll{overflow:visible}.requisition-tab-panel.job-description-panel,.job-description-workspace{display:block}}
 @media(max-width:700px){.matrix-controls{align-items:flex-start;flex-direction:column}.requisition-workspace-tabs button{padding:7px 5px;font-size:10px}}

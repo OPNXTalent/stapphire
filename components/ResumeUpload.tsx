@@ -10,8 +10,6 @@ import { resolveTrackedOperationAuthority } from '@/lib/resumeUploadAuthority';
 import { advancePollTarget, type PollTargetState } from '@/lib/resumeOperationPolling';
 import { dispatchResumeOperationTerminal, resolveTerminalObservation } from '@/lib/resumeTerminalSync';
 import {
-  completedSummary,
-  detailsToggleLabel,
   evaluatingHeading,
   failedLocalItems,
   needsAttentionHeading,
@@ -43,7 +41,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const handedOffStagedRef = useRef<File[] | null>(null);
   const terminalNotificationOperationIdsRef = useRef<Set<string>>(new Set());
-  const { batches, startUpload, dismissBatch, dismissedOperationIds, dismissOperation } = useResumeUploadManager();
+  const { batches, startUpload, dismissBatch, dismissBatchItem, dismissedOperationIds, dismissOperation } = useResumeUploadManager();
   const [staged, setStaged] = useState<File[]>([]);
   const [retrying, setRetrying] = useState(false);
   const localBatches = batches.filter((batch) => batch.requisitionId === requisitionId);
@@ -52,18 +50,6 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const [trackedOperation, setTrackedOperation] = useState<ResumeOperationSummary | null>(null);
   const [knownOperations, setKnownOperations] = useState<ResumeOperationSummary[]>([]);
   const [pollUnavailable, setPollUnavailable] = useState(false);
-  // Purely local, per-operation UI state: whether a completed operation's
-  // filename list is expanded past its collapsed-by-default summary.
-  // Never read by polling/authority/cleanup logic - display-only.
-  const [expandedOperationIds, setExpandedOperationIds] = useState<Set<string>>(new Set());
-  function toggleOperationDetails(operationId: string) {
-    setExpandedOperationIds((current) => {
-      const next = new Set(current);
-      if (next.has(operationId)) next.delete(operationId); else next.add(operationId);
-      return next;
-    });
-  }
-
   // Mirrors currentLocalBatch?.operationId on every render - read by
   // the polling loop below without the loop needing to depend on it
   // (and therefore without tearing the loop down and restarting it
@@ -299,8 +285,8 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
   const localBatchNeedsAttention = Boolean(currentLocalBatch?.phase === 'accepted' && currentBatchHasLocalErrors);
   const visibleLocalBatches = localBatches.filter((batch) =>
     batch === currentLocalBatch
-      ? (localUploading || localBatchNeedsAttention)
-      : batch.phase === 'creating' || batch.phase === 'uploading'
+      ? (localUploading || localBatchNeedsAttention || batch.phase === 'error')
+      : batch.phase === 'creating' || batch.phase === 'uploading' || batch.phase === 'error'
   );
   const localAccepted = currentLocalBatch?.items.filter((item) => item.status === 'accepted').length || 0;
   const localTotal = currentLocalBatch?.items.length || 0;
@@ -324,14 +310,17 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     targetOperationIdRef.current &&
     (!trackedOperation || trackedOperation.id !== targetOperationIdRef.current)
   );
-  // The full operation-progress view (per-item list, Done, Retry) may
+  // The operation-progress view (active items or terminal failures) may
   // only show trackedOperation's data when it's authoritative right
   // now - otherwise a retained, unrelated older operation (e.g. a
   // just-completed prior batch) could keep rendering its own stale
-  // progress/Done button while a brand new, non-matching batch is
+  // progress or failure actions while a brand new, non-matching batch is
   // uploading.
   const showTrackedOperationView = Boolean(
-    trackedOperation && !showCheckingStatus && trackedOperationAuthoritative
+    trackedOperation && !showCheckingStatus && trackedOperationAuthoritative && (
+      isActiveOperation(trackedOperation.status) ||
+      trackedOperation.items.some((item) => item.status === 'failed' || item.status === 'cancelled')
+    )
   );
 
   function dismissProgress() {
@@ -370,18 +359,14 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
     const active = isActiveOperation(operation.status);
     const total = operation.progressTotal || operation.items.length;
     const completed = operation.items.filter((item) => item.status === 'completed').length;
-    const failed = operation.items.filter((item) => item.status === 'failed');
+    const failed = operation.items.filter((item) => item.status === 'failed' || item.status === 'cancelled');
     const retryable = failed.some((item) => item.retryable);
-    const expanded = expandedOperationIds.has(operation.id);
-    const showQueue = active || expanded;
+    const visibleItems = active ? operation.items : failed;
     return <div className="upload-operation-progress" aria-live="polite" key={operation.id}>
       {active
         ? <StapphireProcessing className="processing-compact" title={evaluatingHeading(total)} detail={progressLabel(completed, total)}/>
-        : <p className="upload-summary">{completedSummary(completed, failed.length)}</p>}
-      {!active && <button type="button" className="upload-retry-action" aria-expanded={expanded} onClick={() => toggleOperationDetails(operation.id)}>
-        {detailsToggleLabel(expanded)}
-      </button>}
-      {showQueue && <ul className="upload-queue">{operation.items.map((item) => {
+        : <p className="upload-summary">{needsAttentionHeading(failed.length)}</p>}
+      {visibleItems.length > 0 && <ul className="upload-queue">{visibleItems.map((item) => {
         const presentation = itemPresentation(item.status);
         return <li key={item.id} className={`upload-queue-item ${presentation.className}`}>
           <span className="upload-queue-icon" aria-hidden="true">{presentation.icon}</span>
@@ -391,7 +376,7 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
         </li>;
       })}</ul>}
       {!active && <div className="upload-complete">
-        <button type="button" className="upload-go-btn" onClick={options.onDismiss}>Done</button>
+        <button type="button" className="upload-retry-action" onClick={options.onDismiss}>Dismiss</button>
         {options.onRetry && retryable && <button type="button" className="upload-retry-action" onClick={options.onRetry} disabled={retrying}>{retrying ? 'Retrying…' : 'Retry'}</button>}
       </div>}
     </div>;
@@ -428,7 +413,9 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
         // Once settled, only what failed still needs the user's
         // attention here - a successfully uploaded résumé's own progress
         // is already, and only, communicated by the evaluation section.
-        const attentionItems = failedLocalItems(batch.items);
+        const attentionItems = batch.phase === 'error'
+          ? batch.items.map((item) => ({ ...item, status: 'error' as const, error: batch.error || 'We could not start this upload. Please try again.' }))
+          : failedLocalItems(batch.items);
         return <div className="upload-durable-boundary" key={batch.clientBatchKey}>
           <p className="upload-summary">{needsAttentionHeading(attentionItems.length)}</p>
           <ul className="upload-queue">{attentionItems.map((item) => <li key={item.id} className="upload-queue-item upload-queue-error upload-queue-item-attention">
@@ -438,8 +425,8 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
               <span className="upload-queue-name">{item.filename}</span>
               {item.error && <span className="upload-queue-msg">{item.error}</span>}
             </span>
+            <button type="button" className="upload-remove-btn" onClick={() => dismissBatchItem(batch.clientBatchKey, item.id)} aria-label={`Dismiss ${item.filename} upload error`}>×</button>
           </li>)}</ul>
-          <button type="button" className="upload-go-btn" onClick={() => dismissBatch(batch.clientBatchKey)}>Dismiss</button>
         </div>;
       })}
 
@@ -458,7 +445,12 @@ export function ResumeUpload({ requisitionId }: { requisitionId: string }) {
 
       {showTrackedOperationView && trackedOperation && renderOperationCard(trackedOperation, { onDismiss: dismissProgress, onRetry: retryFailed })}
 
-      {knownOperations.filter((operation) => operation.id !== trackedOperation?.id).map((operation) =>
+      {knownOperations.filter((operation) =>
+        operation.id !== trackedOperation?.id && (
+          isActiveOperation(operation.status) ||
+          operation.items.some((item) => item.status === 'failed' || item.status === 'cancelled')
+        )
+      ).map((operation) =>
         renderOperationCard(operation, { onDismiss: () => dismissKnownOperation(operation) })
       )}
 

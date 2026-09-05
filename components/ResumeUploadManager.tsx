@@ -17,6 +17,7 @@ type UploadManagerValue = {
   batches: LocalUploadBatch[];
   startUpload(requisitionId: string, files: File[]): Promise<void>;
   dismissBatch(clientBatchKey: string): void;
+  dismissBatchItem(clientBatchKey: string, itemId: string): void;
   dismissedOperationIds: ReadonlySet<string>;
   dismissOperation(operationId: string): void;
 };
@@ -113,6 +114,14 @@ export function ResumeUploadManagerProvider({ children }: { children: ReactNode 
     batches,
     startUpload,
     dismissBatch: (clientBatchKey) => setBatches((current) => current.filter((batch) => batch.clientBatchKey !== clientBatchKey)),
+    dismissBatchItem: (clientBatchKey, itemId) => setBatches((current) => current.flatMap((batch) => {
+      if (batch.clientBatchKey !== clientBatchKey) return [batch];
+      const items = batch.items.filter((item) => item.id !== itemId);
+      const stillNeedsAttention = batch.phase === 'error'
+        ? items.length > 0
+        : items.some((item) => item.status === 'error');
+      return stillNeedsAttention ? [{ ...batch, items }] : [];
+    })),
     dismissedOperationIds,
     dismissOperation: (operationId) => setDismissedOperationIds((current) =>
       addDismissedResumeOperationId(current, operationId, browserStorage())
