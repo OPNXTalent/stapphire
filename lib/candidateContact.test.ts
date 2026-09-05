@@ -14,6 +14,16 @@ test('extracts and normalizes candidate contact details from resume text', () =>
   });
 });
 
+test('extracts a parenthesized phone after a bullet in an actual resume header layout', () => {
+  const contact = extractCandidateContact('KISHA BOYER\nPELHAM, AL • (205) 555-0199 • person@example.com');
+  assert.equal(contact.primaryPhoneDisplay, '(205) 555-0199');
+  assert.equal(contact.primaryPhoneE164, '+12055550199');
+});
+
+test('does not pull ten digits out of a longer identifier', () => {
+  assert.equal(extractCandidateContact('Applicant ID 123456789012').primaryPhoneE164, null);
+});
+
 test('rejects unsafe or non-profile LinkedIn links', () => {
   assert.equal(normalizeLinkedInProfileUrl('http://linkedin.com/in/example'), null);
   assert.equal(normalizeLinkedInProfileUrl('https://evil.example/linkedin.com/in/example'), null);

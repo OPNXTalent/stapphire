@@ -61,7 +61,7 @@ function normalizePhone(value: unknown): Pick<CandidateContact, 'primaryPhoneDis
 
 export function extractCandidateContact(resumeText: string): CandidateContact {
   const emailMatch = resumeText.match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/i)?.[0] ?? null;
-  const phoneMatch = resumeText.match(/\b(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?:\s*(?:ext\.?|x)\s*\d{1,6})?\b/i)?.[0] ?? null;
+  const phoneMatch = resumeText.match(/(?<!\d)(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?:\s*(?:ext\.?|x)\s*\d{1,6})?(?!\d)/i)?.[0] ?? null;
   const linkedinMatch = resumeText.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/[a-z0-9%_-]+\/?(?:\?[^\s]*)?/i)?.[0] ?? null;
   return {
     primaryEmail: validEmail(emailMatch),
