@@ -14,6 +14,7 @@ import {
   type SourcingGate
 } from './prospectSourcing';
 import { supabaseAdmin } from './supabaseAdmin';
+import { observedScarcityLevel } from './prospectMarketRead';
 
 const TARGET_SHORTLIST = 8;
 const SCREEN_BATCH_SIZE = 2;
@@ -79,14 +80,7 @@ async function updateSearch(searchId: string, leaseToken: string, values: Record
 async function finishSearch(search: SearchRow, leaseToken: string, progress: PipelineProgress) {
   const strategy = search.search_strategy;
   const existingMarket = strategy.marketAnalysis;
-  const clearanceRate = progress.reviewed > 0 ? progress.qualified / progress.reviewed : 0;
-  const observedScarcity = progress.reviewed >= 8 && progress.qualified === 0
-    ? 'UNICORN'
-    : progress.reviewed >= 12 && (progress.qualified <= 2 || clearanceRate < 0.15)
-      ? 'SCARCE'
-      : progress.qualified >= TARGET_SHORTLIST && progress.completedTracks <= 2
-        ? 'BROAD'
-        : 'COMPETITIVE';
+  const observedScarcity = observedScarcityLevel(progress, existingMarket?.scarcityLevel || 'COMPETITIVE', true);
   const marketAnalysis = existingMarket ? {
     ...existingMarket,
     scarcityLevel: observedScarcity,

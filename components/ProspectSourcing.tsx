@@ -6,6 +6,7 @@ import {
   PROSPECT_SEARCHES_CHANGED_EVENT,
   type ProspectSearchFocusDetail
 } from '@/lib/prospectSearchEvents';
+import { observedScarcityLevel, provisionalUnicornSummary, type ProspectScarcityLevel } from '@/lib/prospectMarketRead';
 import styles from './ProspectSourcing.module.css';
 
 type Criterion = { id: string; label: string; weight: number; isKnockout: boolean };
@@ -204,6 +205,14 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
   const prospects = (payload?.search?.prospects || []).filter((prospect) => Boolean(prospect.evaluation) || prospect.preliminary_score >= 70);
   const canSource = Boolean(payload?.criteriaApplied || payload?.criteriaReadyToApply);
   const legacyScreening = Boolean(payload?.search && payload.search.search_strategy?.config?.screeningVersion !== 'evidence_v2');
+  const storedMarket = payload?.search?.search_strategy?.marketAnalysis;
+  const displayedScarcity = payload?.search && storedMarket
+    ? observedScarcityLevel(payload.search.progress, storedMarket.scarcityLevel as ProspectScarcityLevel, payload.search.status === 'completed')
+    : null;
+  const liveUnicorn = Boolean(payload?.search && storedMarket && payload.search.status !== 'completed' && displayedScarcity === 'UNICORN' && storedMarket.scarcityLevel !== 'UNICORN');
+  const marketSummary = liveUnicorn && payload?.search
+    ? provisionalUnicornSummary(payload.search.progress.reviewed || 0, Math.max(0, (payload.search.progress.discovered || 0) - (payload.search.progress.reviewed || 0)))
+    : storedMarket?.summary;
 
   return (
     <section className={styles.shell} aria-labelledby="prospect-sourcing-title">
@@ -270,10 +279,10 @@ export function ProspectSourcing({ requisitionId }: { requisitionId: string }) {
         </details>
       )}
 
-      {payload?.search?.search_strategy?.marketAnalysis && <section className={styles.market}>
-        <div><span>Talent Market Read</span><strong>{payload.search.search_strategy.marketAnalysis.scarcityLevel}</strong><small>{payload.search.search_strategy.marketAnalysis.confidence} confidence</small></div>
-        <p>{payload.search.search_strategy.marketAnalysis.summary}</p>
-        <details><summary>Why—and what could widen the pool</summary><div className={styles.marketGrid}><section><h4>Constraint drivers</h4><ul>{payload.search.search_strategy.marketAnalysis.constraintDrivers.map((item: { constraint: string; explanation: string }) => <li key={item.constraint}><strong>{item.constraint}</strong> — {item.explanation}</li>)}</ul></section><section><h4>Relaxation levers</h4><ul>{payload.search.search_strategy.marketAnalysis.relaxationLevers.map((item: { change: string; likelyEffect: string }) => <li key={item.change}><strong>{item.change}</strong> — {item.likelyEffect}</li>)}</ul></section></div></details>
+      {storedMarket && displayedScarcity && <section className={styles.market}>
+        <div><span>Talent Market Read</span><strong>{displayedScarcity}</strong><small>{liveUnicorn ? `PROVISIONAL · ${payload?.search?.progress.coverageConfidence || 'MODERATE'} confidence` : `${storedMarket.confidence} confidence`}</small></div>
+        <p>{marketSummary}</p>
+        <details><summary>Why—and what could widen the pool</summary><div className={styles.marketGrid}><section><h4>Constraint drivers</h4><ul>{storedMarket.constraintDrivers.map((item: { constraint: string; explanation: string }) => <li key={item.constraint}><strong>{item.constraint}</strong> — {item.explanation}</li>)}</ul></section><section><h4>Relaxation levers</h4><ul>{storedMarket.relaxationLevers.map((item: { change: string; likelyEffect: string }) => <li key={item.change}><strong>{item.change}</strong> — {item.likelyEffect}</li>)}</ul></section></div></details>
       </section>}
 
       {prospects.length > 0 ? (

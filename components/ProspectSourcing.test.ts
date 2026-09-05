@@ -17,6 +17,7 @@ const sharedTeamwork = readFileSync(join(directory, 'SharedTeamworkWorkspace.tsx
 const sourcingOperation = readFileSync(join(directory, '..', 'lib', 'prospectSearchOperation.ts'), 'utf8');
 const queueRoute = readFileSync(join(directory, '..', 'app', 'api', 'queues', 'prospect-search', 'route.ts'), 'utf8');
 const queue = readFileSync(join(directory, '..', 'lib', 'operationQueue.ts'), 'utf8');
+const marketRead = readFileSync(join(directory, '..', 'lib', 'prospectMarketRead.ts'), 'utf8');
 
 test('locked shortlist exposes name, location, sourcing fit, score, and explicit QC action', () => {
   assert.match(component, /<strong>\{prospect\.full_name\}<\/strong>/);
@@ -165,6 +166,15 @@ test('search coverage remains visible after a sourcing run completes', () => {
   assert.match(component, /payload\.search\.status === 'completed' \? 'Search coverage'/);
   assert.doesNotMatch(component, /\['queued', 'processing'\]\.includes\(payload\.search\.status\) && <section className=\{styles\.pipeline\}/);
   assert.match(component, /confidence based on the completed evidence funnel/);
+});
+
+test('UNICORN sits above Competitive and is driven by observed funnel evidence before final screening ends', () => {
+  assert.match(marketRead, /return 'UNICORN'/);
+  assert.match(marketRead, /allPathsComplete && reviewed >= 16/);
+  assert.match(component, /observedScarcityLevel\(payload\.search\.progress/);
+  assert.match(component, /displayedScarcity === 'UNICORN'/);
+  assert.match(component, /provisionalUnicornSummary/);
+  assert.match(sourcingOperation, /observedScarcityLevel\(progress, existingMarket\?\.scarcityLevel \|\| 'COMPETITIVE', true\)/);
 });
 
 test('evaluation trusts the already-verified shortlist sources as well as newly verified research', () => {
