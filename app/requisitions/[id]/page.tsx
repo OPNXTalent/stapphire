@@ -6,6 +6,7 @@ import { HiringCriteria } from '@/components/HiringCriteria';
 import { InterviewPlan } from '@/components/InterviewPlan';
 import { ProspectSourcing } from '@/components/ProspectSourcing';
 import { getHiringCriteriaModel } from '@/lib/hiringCriteria';
+import { resolveCandidateContact } from '@/lib/candidateContact';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
@@ -109,7 +110,7 @@ export default async function RequisitionPage({ params }: { params: { id: string
   ] = await Promise.all([
     supabaseAdmin
       .from('phase1_candidates')
-      .select('id,full_name,source_filename,source_storage_path,disposition,rank_order,created_at,phase1_evaluations!phase1_evaluations_candidate_id_fkey(overall_match,job_responsibilities_score,hard_skills_score,soft_skills_score,keyword_terminology_score,assessment,evaluation_basis_id,created_at)')
+      .select('id,full_name,source_filename,source_storage_path,resume_text,primary_email,primary_phone_display,primary_phone_e164,linkedin_profile_url,disposition,rank_order,created_at,phase1_evaluations!phase1_evaluations_candidate_id_fkey(overall_match,job_responsibilities_score,hard_skills_score,soft_skills_score,keyword_terminology_score,assessment,evaluation_basis_id,created_at)')
       .eq('requisition_id', params.id)
       .is('deleted_at', null)
       .order('created_at', { ascending: false }),
@@ -138,6 +139,12 @@ export default async function RequisitionPage({ params }: { params: { id: string
     const evaluation = evaluations[0];
     const assessment = evaluation?.assessment ?? null;
     const interviewAggregate = interviewAggregates.get(candidate.id) ?? { score: null, submitted: 0 };
+    const contact = resolveCandidateContact({
+      primaryEmail: candidate.primary_email,
+      primaryPhoneDisplay: candidate.primary_phone_display,
+      primaryPhoneE164: candidate.primary_phone_e164,
+      linkedinProfileUrl: candidate.linkedin_profile_url
+    }, String(candidate.resume_text || ''));
 
     return {
       id: candidate.id,
@@ -159,7 +166,8 @@ export default async function RequisitionPage({ params }: { params: { id: string
         ? candidate.disposition as Disposition
         : null,
       interviewScore: interviewAggregate.score,
-      interviewSubmitted: interviewAggregate.submitted
+      interviewSubmitted: interviewAggregate.submitted,
+      contact
     };
   });
 

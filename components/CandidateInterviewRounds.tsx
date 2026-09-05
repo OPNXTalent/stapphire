@@ -7,6 +7,7 @@ import { ClientPrintFrame, type ClientPrintBranding } from '@/components/ClientP
 import { summarizeInterviewDecision, type InterviewRecommendation } from '@/lib/interviewDecision';
 import { phoneScreenResponseLabel, summarizePhoneScreenRecommendation, summarizePhoneScreenResponses } from '@/lib/phoneScreenResults';
 import styles from './CandidateInterviewRounds.module.css';
+import type { CandidateContact } from '@/lib/candidateContact';
 
 type ViewId = 'evaluation' | string | null;
 type InvitationCount = { participants: number; submitted: number };
@@ -82,12 +83,14 @@ export function CandidateInterviewRounds({
   candidateId,
   candidateName,
   positionTitle,
-  evaluationContent
+  evaluationContent,
+  contact
 }: {
   candidateId: string;
   candidateName: string;
   positionTitle: string;
   evaluationContent: ReactNode;
+  contact: CandidateContact;
 }) {
   const [view, setView] = useState<ViewId>(null);
   const [invitationCounts, setInvitationCounts] = useState<Record<string, InvitationCount>>({});
@@ -240,12 +243,33 @@ export function CandidateInterviewRounds({
     );
   }
 
+  function renderEvaluationBar(selected = false) {
+    const hasContact = Boolean(contact.primaryEmail || (contact.primaryPhoneDisplay && contact.primaryPhoneE164) || contact.linkedinProfileUrl);
+    return (
+      <div className={`${styles.bar} ${styles.evaluationBar} ${selected ? styles.selectedBar : ''}`}>
+        <button
+          type="button"
+          className={styles.evaluationToggle}
+          onClick={() => setView(selected ? null : 'evaluation')}
+          aria-expanded={selected}
+        >
+          Evaluation
+        </button>
+        {hasContact && (
+          <span className={styles.contact} aria-label="Candidate contact information">
+            {contact.primaryEmail && <a href={`mailto:${contact.primaryEmail}`}>Email: {contact.primaryEmail}</a>}
+            {contact.primaryPhoneDisplay && contact.primaryPhoneE164 && <a href={`tel:${contact.primaryPhoneE164}`}>Phone: {contact.primaryPhoneDisplay}</a>}
+            {contact.linkedinProfileUrl && <a href={contact.linkedinProfileUrl} target="_blank" rel="noopener noreferrer">LinkedIn</a>}
+          </span>
+        )}
+      </div>
+    );
+  }
+
   if (view === null) {
     return (
       <section className={styles.records} aria-label={`${candidateName} candidate record`}>
-        <button type="button" className={styles.bar} onClick={() => setView('evaluation')}>
-          <span>Evaluation</span>
-        </button>
+        {renderEvaluationBar()}
         <p className={styles.interviewHelper}>
           Click an interview name to open the evaluation form and share it with participants. Once results come in, click the bar to expand and view them.
         </p>
@@ -259,9 +283,7 @@ export function CandidateInterviewRounds({
     const branding = printBranding.defaultBranding;
     return (
       <section className={styles.records}>
-        <button type="button" className={`${styles.bar} ${styles.selectedBar}`} onClick={() => setView(null)} aria-expanded="true">
-          <span>Evaluation</span>
-        </button>
+        {renderEvaluationBar(true)}
         <div className="candidate-record-actions">
           <button type="button" className="candidate-record-print-action" onClick={() => printStapphireDocument('candidate-evaluation')}>Print</button>
         </div>

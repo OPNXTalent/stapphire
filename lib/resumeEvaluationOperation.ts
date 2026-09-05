@@ -8,6 +8,7 @@ import { normalizeHiringCriteriaError } from './hiringCriteriaError';
 import { isRetryableHiringCriteriaError } from './operationTypes';
 import { classifyNullClaim } from './resumeLeaseClassification';
 import { operationQueue } from './operationQueue';
+import { CONTACT_EXTRACTION_VERSION, extractCandidateContact } from './candidateContact';
 
 const RESUME_BUCKET = 'candidate-resumes';
 const MAX_ATTEMPTS = 3;
@@ -210,8 +211,25 @@ export async function processResumeEvaluationOperationItem(itemId: string): Prom
         p_prompt_schema_version: result.neutralFindingsPersistence.promptSchemaVersion
       } : {})
     };
-    const { error: completionError } = await supabaseAdmin.rpc(completionRpc, completionArguments);
+    const { data: completionData, error: completionError } = await supabaseAdmin.rpc(completionRpc, completionArguments);
     if (completionError) throw completionError;
+    const completedCandidateId = completionData && typeof completionData === 'object' && typeof completionData.candidateId === 'string'
+      ? completionData.candidateId
+      : null;
+    if (completedCandidateId) {
+      const contact = extractCandidateContact(resumeText);
+      const { error: contactError } = await supabaseAdmin
+        .from('phase1_candidates')
+        .update({
+          primary_email: contact.primaryEmail,
+          primary_phone_display: contact.primaryPhoneDisplay,
+          primary_phone_e164: contact.primaryPhoneE164,
+          linkedin_profile_url: contact.linkedinProfileUrl,
+          contact_extraction_version: CONTACT_EXTRACTION_VERSION
+        })
+        .eq('id', completedCandidateId);
+      if (contactError) console.error('Candidate contact persistence failed', { candidateId: completedCandidateId, error: contactError.message });
+    }
     console.info('Resume evaluation item completed', { operationId: item.operationId, operationItemId: item.id, requisitionId: item.requisitionId });
     await reconcileQueuedResumeCapacity();
   } catch (error) {

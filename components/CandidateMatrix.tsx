@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { CandidateReport } from '@/components/CandidateReport';
 import { CandidateDetailActions } from '@/components/CandidateDetailActions';
 import { CandidateInterviewRounds } from '@/components/CandidateInterviewRounds';
+import type { CandidateContact } from '@/lib/candidateContact';
 
 export type Disposition = 'screen' | 'interview' | 'hire' | 'delete';
 
@@ -27,6 +28,7 @@ export type MatrixCandidate = {
   disposition: Disposition | null;
   interviewScore: number | null;
   interviewSubmitted: number;
+  contact: CandidateContact;
 };
 
 const DISPOSITION_LABEL: Record<Disposition, string> = {
@@ -333,6 +335,7 @@ export function CandidateMatrix({ candidates, positionTitle, requisitionId, head
                         evaluationDate={expandedCandidate.evaluationDate}
                       />
                     }
+                    contact={expandedCandidate.contact}
                   />
                 ) : (
                   <p className="muted">No evaluation available for this candidate yet.</p>
