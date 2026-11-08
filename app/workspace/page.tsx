@@ -24,7 +24,7 @@ export default async function RecruiterWorkspace() {
           <h1>Recruiting, in one place.</h1>
           <p>Work your requisitions and open the tools you already use—without losing context.</p>
         </div>
-        <Link className={styles.primary} href="/requisitions/new">+ New requisition</Link>
+        <Link className={styles.primary} href="/">View existing home</Link>
       </div>
 
       <div className={styles.metrics}>
